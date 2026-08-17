@@ -1,0 +1,22 @@
+# The following packages are provided in the competition
+# NOTE: changing these will *not* affect the competition runtime environment
+# To have packages for local development, use requirements.dev.txt
+pandas>=2.3.0
+plotly>=6.7.0
+pydantic-settings>=2.14.1
+structlog>=25.5.0
+requests>=2.34.2
+joblib>=1.5.3
+fastparquet>=2026.5.0
+pyarrow>=24.0.0
+tqdm>=4.67.3
+scikit-learn>=1.7.0
+huggingface_hub>=1.25.1
+batteryswap_public>=0.1.0
+scipy>=1.15.0
+numpy>=2.2.0
+statsmodels>=0.14.0
+polars>=1.43.0
+ortools>=9.15.0
+lifelines>=0.30.0
+torch>=2.13.0
