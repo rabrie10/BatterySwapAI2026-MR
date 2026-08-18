@@ -9,6 +9,9 @@ solution.
 - [Task 2 Planner Reference](TASK2_PLANNER_REFERENCE.md): the practical
   interface, cost model, validation rules, and implementation notes for the
   work-order planning task.
+- [Task 2 Implementation Guide](TASK2_IMPLEMENTATION.md): the implemented
+  architecture, Task 1 API contract, optimization model, configuration,
+  verification workflow, benchmark, and competition tuning protocol.
 - [Submission Checklist](SUBMISSION_CHECKLIST.md): pre-submit checks for local
   testing, reproducibility, Git history, licensing, and final submission.
 - [Solution Design Spec](SOLUTION_DESIGN_SPEC.md): our technical design spec for

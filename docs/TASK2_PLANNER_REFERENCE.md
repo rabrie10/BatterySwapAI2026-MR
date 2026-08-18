@@ -2,6 +2,15 @@
 
 Status: working reference, last updated 2026-08-18.
 
+Implementation status: the production planner now lives in
+`batteryswap_solution/` and is wired into `script.py`. A 12-scenario train-only
+oracle regression on 2026-08-18 averaged `77.83` total cost versus `4885.46`
+for all-defer and `205.24` for the earlier simple oracle baseline. It had zero
+daily-limit, weekly-limit, and late-swap cost, with 11.73 seconds mean planner
+runtime per scenario. This is a Task 2 engineering ceiling, not a claim about
+public/private performance; final score still depends on calibrated out-of-fold
+Task 1 forecasts satisfying the v1 contract.
+
 This document is the Task 2-focused reference for building the work-order
 planner. It translates the official challenge rules into implementation
 requirements and optimization priorities.
