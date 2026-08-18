@@ -45,7 +45,12 @@ from sklearn.linear_model import LogisticRegression
 from batteryswap_solution.forecast import CONTRACT_VERSION, ForecastMetadata, RiskForecast
 
 from .cutoffs import assign_building_folds, build_example_table
-from .features import build_feature_series, leave_one_out_building_features, lookup_asof
+from .features import (
+    build_daily_panels,
+    build_feature_series,
+    compute_features_asof,
+    leave_one_out_building_features,
+)
 
 MODEL_VERSION = "task1-aft-survival-blended/v1"
 
@@ -335,15 +340,19 @@ class Task1Forecaster:
         battery_ids = loc[id_column].tolist()
         loc_indexed = loc.set_index(id_column, drop=False)
 
-        feature_series = build_feature_series(battery_data)
+        # Inference needs exactly one row per battery ("as of" this scenario's
+        # origin), not the full per-date rolling series build_feature_series
+        # computes for training's many-cutoff-per-device reuse. Using the
+        # single-date path here cut per-scenario feature computation from
+        # ~40s to well under a second (see docs/TASK1_IMPLEMENTATION.md Sec 7).
+        panels = build_daily_panels(battery_data)
         rows = []
         for battery_id in battery_ids:
-            series = feature_series.get(battery_id, pd.DataFrame())
+            panel = panels.get(battery_id, pd.DataFrame())
             start_time = pd.Timestamp(loc_indexed.loc[battery_id, "start_time"])
             if start_time.tzinfo is not None:
                 start_time = start_time.tz_localize(None)
-            first_seen = series.index[0] if not series.empty else start_time
-            features = lookup_asof(series, origin, first_seen=first_seen)
+            features = compute_features_asof(panel, origin)
             row = {
                 "device_id": battery_id,
                 "building_id": str(loc_indexed.loc[battery_id, building_column]),

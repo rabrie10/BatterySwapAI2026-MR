@@ -408,6 +408,23 @@ private split.
   split, and the sole signal for genuinely cold-start batteries), but this is
   a different balance than Sec 1's original design intent, and is worth
   revisiting if a future data release brings more physical events.
+- **Full-run wall-clock time is still a live risk for the actual
+  public+private submission**, not just a train-split curiosity. A precisely
+  timed full run of `script.py` on all 48 train scenarios took **19.91
+  minutes** (`Measure-Command`, 2026-08-19), after the Sec 7 feature-path fix
+  (down from ~24.5 minutes before it). That is already close to the "target
+  at most 20 minutes" safety margin `docs/SOLUTION_DESIGN_SPEC.md` Sec 11 sets
+  for the *whole* run under the competition's 30-minute hard limit — and the
+  real submission evaluates train-sized public *and* private splits together,
+  not train alone. If public+private combined have a scenario count anywhere
+  near 2x train's 48, total runtime would land around ~40 minutes and likely
+  fail outright. Per-scenario cost is now dominated by Task 2's CP-SAT +
+  local search (`batteryswap_solution/planner.py`), not Task 1's forecast
+  call (see Sec 7), so closing this gap further means tuning
+  `PlannerConfig`/`OptimizationConfig` (`BATTERYSWAP_SOLVER_SECONDS`,
+  `BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS`, etc.) — outside Task 1's scope and
+  not done here pending explicit sign-off, since it trades plan quality for
+  speed.
 
 ## 7. Runtime and packaging
 
@@ -419,7 +436,17 @@ private split.
   `predict_survival_function` call per scenario across all active batteries
   and all needed day offsets (curve horizon + tail-integration grid, capped
   at 220 extra points) — not a per-battery loop — so it stays well inside the
-  per-scenario budget the Task 2 planner already operates under.
+  per-scenario budget the Task 2 planner already operates under. Feature
+  extraction for that call uses `features.compute_features_asof`, which
+  computes exactly one row per device directly (O(largest rolling window)),
+  not `features.build_feature_series`'s full per-date rolling history
+  (O(entire device history), correct and necessary for training's
+  many-cutoffs-per-device reuse, but wasted work at inference where only one
+  date is ever needed). This was a measured, real bug, not a hypothetical
+  one: before the fix, `predict()` alone took **~40-45s for a single
+  scenario** (profiled directly, not estimated) — comparable to or larger
+  than the entire rest of that scenario's planning time combined. See Sec 6
+  for the resulting full-run timing and the risk that remains.
 - The artifact is a single `pickle`-serialized `Task1Forecaster` dataclass
   (`model_family`, `penalizer`, fitted `lifelines` AFT model, feature
   transform statistics, Platt calibrator parameters) with no external file

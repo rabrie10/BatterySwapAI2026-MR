@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.claude/
+data/
+dataset/
+notebooks/
+outputs/
+tests/
+docs/
+planners/
+submission.csv

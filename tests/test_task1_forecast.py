@@ -14,7 +14,10 @@ from src.risk.cutoffs import (
     terminal_times,
 )
 from src.risk.features import (
+    build_daily_panels,
     build_feature_series,
+    compute_features_asof,
+    compute_rolling_features,
     leave_one_out_building_features,
     lookup_asof,
 )
@@ -78,6 +81,71 @@ class FeatureCausalityTests(unittest.TestCase):
         row = lookup_asof(series, pd.Timestamp("2024-01-01"))
         self.assertTrue(all(pd.isna(v) for k, v in row.items() if k not in ("history_days_available", "n_readings_total")))
         self.assertEqual(row["n_readings_total"], 0.0)
+
+
+class FastAsofFeaturePathEquivalenceTests(unittest.TestCase):
+    """compute_features_asof (inference, one date) must match
+    build_feature_series + lookup_asof (training, full series) exactly.
+
+    This is a regression test for a real bug found while profiling: the
+    inference path originally reused the training path, which recomputes the
+    *entire* rolling-feature history for every device on every predict()
+    call -- a measured ~40s/scenario bottleneck (see
+    docs/TASK1_IMPLEMENTATION.md Sec 7). compute_features_asof fixes that by
+    computing only the single requested date directly, but must produce
+    identical features -- wrong risk scores from a "fast" path would be worse
+    than the slow path it replaced.
+    """
+
+    def _assert_matches(self, panel: pd.DataFrame, as_of: pd.Timestamp) -> None:
+        old_row = lookup_asof(compute_rolling_features(panel), as_of)
+        new_row = compute_features_asof(panel, as_of)
+        self.assertEqual(set(old_row), set(new_row))
+        for key, old_value in old_row.items():
+            new_value = new_row[key]
+            if pd.isna(old_value) and pd.isna(new_value):
+                continue
+            self.assertFalse(pd.isna(old_value) != pd.isna(new_value), msg=f"{key}: {old_value} vs {new_value}")
+            if pd.isna(old_value):
+                continue
+            self.assertAlmostEqual(old_value, new_value, places=3, msg=key)
+
+    def test_clean_decline_matches(self):
+        n = 200
+        voltage = 3.1 - 0.003 * np.arange(n) + np.sin(np.arange(n) / 5.0) * 0.01
+        panel = build_daily_panels(
+            _synthetic_readings("d_clean", pd.Timestamp("2024-01-01"), n, voltage)
+        )["d_clean"]
+        self._assert_matches(panel, pd.Timestamp("2024-01-01") + pd.Timedelta(days=150))
+
+    def test_flat_plateau_matches(self):
+        n = 200
+        voltage = np.full(n, 2.55)
+        panel = build_daily_panels(
+            _synthetic_readings("d_flat", pd.Timestamp("2024-01-01"), n, voltage)
+        )["d_flat"]
+        self._assert_matches(panel, pd.Timestamp("2024-01-01") + pd.Timedelta(days=150))
+
+    def test_insufficient_data_gives_nan_crossing_days_in_both_paths(self):
+        # Single reading: not enough points for any slope window (n < 2), so
+        # crossing_days_extrapolated must be NaN in both paths, not silently
+        # treated as "zero decline" by the fast path.
+        panel = build_daily_panels(
+            _synthetic_readings("d_one", pd.Timestamp("2024-01-01"), 1, np.array([2.9]))
+        )["d_one"]
+        as_of = pd.Timestamp("2024-01-01")
+        old_row = lookup_asof(compute_rolling_features(panel), as_of)
+        new_row = compute_features_asof(panel, as_of)
+        self.assertTrue(pd.isna(old_row["crossing_days_extrapolated"]))
+        self.assertTrue(pd.isna(new_row["crossing_days_extrapolated"]))
+
+    def test_gappy_data_matches(self):
+        n = 60
+        voltage = 3.0 - 0.004 * np.arange(n)
+        frame = _synthetic_readings("d_gap", pd.Timestamp("2024-01-01"), n, voltage)
+        frame = frame[~frame["end_time"].between("2024-01-20", "2024-01-30")]
+        panel = build_daily_panels(frame)["d_gap"]
+        self._assert_matches(panel, pd.Timestamp("2024-02-15"))
 
 
 class LeaveOneOutTests(unittest.TestCase):

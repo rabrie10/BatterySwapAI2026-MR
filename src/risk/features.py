@@ -206,6 +206,112 @@ def lookup_asof(
     return result
 
 
+def compute_features_asof(panel: pd.DataFrame, as_of: pd.Timestamp) -> dict[str, float]:
+    """Same feature schema as ``compute_rolling_features`` + ``lookup_asof``,
+    computed directly for exactly one as-of date, without materializing the
+    full per-date rolling series.
+
+    ``build_feature_series``/``lookup_asof`` exist for training, where the
+    full per-date series is genuinely reused across many cutoffs per device.
+    At inference (``Task1Forecaster.predict()``), only one row per device is
+    ever needed per scenario call; computing the full series there too is
+    O(entire device history) of wasted rolling-window work per battery per
+    scenario. This function is O(largest window) instead — the fix for a
+    measured ~40s-per-scenario feature-computation bottleneck (see
+    docs/TASK1_IMPLEMENTATION.md Sec 7).
+    """
+
+    result: dict[str, float] = {column: np.nan for column in INDIVIDUAL_FEATURE_COLUMNS}
+    as_of = pd.Timestamp(as_of).normalize()
+    if panel.empty:
+        result["history_days_available"] = 0.0
+        result["n_readings_total"] = 0.0
+        return result
+
+    position = int(panel.index.searchsorted(as_of, side="right")) - 1
+    if position < 0:
+        result["history_days_available"] = 0.0
+        result["n_readings_total"] = 0.0
+        return result
+
+    alive = panel.iloc[: position + 1]
+    last_date = alive.index[-1]
+
+    # Cheap O(n) vectorized passes over the full alive history (diff/epoch
+    # conversion), so a window's boundary row still gets its true gap to the
+    # row just before it even when that prior row falls outside the window.
+    # Only the per-window aggregation below is restricted to the window's
+    # rows, which is the part that was previously O(window) per historical
+    # date instead of O(window) once.
+    age_from_last = (last_date - alive.index).days.to_numpy(dtype=float)
+    gap_days_full = alive.index.to_series().diff().dt.days.fillna(0.0).to_numpy(dtype=float)
+    epoch_days_full = (alive.index - pd.Timestamp("2000-01-01")).days.to_numpy(dtype=float)
+    voltage_full = alive["voltage"].to_numpy(dtype=float)
+    temperature_full = alive["temperature"].to_numpy(dtype=float)
+
+    max_window = max(ROLLING_WINDOWS_DAYS)
+    keep = age_from_last < max_window
+    age = age_from_last[keep]
+    gap_days = gap_days_full[keep]
+    epoch_days = epoch_days_full[keep]
+    voltage = voltage_full[keep]
+    temperature = temperature_full[keep]
+
+    result["latest_voltage"] = float(voltage_full[-1])
+    result["latest_temperature"] = float(temperature_full[-1])
+    result["distance_to_threshold"] = result["latest_voltage"] - EOL_VOLTAGE
+
+    for window_days in ROLLING_WINDOWS_DAYS:
+        mask = age < window_days  # matches pandas '{n}D' rolling: right-closed (last-n, last]
+        w_v = voltage[mask]
+        w_t = temperature[mask]
+        w_gap = gap_days[mask]
+        count = w_v.size
+        result[f"n_readings_{window_days}d"] = float(count)
+        result[f"completeness_{window_days}d"] = min(count / float(window_days), 1.0)
+        if count:
+            result[f"voltage_mean_{window_days}d"] = float(w_v.mean())
+            result[f"voltage_min_{window_days}d"] = float(w_v.min())
+            result[f"temp_mean_{window_days}d"] = float(w_t.mean())
+            result[f"frac_low_voltage_{window_days}d"] = float(
+                (w_v < (EOL_VOLTAGE + NEAR_THRESHOLD_BAND)).sum() / count
+            )
+            result[f"max_gap_{window_days}d"] = float(w_gap.max())
+        if count > 1:
+            result[f"voltage_std_{window_days}d"] = float(w_v.std(ddof=1))
+            result[f"temp_std_{window_days}d"] = float(w_t.std(ddof=1))
+
+    for window_days in SLOPE_WINDOWS_DAYS:
+        mask = age < window_days
+        t = epoch_days[mask]
+        y = voltage[mask]
+        n = t.size
+        if n >= 2:
+            sum_t, sum_y = float(t.sum()), float(y.sum())
+            sum_ty, sum_tt = float((t * y).sum()), float((t * t).sum())
+            denom = n * sum_tt - sum_t * sum_t
+            result[f"voltage_slope_{window_days}d"] = (
+                (n * sum_ty - sum_t * sum_y) / denom if denom != 0 else np.nan
+            )
+
+    long_slope = result.get(f"voltage_slope_{SLOPE_WINDOWS_DAYS[-1]}d", np.nan)
+    if pd.isna(long_slope):
+        # Matches compute_rolling_features: NaN slope propagates to NaN here,
+        # rather than being silently treated as "no decline". Task1Forecaster
+        # fills this NaN with a huge placeholder distance at predict() time.
+        result["crossing_days_extrapolated"] = np.nan
+    else:
+        decline = max(-long_slope, MIN_DECLINE_PER_DAY)
+        result["crossing_days_extrapolated"] = float(
+            np.clip(result["distance_to_threshold"] / decline, 0.0, MAX_CROSSING_DAYS)
+        )
+
+    result["days_since_last_reading"] = float((as_of - last_date).days)
+    result["history_days_available"] = float((last_date - panel.index[0]).days)
+    result["n_readings_total"] = float(position + 1)
+    return result
+
+
 LOO_SOURCE_COLUMNS = [
     "latest_voltage",
     "voltage_slope_28d",
