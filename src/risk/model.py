@@ -8,9 +8,15 @@ because it extrapolates smoothly and monotonically to arbitrary horizons
 surviving several hundred days past the 42-day planning horizon for early
 scenarios) without any special-casing, and because the dataset has only 82
 observed physical events — far too few to safely support the ~100+ covariates
-a fully-featured discrete model would want. The curated feature set below (13
-covariates) is a deliberately conservative choice given that event count; see
-docs/TASK1_IMPLEMENTATION.md for the calibration and validation evidence.
+a fully-featured discrete model would want. The curated feature set below (6
+covariates) is a deliberately conservative choice given that event count —
+even smaller than an earlier 14-covariate version, after integration testing
+against the real Task 2 planner showed the extra covariates were diluting
+signal without buying identification (see docs/TASK1_IMPLEMENTATION.md Sec
+5.2). The AFT curve is also not used alone: `Task1Forecaster.predict()`
+blends it with a sharp deterministic physical-extrapolation prior (Sec 4.5 of
+that document) that was needed to fix under-prediction of near-term risk
+for a specific, common failure pattern.
 
 Everything Task 1 needs to reproduce evaluator-aligned outcome probabilities
 from one calibrated conditional survival curve is:
@@ -27,7 +33,7 @@ G at capped time arguments rather than post-hoc patching the tail.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable
 
 import numpy as np
@@ -41,14 +47,14 @@ from batteryswap_solution.forecast import CONTRACT_VERSION, ForecastMetadata, Ri
 from .cutoffs import assign_building_folds, build_example_table
 from .features import build_feature_series, leave_one_out_building_features, lookup_asof
 
-MODEL_VERSION = "task1-aft-survival/v1"
+MODEL_VERSION = "task1-aft-survival-blended/v1"
 
 AFT_FAMILIES = {
     "weibull": WeibullAFTFitter,
     "lognormal": LogNormalAFTFitter,
     "loglogistic": LogLogisticAFTFitter,
 }
-PENALIZER_GRID: tuple[float, ...] = (0.1, 0.5, 1.0)
+PENALIZER_GRID: tuple[float, ...] = (0.1, 0.5)
 HORIZONS_FOR_METRICS: tuple[int, ...] = (7, 14, 21, 28, 35, 42)
 
 CURATED_FEATURES: tuple[str, ...] = (
@@ -264,9 +270,51 @@ def build_calibration_pool(
     return np.concatenate(raws), np.concatenate(labels), np.concatenate(weights)
 
 
+def _conditional_logistic_cdf(days: np.ndarray, location: np.ndarray, scale: float) -> np.ndarray:
+    """P(T <= days | T > 0) under a logistic location-scale model, vectorized.
+
+    Same functional form as ``forecast.VoltageTrendForecaster``'s physical
+    extrapolation. Used as a sharp, low-variance safety floor on top of the
+    AFT model's calibrated curve (see ``Task1Forecaster.predict`` docstring
+    for why): with only 82 physical events, the AFT's covariate coefficients
+    are necessarily heavily shrunk (Sec 1/4 of docs/TASK1_IMPLEMENTATION.md),
+    which under-predicts near-term risk specifically for batteries whose
+    voltage has plateaued just above the EOL threshold rather than declining
+    smoothly — exactly the physical situation ``crossing_days_extrapolated``
+    is designed to flag directly.
+    """
+
+    raw = 1.0 / (1.0 + np.exp(-np.clip((days - location) / scale, -40.0, 40.0)))
+    at_origin = 1.0 / (1.0 + np.exp(-np.clip((-location) / scale, -40.0, 40.0)))
+    conditioned = (raw - at_origin) / np.maximum(1.0 - at_origin, 1e-9)
+    return np.clip(conditioned, 0.0, 1.0)
+
+
 @dataclass
 class Task1Forecaster:
-    """Fitted Task 1 artifact implementing ``RiskForecaster.predict()`` (contract v1)."""
+    """Fitted Task 1 artifact implementing ``RiskForecaster.predict()`` (contract v1).
+
+    The final curve is ``max(calibrated AFT CDF, physical crossing-day CDF)``
+    at every evaluated time, not the AFT curve alone. This blend is a
+    deliberate correction, not an afterthought: with only 82 physical EOL
+    events in the whole dataset, the AFT model's per-covariate coefficients
+    are necessarily heavily shrunk toward the population baseline (every
+    covariate has p > 0.25 even alone — see docs/TASK1_IMPLEMENTATION.md Sec
+    1/4), which was measured (via the real Task 2 planner, not just
+    Brier/concordance) to under-predict near-term risk for batteries whose
+    voltage has plateaued just above the 2.4V threshold rather than declined
+    smoothly — precisely because a plateau produces a near-zero trailing
+    slope and therefore a large, physically-wrong crossing-day extrapolation
+    if left to the AFT's weak covariate fit alone. Taking the pointwise
+    maximum with the sharp, low-variance physical extrapolation
+    (``crossing_days_extrapolated``, the same estimator this module derives
+    for the AFT covariate, evaluated as a direct logistic location) recovers
+    the sharpness the AFT cannot supply from 82 events, while the AFT model
+    still supplies calibration, the observed/unobserved tail split, and
+    monotonicity everywhere the physical estimate is less informative (e.g.
+    genuinely cold-start batteries, where crossing_days_extrapolated falls
+    back to the population median and stops dominating).
+    """
 
     model_family: str
     penalizer: float
@@ -275,6 +323,7 @@ class Task1Forecaster:
     calibrator: PlattCalibrator
     model_version: str = MODEL_VERSION
     max_integration_points: int = 220
+    physical_uncertainty_days: float = 20.0
 
     def _scenario_table(
         self, battery_data: pd.DataFrame, locations: pd.DataFrame, origin: pd.Timestamp
@@ -354,7 +403,17 @@ class Task1Forecaster:
         survival = self.aft_model.predict_survival_function(scaled, times=all_times)
         raw_cdf_matrix = 1.0 - survival.to_numpy()
         calibrated_matrix = self.calibrator.apply(raw_cdf_matrix)
-        calibrated_matrix = np.maximum.accumulate(calibrated_matrix, axis=0)
+
+        # Cold-start batteries (no crossing-day estimate available) get a huge
+        # placeholder distance so the physical term contributes ~0 and the
+        # AFT+calibration curve alone determines their forecast, which is the
+        # right behavior when there is no voltage history to extrapolate from.
+        crossing_days = table["crossing_days_extrapolated"].fillna(1.0e4).to_numpy(dtype=float)
+        physical_cdf_matrix = _conditional_logistic_cdf(
+            all_times[:, None], crossing_days[None, :], self.physical_uncertainty_days
+        )
+        combined_matrix = np.maximum(calibrated_matrix, physical_cdf_matrix)
+        calibrated_matrix = np.maximum.accumulate(combined_matrix, axis=0)
 
         time_index = {round(float(t), 6): i for i, t in enumerate(all_times)}
 
@@ -504,6 +563,9 @@ def fit_task1_forecaster(
     cutoff_dates: pd.DatetimeIndex,
     n_folds: int = 5,
     seed: int = 20260818,
+    families: Iterable[str] = tuple(AFT_FAMILIES),
+    penalizers: Iterable[float] = PENALIZER_GRID,
+    physical_uncertainty_days: float = 20.0,
 ) -> tuple[Task1Forecaster, dict]:
     """End-to-end: causal features -> example table -> model selection -> calibration."""
 
@@ -511,6 +573,10 @@ def fit_task1_forecaster(
     table = build_example_table(locations, eol_times, feature_series, cutoff_dates)
     if table.empty:
         raise RuntimeError("No causal (device, cutoff) examples were constructed")
-    forecaster, report = select_and_fit(table, n_folds=n_folds, seed=seed)
+    forecaster, report = select_and_fit(
+        table, n_folds=n_folds, seed=seed, families=families, penalizers=penalizers
+    )
+    if physical_uncertainty_days != forecaster.physical_uncertainty_days:
+        forecaster = replace(forecaster, physical_uncertainty_days=physical_uncertainty_days)
     report["table_rows"] = int(len(table))
     return forecaster, report

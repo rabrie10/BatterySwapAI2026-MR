@@ -63,8 +63,29 @@ def main() -> None:
     parser.add_argument("--out-path", type=Path, default=Path("models/risk_forecaster.pkl"))
     parser.add_argument("--report-path", type=Path, default=Path("docs/task1_training_report.json"))
     parser.add_argument("--synthetic-step-days", type=int, default=21)
-    parser.add_argument("--n-folds", type=int, default=5)
+    parser.add_argument("--n-folds", type=int, default=4)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    parser.add_argument(
+        "--families",
+        type=str,
+        default="weibull,lognormal",
+        help="Comma-separated AFT families to grid-search (subset of weibull,lognormal,loglogistic). "
+        "loglogistic is excluded by default: it was never selected in either training run and "
+        "scored within noise of lognormal, so dropping it roughly halves grid-search time.",
+    )
+    parser.add_argument(
+        "--penalizers",
+        type=str,
+        default="0.1,0.5",
+        help="Comma-separated AFT penalizer values to grid-search.",
+    )
+    parser.add_argument(
+        "--physical-uncertainty-days",
+        type=float,
+        default=20.0,
+        help="Logistic scale for the deterministic physical crossing-day prior blended into "
+        "predict() (see docs/TASK1_IMPLEMENTATION.md Sec 4.5/5.2 for why this blend exists).",
+    )
     args = parser.parse_args()
 
     started = time.perf_counter()
@@ -80,8 +101,19 @@ def main() -> None:
         scenario_starts, timeline_start, timeline_end, step_days=args.synthetic_step_days
     )
 
+    families = tuple(name.strip() for name in args.families.split(",") if name.strip())
+    penalizers = tuple(float(value) for value in args.penalizers.split(",") if value.strip())
+
     forecaster, report = fit_task1_forecaster(
-        locations, eol_times, timeseries, cutoff_dates, n_folds=args.n_folds, seed=args.seed
+        locations,
+        eol_times,
+        timeseries,
+        cutoff_dates,
+        n_folds=args.n_folds,
+        seed=args.seed,
+        families=families,
+        penalizers=penalizers,
+        physical_uncertainty_days=args.physical_uncertainty_days,
     )
 
     feature_series = build_feature_series(timeseries)
@@ -93,6 +125,9 @@ def main() -> None:
         "synthetic_step_days": args.synthetic_step_days,
         "n_folds": args.n_folds,
         "seed": args.seed,
+        "families": list(families),
+        "penalizers": list(penalizers),
+        "physical_uncertainty_days": args.physical_uncertainty_days,
         "n_official_scenarios": len(scenario_starts),
         "n_cutoff_dates": int(len(cutoff_dates)),
         "curated_features": list(forecaster.transform.columns),

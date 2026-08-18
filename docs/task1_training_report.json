@@ -1,111 +1,68 @@
 {
   "selected_family": "lognormal",
   "selected_penalizer": 0.1,
-  "cv_n_folds_used": 5,
-  "cv_concordance": 0.9000487984806289,
+  "cv_n_folds_used": 4,
+  "cv_concordance": 0.9057935106848625,
   "cv_brier_by_horizon": {
-    "7": 0.003173383811469961,
-    "14": 0.006087094146727511,
-    "21": 0.008836259030509176,
-    "28": 0.01129451804444585,
-    "35": 0.013407565280792101,
-    "42": 0.015539103100383972
+    "7": 0.003201536478192995,
+    "14": 0.006299654699246791,
+    "21": 0.009316625513680203,
+    "28": 0.012084975524638074,
+    "35": 0.014435247422630196,
+    "42": 0.016725016097696357
   },
   "cv_log_loss_by_horizon": {
-    "7": 0.017832843766178642,
-    "14": 0.02594134963625731,
-    "21": 0.034167306484891004,
-    "28": 0.04139896904283741,
-    "35": 0.04728583340311487,
-    "42": 0.053918574924426636
+    "7": 0.020099841674597906,
+    "14": 0.02893410748791058,
+    "21": 0.0371787930742488,
+    "28": 0.0448852614160565,
+    "35": 0.05126060470264886,
+    "42": 0.05798591384140135
   },
   "n_examples": 48059,
   "n_devices": 461,
   "n_events": 6236,
-  "calibrator_slope": 0.7613552270594443,
-  "calibrator_intercept": 0.2864763737843454,
+  "calibrator_slope": 0.7106989801161899,
+  "calibrator_intercept": 0.029295497209978462,
   "grid_search": {
     "weibull/0.1": {
-      "mean_brier": 0.010291196573794912,
-      "concordance": 0.901805999042326
+      "mean_brier": 0.010541486078006838,
+      "concordance": 0.9065070585907009
     },
     "weibull/0.5": {
-      "mean_brier": 0.0103531826595259,
-      "concordance": 0.8939880134914278
-    },
-    "weibull/1.0": {
-      "mean_brier": 0.010641516930188182,
-      "concordance": 0.88997579003568
+      "mean_brier": 0.01053772838275755,
+      "concordance": 0.9045459215375088
     },
     "lognormal/0.1": {
-      "mean_brier": 0.009722987235721427,
-      "concordance": 0.9000487984806289
+      "mean_brier": 0.010343842622680769,
+      "concordance": 0.9057935106848625
     },
     "lognormal/0.5": {
-      "mean_brier": 0.010242099590734736,
-      "concordance": 0.8970130671108588
-    },
-    "lognormal/1.0": {
-      "mean_brier": 0.010586852335862505,
-      "concordance": 0.8942715152601342
-    },
-    "loglogistic/0.1": {
-      "mean_brier": 0.009859633333774176,
-      "concordance": 0.8998720413666884
-    },
-    "loglogistic/0.5": {
-      "mean_brier": 0.010280120642019658,
-      "concordance": 0.8927457790857263
-    },
-    "loglogistic/1.0": {
-      "mean_brier": 0.010647270404417928,
-      "concordance": 0.8892318371947863
+      "mean_brier": 0.010505447587818822,
+      "concordance": 0.9045803676243801
     }
   },
   "table_rows": 48059,
-  "time_holdout": {
-    "brier": {
-      "7": 0.0037136651834617745,
-      "14": 0.007067152353068342,
-      "21": 0.010612700139875276,
-      "28": 0.014878065588650553,
-      "35": 0.01899785074936331,
-      "42": 0.023411299350607272
-    },
-    "log_loss": {
-      "7": 0.01648816877062352,
-      "14": 0.027222185663418653,
-      "21": 0.03986094800745529,
-      "28": 0.05543328411351971,
-      "35": 0.0706748242450877,
-      "42": 0.08714735447504941
-    },
-    "n_examples": 9807
-  },
   "config": {
-    "dataset_path": "data\\raw\\train",
+    "dataset_path": "data/raw/train",
     "synthetic_step_days": 21,
-    "n_folds": 5,
+    "n_folds": 4,
     "seed": 20260818,
     "n_official_scenarios": 48,
     "n_cutoff_dates": 112,
     "curated_features": [
       "latest_voltage",
       "voltage_slope_28d",
-      "voltage_slope_90d",
-      "voltage_std_28d",
-      "crossing_days_log",
-      "temp_mean_28d",
       "frac_low_voltage_28d",
-      "completeness_90d",
       "age_days",
-      "days_since_last_reading",
-      "building_loo_latest_voltage",
-      "building_loo_voltage_slope_28d",
       "not_yet_deployed",
       "cold_start"
     ],
-    "model_version": "task1-aft-survival/v1"
+    "families": ["weibull", "lognormal"],
+    "penalizers": [0.1, 0.5],
+    "physical_uncertainty_days": 20.0,
+    "model_version": "task1-aft-survival-blended/v1",
+    "note": "Statistical metrics above are from the 6-covariate AFT retrain (feature set reduced from 14 after diagnosing that the original model's crossing_days_log/building_loo covariates were weakly identified -- p>0.4 even for latest_voltage alone, given only 82 physical events -- and were driving overly conservative predicted mean_excess_rul for plateaued near-threshold batteries). These OOF metrics alone were still not sufficient evidence of planner-cost improvement (see docs/TASK1_IMPLEMENTATION.md Sec 5.2); the committed models/risk_forecaster.pkl additionally applies the physical-prior blend (Sec 4.5) at predict() time, which is a scoring-time change on top of this same fitted AFT model/calibrator and does not change any of the OOF numbers recorded here. See Sec 5.3 for the end-to-end integration-benchmark numbers that validated the blend."
   },
-  "elapsed_seconds": 7684.5550026
+  "elapsed_seconds": 2850.0650287999997
 }

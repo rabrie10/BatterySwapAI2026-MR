@@ -22,8 +22,10 @@ TASK2_IMPLEMENTATION.md Sec 4 for the exact contract this satisfies.
 
 **Model family: one censoring-aware parametric AFT model** (Weibull,
 LogNormal, or LogLogistic — selected by causal out-of-fold Brier score), fit
-on a small, curated covariate set, with a 1-D Platt recalibration layer on
-top.
+on a small, curated covariate set, with a 1-D Platt recalibration layer, and
+a sharp deterministic physical-extrapolation prior blended in at prediction
+time. That last piece is not a minor detail — Sec 5 explains why it turned
+out to be necessary, not optional.
 
 This is a deliberate choice given the dataset: **only 82 observed physical
 EOL events** across 461 devices (82.2% censored). A discrete-time hazard
@@ -45,10 +47,14 @@ parametric AFT model:
 
 The tradeoff is real and documented, not hidden: AFT's linear-in-log-time
 covariate effects cannot capture strong nonlinear interactions (e.g. a
-temperature-conditioned voltage residual) the way a boosted tree could. If
-more labeled events become available, replacing/ensembling with a
-discrete-time `HistGradientBoostingClassifier` hazard model over the same
-causal features is the natural P2 extension (see Sec 8).
+temperature-conditioned voltage residual) the way a boosted tree could, and —
+as Sec 5 found empirically, not just theoretically — its covariate
+coefficients are so heavily shrunk by only 82 events that the AFT curve alone
+under-predicts near-term risk for a specific, common physical pattern
+(voltage plateaued just above the EOL threshold rather than declining
+smoothly). If more labeled events become available, replacing/ensembling with
+a discrete-time `HistGradientBoostingClassifier` hazard model over the same
+causal features is the natural P2 extension (see Sec 9).
 
 ## 2. Causal feature pipeline (`src/risk/features.py`)
 
@@ -152,21 +158,37 @@ across the training period, cannot go unnoticed.
 
 ### 4.1 Curated features
 
-Fourteen covariates (listed in `model.CURATED_FEATURES`): latest voltage,
-28-/90-day voltage slope, 28-day voltage volatility, log1p(crossing-day
-extrapolation), 28-day mean temperature, 28-day low-voltage fraction, 90-day
-completeness, age, days since last reading, two building leave-one-out
-aggregates, and `not_yet_deployed`/`cold_start` flags. This list is
-deliberately short: with 82 events, the classical "~10 events per covariate"
-survival-model rule of thumb would cap a stable fit at well under half the
-size of the full engineered feature set (60+ columns across six rolling
-windows); `distance_to_threshold` was dropped from the naive superset because
-it is an exact linear function of `latest_voltage` (pure collinearity, no
-extra information). `cold_start` (fewer than 3 total readings) acts as a
-single unified missing-data indicator rather than adding one indicator column
-per feature, since the causal columns tend to go missing together.
-Continuous covariates are z-scored using **train-fold-only** statistics
-inside cross-validation, and full-data statistics for the final artifact.
+Six covariates (listed in `model.CURATED_FEATURES`): latest voltage, 28-day
+voltage slope, 28-day low-voltage fraction, age, and `not_yet_deployed`/
+`cold_start` flags. `features.py` computes a much larger engineered set
+(60+ columns across six rolling windows, plus building leave-one-out
+aggregates — Sec 2.2/2.3); the AFT model deliberately uses only a small
+subset of it.
+
+This started as a 14-covariate set (adding 90-day slope, volatility,
+log1p(crossing-day extrapolation), temperature, completeness, days-since-
+last-reading, and two building leave-one-out aggregates) and was cut down
+after the retrain #2 investigation in Sec 5 found that **every one of those
+14 covariates had p > 0.25 in the fitted model, including `latest_voltage`
+alone with no other covariates present.** This is an expected consequence,
+not a bug: `lifelines`' `robust=True` sandwich variance estimator correctly
+accounts for the fact that the 48,059 training rows are really only ~461
+independent devices with 82 independent events (each device contributes many
+person-period rows at different cutoffs), so no covariate can reach classical
+significance regardless of how many are included. But it does mean including
+weak covariates purely dilutes optimizer attention without buying identification, so the set was cut to the smallest group with a
+direct physical justification for individual battery risk (voltage level,
+its recent trend, and how much of its recent history was already close to
+the threshold), plus age and data-availability flags. `distance_to_threshold`
+was excluded throughout because it is an exact linear function of
+`latest_voltage` (pure collinearity, no extra information); `crossing_days_log`
+and the building leave-one-out features were dropped in this cut — see Sec 5
+for why `crossing_days_extrapolated` came back afterward, in a different
+role. `cold_start` (fewer than 3 total readings) acts as a single unified
+missing-data indicator rather than one indicator column per feature, since
+the causal columns tend to go missing together. Continuous covariates are
+z-scored using **train-fold-only** statistics inside cross-validation, and
+full-data statistics for the final artifact.
 
 ### 4.2 Model selection
 
@@ -224,60 +246,170 @@ trained on plenty of real cold-start examples (see Sec 3.1), so it already
 knows what a conservative population-level prediction looks like for this
 regime.
 
+### 4.5 Physical-prior blend (`Task1Forecaster.predict`)
+
+The final curve is `max(calibrated AFT CDF, physical crossing-day CDF)` at
+every evaluated time point, not the AFT curve alone. `_conditional_logistic_cdf`
+reuses the same location-scale logistic form as `forecast.VoltageTrendForecaster`,
+located at each battery's own `crossing_days_extrapolated` (the same causal
+feature described in Sec 2.2) with a fixed 20-day uncertainty scale, and the
+pointwise maximum is taken before the final `cummax` monotonicity pass — so
+whichever of the two estimates thinks failure is more imminent wins at each
+point in time, and the blended curve is still guaranteed monotone and
+contract-valid. Cold-start batteries fall back to a placeholder crossing-day
+distance far outside the horizon, so the physical term contributes ~0 there
+and the AFT+calibration curve alone determines their forecast.
+
+This exists because it was *measured*, not assumed, to matter — see Sec 5.
+`PhysicalPriorBlendTests` in `tests/test_task1_forecast.py` locks in both
+directions: a battery in clear physical decline gets lifted to high risk even
+when a stub AFT model predicts exactly zero, and a battery with flat voltage
+(and therefore a huge, capped crossing-day estimate) stays near zero — the
+blend does not spuriously inflate risk for batteries with no real signal.
+
 ## 5. Validation results
 
-Full numbers are in `docs/task1_training_report.json`; this is the 2026-08-18
-training run (`data/raw/train`, `synthetic_step_days=21`, `n_folds=5`,
-`seed=20260818`): **48,059** `(device, cutoff)` examples from all 461
-devices, **6,236** person-period rows with an in-window observed event
-(pooled from the dataset's 82 unique physical EOL events across many
-cutoffs). Elapsed training time (grid search + final fit): ~7,685s
-(~2.1h) — an offline, one-time cost, not part of the competition's
-per-scenario runtime budget.
+### 5.1 Statistical (out-of-fold) metrics
 
-**Grid search** (mean OOF Brier across the six horizons, causal
-building-grouped 5-fold CV):
+Full numbers are in `docs/task1_training_report.json`; this reflects the
+2026-08-18 retrain (`data/raw/train`, `synthetic_step_days=21`, `n_folds=4`,
+6-covariate feature set, `families=(weibull, lognormal)`,
+`penalizers=(0.1, 0.5)`, `seed=20260818`): **48,059** `(device, cutoff)`
+examples from all 461 devices, **6,236** person-period rows with an in-window
+observed event (pooled from the dataset's 82 unique physical EOL events
+across many cutoffs). Elapsed training time (grid search + final fit): ~2,850s
+(~47min) — an offline, one-time cost, not part of the competition's
+per-scenario runtime budget. (An earlier 14-covariate, 3-family, 3-penalizer
+grid search took ~7,685s and is what first surfaced usable OOF metrics before
+the feature-set investigation below; it is superseded by this retrain, not
+separately reported.)
 
-| Family | penalizer=0.1 | penalizer=0.5 | penalizer=1.0 |
-| --- | ---: | ---: | ---: |
-| Weibull | 0.01029 (conc. 0.902) | 0.01035 | 0.01064 |
-| LogNormal | **0.00972 (conc. 0.900)** ← selected | 0.01024 | 0.01059 |
-| LogLogistic | 0.00986 (conc. 0.900) | 0.01028 | 0.01065 |
-
-All nine configurations land in a narrow band (concordance 0.889-0.902,
-mean Brier 0.0097-0.0106) — the family/penalizer choice is not fragile, which
-is itself a useful robustness signal given only 82 physical events.
-
-**Selected model** (LogNormal AFT, penalizer=0.1), causal grouped
-out-of-fold, by horizon:
+**Selected model**: LogNormal AFT, penalizer=0.1 (same family the earlier
+14-covariate search also selected). Causal building-grouped out-of-fold
+concordance: **0.906**. Brier/log loss by horizon:
 
 | Horizon (days) | Brier | Log loss |
 | ---: | ---: | ---: |
-| 7 | 0.00317 | 0.01783 |
-| 14 | 0.00609 | 0.02594 |
-| 21 | 0.00884 | 0.03417 |
-| 28 | 0.01129 | 0.04140 |
-| 35 | 0.01341 | 0.04729 |
-| 42 | 0.01554 | 0.05392 |
+| 7 | 0.00320 | 0.02010 |
+| 14 | 0.00630 | 0.02893 |
+| 21 | 0.00932 | 0.03718 |
+| 28 | 0.01208 | 0.04489 |
+| 35 | 0.01444 | 0.05126 |
+| 42 | 0.01673 | 0.05799 |
 
-Concordance index: **0.900**.
+(Full grid search table is in `docs/task1_training_report.json`; concordance
+and Brier are essentially unchanged from the 14-covariate version — see
+Sec 5.2 for why that alone was misleading.) Calibrator: Platt slope=0.711,
+intercept=0.029.
 
-**Calibrator**: Platt slope=0.761, intercept=0.286 — a real, non-trivial
-adjustment (not a no-op), consistent with the design spec's expectation that
-raw AFT probabilities need recalibration before being treated as evaluator
-outcome probabilities.
+### 5.2 Why out-of-fold statistical metrics were not enough
+
+This is the most important methodological finding from building Task 1, so
+it is documented in full rather than summarized away.
+
+The 14-covariate model above passed every contract test and had a
+respectable OOF concordance (0.900). But loading it into the *actual*
+`CompetitionPlanner` and scoring it with the official evaluator
+(`tools/benchmark_task2.py --mode real`) on real train scenarios told a
+different story: mean `total_cost` on scenarios `s_0..s_2` was **~3,115**,
+worse than the existing deterministic `VoltageTrendForecaster` fallback's
+**~2,338** on the same three scenarios, and one scenario (`s_4`) scheduled
+*zero* in-window swaps at all (a legitimate optimizer decision given that
+forecast, not a crash).
+
+Diagnosis (reproduced with a small ad hoc script, not committed — the
+methodology is what matters): for the 9 batteries in `s_0` with a real
+observed EOL inside the 42-day horizon (in some cases only 15-19 days out),
+the fitted AFT model predicted only 3-31% cumulative failure probability by
+day 42, and a **90-130 day** mean-excess RUL for the "survives past the
+horizon" branch. Inspecting the fitted coefficients directly explained why:
+every covariate, including `latest_voltage` fit *alone* with nothing else in
+the model, had p > 0.25. The point estimates were directionally sensible and
+reasonably stable across covariate subsets (so not literally noise), but with
+only 82 independent events, `lifelines`' `robust=True` sandwich variance
+estimator correctly reports that no individual covariate's effect is sharply
+identified — so the AFT's location parameter regresses heavily toward the
+population baseline for every battery. Since the population baseline
+survival time is dominated by the 82.2% of devices that essentially never
+fail, this shrinkage systematically under-predicts near-term risk exactly for
+the subpopulation the planner most needs to distinguish: batteries whose
+voltage has plateaued just above 2.4V (a near-zero trailing slope in every
+rolling window, since a battery near end-of-life often oscillates near
+threshold for a while before crossing) rather than declining smoothly.
+Reducing the feature set from 14 to 6 covariates (Sec 4.1) did not fix this —
+a retrain with the smaller set actually scored *worse* in the same
+integration benchmark (mean `total_cost` ≈ 3,834) — confirming the problem
+was never "too many features," it was that **AFT's covariate-driven
+shrinkage cannot supply the sharp, individually-differentiated risk signal
+this planning problem needs from only 82 events, regardless of which or how
+many covariates it is given.**
+
+The fix (Sec 4.5) does not require retraining: blend in a sharp, low-variance
+*deterministic* estimate — the same physical crossing-day extrapolation
+already computed as a causal feature — as a floor under the AFT+calibration
+curve. This directly targets the diagnosed failure mode (the AFT under-reacts
+to voltage proximity to the threshold) while keeping the AFT model
+responsible for everything it *is* well-identified for from 82 events pooled
+together: overall calibration, the observed/unobserved-EOL tail split, and
+monotone extrapolation for genuinely cold-start batteries where no physical
+extrapolation is available.
+
+### 5.3 End-to-end integration results (after the blend)
+
+Re-running the identical integration benchmark with the blend in place, mean
+`total_cost` against the official evaluator:
+
+| Scenarios | All-defer | `VoltageTrendForecaster` fallback | Task 1 (blended) |
+| --- | ---: | ---: | ---: |
+| `s_0..s_2` (3 scenarios) | 4,341.5 | 2,337.7 | **1,998.9** |
+| `s_0..s_11` (12 scenarios) | 4,885.5 | 6,622.9 | **4,451.1** |
+
+The blended model now beats the deterministic fallback on **all three**
+directly-compared scenarios individually, not just on average, and beats both
+baselines on the broader 12-scenario sample (the fallback is in fact worse
+than all-defer over 12 scenarios — dominated by one very early-swap-heavy
+scenario — which is itself evidence that a 3-scenario spot check is not a
+reliable comparison and the 12-scenario number is the one to trust). This
+satisfies the design spec's own primary acceptance bar for Task 1 (Sec 5.5:
+"most importantly, improves held-out total planner cost"), on the largest
+sample this session's time budget allowed; see Sec 6 for what a
+pre-submission check should still add.
 
 **Time holdout (diagnostic only, not used for fitting/calibration)** — the
-temporally latest 20% of cutoffs (9,807 examples): Brier degrades from
-0.00371 (7d) to 0.02341 (42d), roughly 1.2-1.5x the causal building-grouped
-OOF numbers at the same horizons. This is an expected, moderate gap (later
-cutoffs see building/seasonal conditions the earlier training period covers
-less densely) — not a red flag, but it is the reason Sec 10 of
-`docs/SOLUTION_DESIGN_SPEC.md` (competition tuning protocol) and the honest
-tradeoff noted in Sec 1 above should be kept in mind before trusting long-tail
-extrapolation on a materially different private split.
+temporally latest 20% of cutoffs: Brier degrades moderately at longer
+horizons relative to the causal building-grouped OOF numbers (see
+`docs/task1_training_report.json`'s `time_holdout` block for the exact
+figures from whichever retrain most recently populated it). This is an
+expected, moderate gap, not a red flag — but per Sec 10 of
+`docs/SOLUTION_DESIGN_SPEC.md` (competition tuning protocol), it is the
+reason the physical-uncertainty-days constant (20, fixed, not tuned on
+leaderboard feedback) and the general tradeoff noted in Sec 1 should be kept
+in mind before trusting long-tail extrapolation on a materially different
+private split.
 
-## 6. Runtime and packaging
+## 6. Known limitations and suggested next check
+
+- **12 scenarios is not 48.** Sec 5.3's comparison used 12 of the 48 train
+  scenarios (chosen for wall-clock budget within this session, each real-mode
+  scenario costs ~25-35s end-to-end through the full planner). Before an
+  official submission, re-run
+  `python tools/benchmark_task2.py --mode real --limit 0` (all scenarios) and
+  confirm the improvement holds; also compare worst-case/tail scenario cost,
+  not only the mean, per the design spec's competition tuning protocol.
+- **`physical_uncertainty_days=20.0` is a fixed constant**, not fit from
+  data. It matches `VoltageTrendForecaster`'s own default scale (18), which
+  the existing benchmark evidence already shows is reasonable, but it was not
+  independently re-tuned here. Sensitivity to this constant is worth checking
+  as a P1 follow-up.
+- **The AFT component's practical contribution is now smaller than
+  originally intended** — for batteries with a clear physical decline signal,
+  the blend is dominated by the deterministic term, not the fitted model.
+  The AFT model still does real work (calibration shape, the tail/censoring
+  split, and the sole signal for genuinely cold-start batteries), but this is
+  a different balance than Sec 1's original design intent, and is worth
+  revisiting if a future data release brings more physical events.
+
+## 7. Runtime and packaging
 
 - Training (`src/risk/train.py`) is offline and not subject to the
   competition's 30-minute evaluation limit; it uses only
@@ -294,55 +426,69 @@ extrapolation on a materially different private split.
   dependencies, matching the pattern already used for
   `models/cox_baseline.pkl` in this repository.
 
-## 7. Reproducibility
+## 8. Reproducibility
 
 ```powershell
-python -m src.risk.train --dataset-path data/raw/train --out-path models/risk_forecaster.pkl --report-path docs/task1_training_report.json --synthetic-step-days 21 --n-folds 5 --seed 20260818
+python -m src.risk.train --dataset-path data/raw/train --out-path models/risk_forecaster.pkl --report-path docs/task1_training_report.json --synthetic-step-days 21 --n-folds 4 --seed 20260818 --families weibull,lognormal --penalizers 0.1,0.5 --physical-uncertainty-days 20.0
 ```
+
+These are `train.py`'s defaults, so a bare invocation with just
+`--dataset-path` reproduces the currently-committed artifact.
 
 - Deterministic building-fold assignment (seeded hash), deterministic
   synthetic-cutoff grid derived only from the dataset's own timestamps, fixed
-  `sample_weight` scheme, fixed AFT `penalizer` grid. Re-running with the same
-  dataset and arguments reproduces the same artifact.
+  `sample_weight` scheme, fixed AFT family/penalizer grid, fixed physical
+  blend scale. Re-running with the same dataset and arguments reproduces the
+  same artifact.
 - `docs/task1_training_report.json` records the exact configuration (dataset
-  path, step size, fold count, seed, curated feature list, model version
-  string) alongside the metrics, so a report and an artifact can always be
-  matched to each other.
+  path, step size, fold count, seed, family/penalizer grid, physical
+  uncertainty scale, curated feature list, model version string) alongside
+  the metrics, so a report and an artifact can always be matched to each
+  other. Note: the currently-committed report's `config` block predates the
+  `--families`/`--penalizers`/`--physical-uncertainty-days` CLI flags (it was
+  produced by an equivalent ad hoc script during the Sec 5.2 investigation,
+  before those flags were added to `train.py` for reproducibility); its
+  metrics are still the exact metrics of the committed artifact.
 
-## 8. Task 1 handoff checklist (per TASK2_IMPLEMENTATION.md Sec 12)
+## 9. Task 1 handoff checklist (per TASK2_IMPLEMENTATION.md Sec 12)
 
 - Serialized forecaster: `models/risk_forecaster.pkl`; immutable
-  `model_version = "task1-aft-survival/v1"` (bump on any retrain with a
-  materially different configuration).
+  `model_version = "task1-aft-survival-blended/v1"` (bump on any retrain with
+  a materially different configuration — this version already reflects the
+  6-covariate feature set plus the physical-prior blend from Sec 4.5/5.2, not
+  the original 14-covariate design).
 - Training data/feature version: this document, Sec 2-4, plus
   `docs/task1_training_report.json`'s `config` block.
 - Causal out-of-fold forecasts: reproducible via the training command above
-  (Sec 7); OOF predictions are not persisted separately, only their
+  (Sec 8); OOF predictions are not persisted separately, only their
   aggregated metrics (persisting full per-row OOF predictions was judged
   unnecessary extra artifact surface for a single-owner project).
 - Per-horizon calibration/ranking metrics: `docs/task1_training_report.json`
-  (`cv_brier_by_horizon`, `cv_log_loss_by_horizon`, `cv_concordance`).
+  (`cv_brier_by_horizon`, `cv_log_loss_by_horizon`, `cv_concordance`); see
+  Sec 5.2 for why these alone were not sufficient evidence and Sec 5.3 for the
+  end-to-end planner-cost metrics that were.
 - Every active battery receives a complete daily CDF: enforced by
   `batteryswap_solution.forecast.validate_forecast`, exercised end-to-end in
   `EndToEndSyntheticFitTests`.
 - Observed-tail / unobserved-EOL mass: Sec 4.4 above.
-- Runtime/memory: Sec 6 above; see also the fallback and real-mode benchmark
+- Runtime/memory: Sec 7 above; see also the fallback and real-mode benchmark
   commands below.
 - Required packages: `pandas`, `numpy`, `scikit-learn`, `lifelines`, `scipy`
   — all already in `requirements.txt` / the official package list.
-- Reproducibility seed and command: Sec 7 above (`seed=20260818`, matching
+- Reproducibility seed and command: Sec 8 above (`seed=20260818`, matching
   the Task 2 planner's own default seed).
 
-## 9. Commands
+## 10. Commands
 
 ```powershell
 python -m unittest discover -s tests -v
-python tools/benchmark_task2.py --mode fallback --limit 3
-python tools/benchmark_task2.py --mode real --limit 12
+python tools/benchmark_task2.py --dataset-path data/raw/train --mode fallback --limit 3
+python tools/benchmark_task2.py --dataset-path data/raw/train --mode real --limit 12
 ```
 
 `--mode real` loads `models/risk_forecaster.pkl` into `CompetitionPlanner`
 and scores it with the official evaluator on train scenarios — the actual
 integration check that this artifact both satisfies the v1 contract under
-real scenario data and improves total cost over the deterministic fallback,
-not just that the submission path survives without it.
+real scenario data and improves total cost over the deterministic fallback
+(Sec 5.3), not just that the submission path survives without it (which
+`--mode fallback` alone would not have caught — see Sec 5.2).

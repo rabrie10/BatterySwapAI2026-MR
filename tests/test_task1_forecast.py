@@ -19,6 +19,7 @@ from src.risk.features import (
     lookup_asof,
 )
 from src.risk.model import (
+    CURATED_FEATURES,
     PlattCalibrator,
     Task1Forecaster,
     FeatureTransform,
@@ -262,6 +263,84 @@ class ContractMathTests(unittest.TestCase):
         self.assertAlmostEqual(tail["prob_observed_after_horizon"], 0.0, places=6)
         self.assertAlmostEqual(tail["mean_excess_rul_days_given_observed_after_horizon"], 0.0, places=6)
         self.assertGreater(tail["prob_unobserved_eol"], 0.0)
+
+
+class FakeZeroRiskAFTModel:
+    """Stand-in AFT model that always predicts zero risk (S(t)=1 for all t).
+
+    Isolates the physical-crossing-day blend: any elevated risk in the
+    output must come from the physical term, not the AFT term.
+    """
+
+    def predict_survival_function(self, X: pd.DataFrame, times) -> pd.DataFrame:
+        times = np.asarray(times, dtype=float)
+        data = np.ones((len(times), len(X)))
+        return pd.DataFrame(data, index=times, columns=X.index)
+
+
+class PhysicalPriorBlendTests(unittest.TestCase):
+    def _forecaster(self, physical_uncertainty_days: float = 10.0) -> Task1Forecaster:
+        columns = tuple(CURATED_FEATURES)
+        transform = FeatureTransform(
+            columns=columns,
+            medians={c: 0.0 for c in columns},
+            means={c: 0.0 for c in columns},
+            stds={c: 1.0 for c in columns},
+        )
+        return Task1Forecaster(
+            model_family="fake-zero-risk",
+            penalizer=0.0,
+            aft_model=FakeZeroRiskAFTModel(),
+            transform=transform,
+            calibrator=PlattCalibrator(slope=1.0, intercept=0.0),
+            physical_uncertainty_days=physical_uncertainty_days,
+        )
+
+    def _locations(self, battery_id: str, origin: pd.Timestamp) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "battery": [battery_id],
+                "building": ["b1"],
+                "room": ["r1"],
+                "start_time": [origin - pd.Timedelta(days=200)],
+                "end_time": [origin + pd.Timedelta(days=100)],
+            }
+        )
+
+    def test_physical_prior_lifts_risk_when_aft_predicts_zero(self):
+        forecaster = self._forecaster()
+        origin = pd.Timestamp("2025-06-01")
+        n = 40
+        # Steep, clean decline crossing the 2.4V EOL threshold around day 20.
+        voltage = 3.0 - 0.03 * np.arange(n)
+        battery_data = _synthetic_readings("d_decline", origin - pd.Timedelta(days=n), n, voltage)
+
+        forecast = forecaster.predict(
+            battery_data,
+            self._locations("d_decline", origin),
+            prediction_origin=origin,
+            horizon_days=42,
+            evaluation_observation_end=origin + pd.Timedelta(days=100),
+        )
+        final_cdf = forecast.curves.iloc[-1]["failure_cdf"]
+        self.assertGreater(final_cdf, 0.9)  # AFT alone gives exactly 0 here
+
+    def test_physical_prior_stays_near_zero_for_flat_voltage(self):
+        forecaster = self._forecaster()
+        origin = pd.Timestamp("2025-06-01")
+        n = 40
+        voltage = np.full(n, 3.0)  # no decline at all -> huge crossing-day estimate
+        battery_data = _synthetic_readings("d_flat", origin - pd.Timedelta(days=n), n, voltage)
+
+        forecast = forecaster.predict(
+            battery_data,
+            self._locations("d_flat", origin),
+            prediction_origin=origin,
+            horizon_days=42,
+            evaluation_observation_end=origin + pd.Timedelta(days=100),
+        )
+        final_cdf = forecast.curves.iloc[-1]["failure_cdf"]
+        self.assertLess(final_cdf, 0.05)
 
 
 class EndToEndSyntheticFitTests(unittest.TestCase):
