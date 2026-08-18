@@ -1,6 +1,6 @@
 # BatterySwapAI 2026 Solution Design Specification
 
-**Status:** v0.9 implementation draft; freeze after Phase P0 clock/schema tests  
+**Status:** v0.10 leaderboard-informed implementation draft; freeze after Phase P0 clock/schema tests
 **Owners:** Task 1 (RUL/risk model) and Task 2 (work-order planner)  
 **Primary objective:** Minimize the official evaluator's mean `total_cost` across unseen scenarios under the CPU, memory, and runtime constraints.  
 **Secondary objective:** Preserve enough uncertainty and diagnostics to improve the complete prediction-to-planning system rather than optimizing an isolated ML metric.
@@ -83,7 +83,43 @@ These are engineering references, not leaderboard results. The oracle policy is 
 
 The three-policy run took approximately 138 seconds because the public `iterate_scenarios()` implementation rescans/copies the raw history at each cutoff. Production feature extraction must preaggregate once and reuse compact daily state.
 
-### 2.5 Still to verify externally or during final packaging
+### 2.5 Public leaderboard snapshot and implications
+
+The public leaderboard observed on 2026-08-18 had a leading score of `1899.53`.
+The displayed component costs allow a useful, but limited, diagnosis:
+
+| Rank | Total | Timing (`early + late`) | Execution and capacity | Approx. swaps/scenario |
+|---:|---:|---:|---:|---:|
+| 1 | 1899.53 | 1594.84 | 304.69 | 19.52 |
+| 2 | 1938.15 | 1368.57 | 569.58 | 14.88 |
+| 3 | 1964.29 | 1532.61 | 431.68 | 11.71 |
+| 4 | 2167.11 | 1295.34 | 871.76 | 20.62 |
+
+The swap count is inferred from `battery_swap / 0.25` and is therefore an
+average that includes evaluator-added emergency work. The most important
+observations are:
+
+- Rank 2 has `226.27` lower timing cost than rank 1, but loses `264.89` in
+  execution/capacity cost. Rank 4 has the best timing cost among the top four,
+  but gives back the advantage through `871.76` of execution/capacity cost.
+- Rank 1 combines the highest approximate action count among the top three with
+  the lowest travel cost. This is strong evidence that building/room batching
+  and route construction are already decisive.
+- Rank 1 still averages `104.17` daily-limit and `54.17` weekly-limit penalty.
+  Because each threshold hit costs 100 in the inspected evaluator, avoiding
+  overload without materially increasing late risk is a high-value Task 2
+  opportunity.
+- Timing still accounts for about 84% of the leading score, so routing cannot
+  rescue weak risk forecasts. The winning system must improve calibration and
+  planning together.
+
+This snapshot is directional evidence, not a validation set. Public and train
+scores are not directly comparable, and planner parameters must not be fitted
+to leaderboard feedback. Official submissions are used only for coarse,
+pre-declared ablations after local OOF selection; hidden-target reconstruction
+or repeated leaderboard probing is prohibited.
+
+### 2.6 Still to verify externally or during final packaging
 
 - Whether the final competition image uses the same evaluator behavior and `batteryswap_public==0.3.4`.
 - Exact package versions available in the final CPU-only execution image.
@@ -108,6 +144,33 @@ q = c_early / (c_early + c_late)
 ```
 
 With default costs, `q = 0.5 / 10.5 = 0.0476`. This explains why `p10` must not be a fixed universal deadline: the best risk threshold comes from scenario costs, route economics, and capacity, and defaults place the isolated optimum near `p05`.
+
+This quantile result applies to a scheduled battery under a continuous EOL
+distribution. Deferral is a separate action with evaluator-specific emergency
+semantics and must not be represented as merely another service date.
+
+### 3.1 Evaluator-aligned outcome mixture
+
+The current evaluator does not score a missing EOL as an ordinary long survival
+time. For a battery whose hidden `eol_times` value is missing, it:
+
+- excludes the battery from the emergency set;
+- substitutes `locations.end_time + settings.unobserved_eol_days` when scoring
+  the timing of an in-window planned swap; and
+- charges no swap or timing cost when that battery is deferred.
+
+Consequently, a physical lifetime CDF and one undifferentiated survival tail are
+not sufficient for exact expected score. The prediction contract must represent
+three mutually exclusive evaluator outcomes:
+
+1. evaluator-observed EOL on or before the planning horizon;
+2. evaluator-observed EOL after the horizon; and
+3. EOL unobserved in the evaluation data.
+
+This is legitimate target alignment using the published evaluator, not hidden
+data access. Task 1 estimates the probabilities only from permitted training
+data and causal scenario history. Task 2 applies the published scoring semantics
+to those probabilities.
 
 Task 2 will minimize:
 
@@ -163,6 +226,20 @@ label(t, h) = MASKED  if follow-up ends before t + h without an observed EOL
 ```
 
 An EOL after `t + h` is a valid zero because the device is known to survive the horizon. A right-censored device is a valid zero only for horizons ending on or before its censoring time. Masked targets contribute no loss. This rule must have unit tests at the exact EOL/censoring boundary.
+
+The censoring-aware model first estimates the conditional physical event
+distribution. It is then projected onto the evaluator's finite observation
+window. If `C` is the published evaluation observation end:
+
+```text
+failure_cdf(d) = P(T <= min(d, C) | T > t, history <= t)
+prob_unobserved_eol = P(T > C | T > t, history <= t)
+prob_observed_after_horizon = P(horizon_end < T <= C | T > t, history <= t)
+```
+
+This preserves statistically correct censoring while giving Task 2 the outcome
+mixture that the evaluator actually scores. The observation endpoint is public
+competition metadata, never inferred from hidden future rows.
 
 Official scenario cutoffs are the highest-value examples because they match inference. Add synthetic cutoffs to increase event coverage, subject to:
 
@@ -271,6 +348,7 @@ class ForecastMetadata:
     prediction_origin: pd.Timestamp
     forecast_end_date: pd.Timestamp
     horizon_days: int
+    evaluation_observation_end: pd.Timestamp
 
 
 @dataclass(frozen=True)
@@ -289,10 +367,17 @@ class RiskForecaster(Protocol):
         *,
         prediction_origin: pd.Timestamp,
         horizon_days: int,
+        evaluation_observation_end: pd.Timestamp,
     ) -> RiskForecast: ...
 ```
 
-The official `Planner.plan(...)` adapter derives `prediction_origin`, constructs a separate planning clock, calls this interface, validates the result, and sends it to Task 2. Task 1 may not read travel costs, alter probabilities for planner utility, or inspect planner decisions. `generated_at` is intentionally excluded so identical inputs produce identical contract objects.
+The official `Planner.plan(...)` adapter derives `prediction_origin`, constructs
+a separate planning clock, supplies the publicly documented evaluation
+observation endpoint from versioned competition configuration, calls this
+interface, validates the result, and sends it to Task 2. Task 1 may not read
+travel costs, alter probabilities for planner utility, or inspect planner
+decisions. `generated_at` is intentionally excluded so identical inputs produce
+identical contract objects.
 
 ### 6.3 Canonical identifiers
 
@@ -312,7 +397,7 @@ Long-form DataFrame with one row per active battery and daily forecast date cove
 |---|---|---|
 | `battery_id` | string | Canonical ID matching the active location set exactly. |
 | `forecast_date` | datetime64 | Normalized calendar date, timezone-consistent. |
-| `failure_cdf` | float64 | `P(T <= forecast_date | T > prediction_origin, history <= prediction_origin)`. |
+| `failure_cdf` | float64 | `P(E=1, T <= forecast_date | alive at prediction_origin, causal history)`, where `E=1` means EOL is observed by the evaluator. |
 
 Required invariants:
 
@@ -322,19 +407,44 @@ Required invariants:
 - The date sequence covers every candidate service date constructed by the planning clock.
 - `failure_cdf` is finite, bounded, and non-decreasing.
 
-Task 2 derives `failure_pmf` by differencing the repaired CDF and derives survival as `1 - failure_cdf`. These redundant columns are not serialized across the ownership boundary.
+Task 2 derives `failure_pmf` by differencing the repaired CDF and derives
+`prob_no_observed_eol_by_date = 1 - failure_cdf`. This complement is an
+evaluator-event probability, not necessarily physical survival after the finite
+observation endpoint. These redundant columns are not serialized across the
+ownership boundary.
 
 ### 6.5 `tail` table
 
-One required row per active battery:
+One required row per active battery. The tail explicitly separates an observed
+post-horizon EOL from an evaluator-unobserved EOL:
 
 | Column | Type | Meaning |
 |---|---|---|
 | `battery_id` | string | Canonical join key. |
-| `prob_survive_horizon` | float64 | Probability of EOL after `forecast_end_date`; equals `1 - final failure_cdf`. |
-| `mean_excess_rul_days_given_survival` | float64 | `E[T - forecast_end_date | T > forecast_end_date]` in days. |
+| `prob_observed_after_horizon` | float64 | Probability EOL is evaluator-observed after `forecast_end_date`. |
+| `mean_excess_rul_days_given_observed_after_horizon` | float64 | `E[T - forecast_end_date | E=1, T > forecast_end_date]` in days. |
+| `prob_unobserved_eol` | float64 | Probability the evaluator receives a missing EOL for this battery. |
+| `prob_no_observed_eol_by_horizon` | float64 | Validation convenience: `prob_observed_after_horizon + prob_unobserved_eol`. |
 
-This table makes expected early-replacement cost identifiable beyond the 42-day decision window. Task 1 should estimate the tail using a survival/AFT component or a validated long-horizon extrapolation, preferably through 180-365 days or the longest defensible range. It must document any cap. Task 2 must not interpret a capped mean as a claim that all batteries fail at the cap.
+Required probability identity, up to numerical tolerance:
+
+```text
+final failure_cdf
++ prob_observed_after_horizon
++ prob_unobserved_eol
+= 1
+```
+
+This decomposition makes evaluator-aligned expected timing cost identifiable.
+Task 1 estimates the observed-event tail using a survival/AFT component or a
+validated long-horizon extrapolation up to the evaluation observation end. It
+must document any cap and how `prob_unobserved_eol` is derived. Task 2 uses the
+scenario setting for the unobserved-EOL proxy date and must never reinterpret
+that proxy as a physical failure forecast.
+
+When `prob_observed_after_horizon == 0`, set the conditional mean-excess field
+to `0.0`; its weighted contribution is zero. Contract tables contain no NaN or
+infinite numeric values.
 
 ### 6.6 `summaries` table
 
@@ -378,7 +488,10 @@ Task 2 development uses a deterministic mock forecast with the exact v1 schema a
 - `medium`: low near-term risk with material late-horizon risk.
 - `defer`: near-zero 42-day risk.
 
-Every profile includes a consistent tail row. The fixture must also include one cold-start battery and one building with multiple rooms. The fixture lives in tests and is owned jointly; either side changing it requires contract review.
+Every profile includes a consistent three-state tail row. The fixture must also
+include one evaluator-unobserved battery, one cold-start battery, and one
+building with multiple rooms. The fixture lives in tests and is owned jointly;
+either side changing it requires contract review.
 
 ## 7. Task 2 specification: score-aligned planning
 
@@ -393,15 +506,31 @@ For in-horizon actions, choose the ordered sequence of buildings, rooms, and bat
 
 ### 7.2 Expected battery timing cost
 
-For each battery and candidate service date, derive daily PMF from the calibrated CDF and compute expected asymmetric timing loss. For service date `d`, the tail contribution to early-replacement cost is:
+For each battery and candidate service date, derive the observed-EOL daily PMF
+from the calibrated CDF and compute expected asymmetric timing loss. For service
+date `d`, the observed post-horizon tail contribution is:
 
 ```text
-prob_survive_horizon
+prob_observed_after_horizon
 * early_penalty_daily
-* ((forecast_end_date - d).days + mean_excess_rul_days_given_survival)
+* ((forecast_end_date - d).days
+   + mean_excess_rul_days_given_observed_after_horizon)
 ```
 
-This assumes `d <= forecast_end_date`, as required for in-window candidates. Unit-test the complete calculation against hand-computed discrete distributions.
+The evaluator-unobserved contribution uses its published proxy target:
+
+```text
+proxy_date = locations.end_time + settings.unobserved_eol_days
+
+prob_unobserved_eol * (
+    early_penalty_daily * max(proxy_date - d, 0)
+  + late_penalty_daily  * max(d - proxy_date, 0)
+)
+```
+
+These formulas assume `d <= forecast_end_date`, as required for in-window
+candidates. Unit-test the complete mixture calculation against hand-computed
+discrete distributions.
 
 For defer, estimate the expected emergency cost for EOL within the horizon, including:
 
@@ -410,31 +539,61 @@ For defer, estimate the expected emergency cost for EOL within the horizon, incl
 - Building/room transition and battery work.
 - Expected overtime or weekly penalty where material.
 
-Validate the analytical cost table against the exact evaluator on deterministic micro-scenarios. Monte Carlo validation is P2 and is added only if analytical tail approximations remain a measured source of error.
+In evaluator version 0.3.4, deferred due batteries are not serviced on their EOL
+dates. After the planned horizon is closed, they are processed as one emergency
+visit per battery in sorted battery-ID order on consecutive synthetic days.
+Therefore deferred costs are coupled: a battery's late cost depends on which
+lexicographically earlier batteries are also due, and weekly penalties depend
+on the whole due set. Implement this exact queue in the local replay.
+
+Use an analytical expectation for linear timing and visit terms under the
+calibrated marginals, then use a small deterministic scenario set with common
+random numbers to validate and rank close candidate plans under queue and
+threshold effects. This stochastic replay is P1 because leaderboard costs show
+that emergency and capacity behavior are material; broad Monte Carlo and
+correlated frailty models remain P2.
+
+Validate the analytical cost table and custom fast replay against the official
+evaluator on deterministic micro-scenarios before using either for search.
 
 ### 7.3 Decision-risk policy
 
-Task 1 probabilities remain calibrated estimates of reality. Task 2 may apply a separate, explicit decision policy such as conservative probability scaling, an uncertainty margin, or a low-data-quality premium. Policy parameters are tuned only on out-of-fold scenario cost.
+Task 1 probabilities remain calibrated estimates of the evaluator outcomes.
+Task 2 may apply a separate, explicit decision policy such as conservative
+probability scaling, an uncertainty margin, or a low-data-quality premium.
+Policy parameters are tuned only on out-of-fold scenario cost.
 
 The planner must retain both `failure_cdf` and its derived `effective_risk`; logs and reports must never present the latter as a calibrated probability. This separation lets the team change risk appetite without retraining or corrupting Task 1.
 
 ### 7.4 Optimization decomposition
 
-The deterministic greedy planner is P0. Local search is P1. CP-SAT, exact route dynamic programming, and OR-Tools routing are P2 and are implemented only after profiling shows a material planner gap.
+The deterministic greedy planner is P0. Capacity-aware assignment, exact
+small-route optimization, local search, and stochastic acceptance are P1. The
+leaderboard decomposition justifies promoting these components: top entries
+currently lose hundreds of points to execution and threshold penalties.
+Advanced large-neighborhood search and correlated stochastic models remain P2.
 
-**Optional P2 Stage A: battery-day assignment**
+**P1 Stage A: candidate compression and battery-day assignment**
 
 - Binary decision `x[i,d]` for battery `i` on day `d`, plus `defer[i]`.
 - Building activation `y[b,d]` and room activation `z[b,r,d]`.
 - Link battery assignments to their building and room activations.
-- Include exact expected timing cost and conservative lower-bound visit costs.
-- Respect configurable strict daily/weekly limits or evaluator penalty mode.
+- Keep each battery's standalone optimum plus nearby days, quantile crossings,
+  existing same-building visit days, and week-boundary alternatives. This keeps
+  the CP-SAT model compact without forcing one hard deadline.
+- Include exact expected timing cost and conservative route lower bounds.
+- Model battery/room/building work exactly and overtime piecewise. Use strict
+  `< weekly_limit` and `<= daily_limit` guardrails by default because the current
+  evaluator applies the weekly penalty at equality and the daily penalty only
+  above its threshold.
 - Solve with CP-SAT under a fixed time budget and deterministic seed.
 
-**Optional P2 Stage B: daily route ordering**
+**P1 Stage B: exact daily route ordering**
 
 - Group batteries contiguously by building and room.
-- Solve the daily building route from base and back to base using exact enumeration/dynamic programming when the activated building count is small; otherwise use OR-Tools routing or deterministic local search.
+- Solve the daily building route from base and back to base using Held-Karp
+  dynamic programming when the activated building count is small; otherwise
+  use OR-Tools routing or deterministic nearest-insertion plus 2-opt.
 - Within a building, group rooms contiguously; within a room, battery order is irrelevant to evaluator cost.
 
 **P1 Stage C: exact repair and local search**
@@ -443,7 +602,27 @@ The deterministic greedy planner is P0. Local search is P1. CP-SAT, exact route 
 - Repair invalid dates, overload, and ordering.
 - Explore moving a battery/day, activating or removing a building visit, bundling a room, swapping day clusters, and deferring/reinstating a battery.
 - Accept moves by exact or analytically equivalent score delta.
+- Prioritize moves that remove a 100-point daily/weekly threshold hit, then
+  re-optimize timing and route cost.
 - Stop deterministically on time budget and return the best valid incumbent.
+
+**P1 Stage D: robust stochastic acceptance**
+
+- Compare the strongest deterministic incumbents on a fixed, seeded set of EOL
+  outcome scenarios drawn from the v1 forecast mixture.
+- Use common random numbers so candidate differences have low variance.
+- Accept a candidate only when it improves mean expected score and does not
+  create an unacceptable lower-tail regression across OOF folds and calibrated
+  risk-shift stresses.
+- Always replay the chosen route with exact evaluator-equivalent mechanics.
+
+**Optional P2 Stage E: large-neighborhood search**
+
+- Destroy and rebuild whole building/day and week bundles, not random individual
+  rows.
+- Add building-level frailty or copula scenarios only if residual analysis shows
+  correlated failures that materially alter planning decisions.
+- Keep the greedy and P1 incumbents as hard fallbacks.
 
 ### 7.5 Required greedy planner
 
@@ -473,10 +652,14 @@ This planner must be able to complete every scenario without OR-Tools. The final
 - Valid on empty-risk, all-urgent, one-building, multi-building, sparse-room, and cold-start fixtures.
 - Never loses a battery or schedules duplicates.
 - Exact travel replay matches evaluator cost on hand-computed micro-scenarios.
+- Expected unobserved-EOL and deferred emergency-queue costs match exhaustive
+  enumeration on small fixtures.
 - Greedy planner beats the official one-swap-per-day baseline on held-out scenarios.
 - Optimized planner is never worse than its greedy incumbent according to its selection objective.
 - Oracle-EOL plus planner establishes a strong upper bound and diagnoses planner limitations.
 - OOF-risk plus planner improves held-out total cost consistently across folds, not only in aggregate.
+- Daily/weekly threshold penalties are zero in the route-aware oracle unless an
+  exact evaluator comparison proves that paying a threshold penalty is cheaper.
 
 ## 8. Validation and experiment design
 
@@ -505,6 +688,8 @@ For every fold and scenario, log:
 
 - `total_cost` and all official cost components.
 - Number of planned in-horizon swaps and deferred batteries.
+- Timing subtotal and execution/capacity subtotal, matching the leaderboard
+  decomposition used in Section 2.5.
 - Buildings/rooms visited per day and total route hours.
 - Overtime and capacity-penalty counts.
 - Predicted risk captured by scheduled batteries.
@@ -530,6 +715,12 @@ A change is promoted only when:
 - The full run is deterministic or seed-stable.
 
 Use paired scenario-level score differences and bootstrap confidence intervals. Prefer the simpler candidate when the improvement is within noise.
+
+Planner policy selection must also survive fixed probability perturbations
+(for example hazard multipliers below and above 1, calibration-logit shifts,
+and cold-start degradation). These are private-shift stress tests, not alternate
+probabilities reported by Task 1. A small public-score gain cannot promote a
+candidate that is unstable across OOF folds or these perturbations.
 
 ## 9. Team parallelization and repository boundaries
 
@@ -595,26 +786,32 @@ Task 1 and Task 2 branches can modify their owned directories independently. Sha
 - Run the official evaluator harness.
 - Establish oracle, all-defer, and official/naive baselines.
 - Implement a valid defer-aware greedy planner with building/room batching.
+- Reproduce the evaluator's unobserved-EOL proxy and sorted post-horizon
+  emergency queue exactly in unit tests.
 - Return a valid complete plan for every scenario and mock fixture.
 
 ### P1: likely score gain after P0 is stable
 
 - Task 1: calibrate the primary model, improve long-tail estimates, and add temperature/voltage residual and trajectory features.
-- Task 2: implement exact expected timing cost with tail, decision-risk policy, defer logic, and route-aware local search.
+- Task 2: implement the three-state expected timing cost, analytical emergency
+  expectation, candidate-day CP-SAT, exact small-day routing, capacity repair,
+  route-aware local search, and seeded stochastic acceptance.
 - Shared: tune only on OOF scenario cost, run the highest-value ablations, and profile clean-process runtime/memory.
 
 ### P2: only after a measured bottleneck
 
-- Add a Task 1 ensemble or extra survival model only if the OOF forecast gap is limiting end-to-end score.
-- Add CP-SAT, exact route DP, OR-Tools routing, or advanced repair only if oracle plus greedy exposes a material planner gap.
-- Add Monte Carlo validation and bootstrap confidence intervals only when scenario-level results are too unstable for a decision.
+- Add large-neighborhood search, correlated building-risk scenarios, or broader
+  Monte Carlo only if P1 leaves a measured planner gap.
+- Add a Task 1 ensemble or richer joint-risk model only when its OOF gain survives
+  planner evaluation and runtime limits.
 - Prepare conservative and travel-efficient submission variants only after the balanced primary is frozen and reproducible.
 
 ### Stop/go rules
 
 - Do not start P1 until P0 generates valid plans and score decompositions on all train scenarios.
 - Do not start a P2 Task 1 experiment when oracle-to-OOF gap is already small relative to the planner gap.
-- Do not start a P2 optimizer when oracle plus greedy is already close to the best observed oracle score.
+- Do not start P2 search when the P1 oracle planner has negligible gap after
+  exact routing and threshold repair.
 - Stop any addition that does not show paired scenario-level improvement, fits poorly inside the runtime margin, or complicates submission packaging without stable gain.
 
 ## 11. Runtime and reliability requirements
@@ -631,16 +828,22 @@ Task 1 and Task 2 branches can modify their owned directories independently. Sha
 
 Run in this priority order before broad hyperparameter search:
 
-1. **P0:** Exact evaluator baseline versus all-defer, earliest-voltage, risk-only, and risk-plus-building-batching policies.
-2. **P0:** Oracle EOL plus greedy planner to quantify the Task 2 ceiling.
-3. **P0:** Fixed first-60-day features versus cutoff-relative recent-window features.
-4. **P1:** Raw voltage features versus smoothed and temperature-residualized features.
-5. **P1:** Censoring-aware baseline versus primary tree hazard, both evaluated with the same planner.
-6. **P1:** Uncalibrated versus calibrated CDFs under official total cost.
-7. **P1:** Fixed `p10` deadline versus expected-cost scheduling with explicit tail.
-8. **P1:** Battery-level ordering versus building/room batching and local search.
-9. **P1/P2:** Strict capacity versus evaluator penalty mode.
-10. **P2:** Greedy versus CP-SAT/routing, including runtime and stability, only if oracle results justify it.
+1. **P0:** Exact evaluator baseline versus all-defer, earliest-voltage,
+   risk-only, and risk-plus-building-batching policies.
+2. **P0:** Oracle EOL plus capacity-aware planning to establish the real Task 2
+   ceiling and eliminate avoidable 100-point threshold hits.
+3. **P0:** Physical-tail approximation versus the evaluator-aligned three-state
+   mixture for observed, post-horizon, and unobserved EOL.
+4. **P0:** Fixed first-60-day features versus cutoff-relative recent-window features.
+5. **P1:** Raw voltage features versus smoothed and temperature-residualized features.
+6. **P1:** Censoring-aware baseline versus primary tree hazard, both evaluated with the same planner.
+7. **P1:** Uncalibrated versus calibrated CDFs under official total cost.
+8. **P1:** Fixed `p10` deadline versus expected-cost scheduling with explicit tail and defer semantics.
+9. **P1:** Battery-level ordering versus building/room batching, exact small-day routes, and local search.
+10. **P1:** Greedy versus candidate-day CP-SAT plus route/capacity repair.
+11. **P1:** Analytical objective versus seeded emergency-queue scenario replay.
+12. **P1:** Strict capacity guardrails versus evaluator penalty mode.
+13. **P2:** Independent battery risks versus building-correlated stress scenarios, only if residual evidence supports them.
 
 ## 13. Definition of done
 
@@ -663,5 +866,52 @@ The solution is competition-ready when:
 4. The current Cox artifact is a baseline, not a validated winner; the other modeling/evaluation notebooks are currently empty files.
 5. The simple oracle reference still averages 151.39 in overtime/daily/weekly penalties. We need an oracle greedy planner with early moves and route-aware batching to establish a meaningful Task 2 ceiling.
 6. The planner needs automated evaluator edge tests for inclusive horizon dates, post-horizon deferral, emergency visits, non-zero diagonal travel, changing bases, and capacity penalties.
+7. The current contract has not yet been tested for its new evaluator-aligned
+   unobserved-EOL mixture. Until that test passes, Task 2 expected costs may be
+   systematically wrong for the 82.2% censored population.
 
 These are execution risks, not reasons to change the core architecture.
+
+## 15. Leaderboard and final-submission strategy
+
+The current public target to beat is `1899.53` as observed on 2026-08-18, but
+the primary selection target remains OOF expected official cost and stability.
+Public performance is a final external check, not the training objective.
+
+### 15.1 Submission discipline
+
+- Every official submission has one written hypothesis and differs from the
+  previous candidate in one interpretable policy family whenever possible.
+- Record commit SHA, forecast artifact, planner configuration, local OOF mean,
+  worst fold, timing subtotal, execution subtotal, runtime, and public result.
+- Spend no submission on a candidate that has not passed contract, validity,
+  clean-process runtime, and exact component-replay checks.
+- Use leaderboard component movement to diagnose calibration versus logistics,
+  never to reconstruct hidden labels or hard-code hidden outcomes.
+
+### 15.2 Final candidate portfolio
+
+After the balanced primary is frozen, prepare up to three genuinely distinct,
+fully reproducible finalists:
+
+1. **Balanced primary:** minimum robust OOF mean with calibrated probabilities,
+   full P1 planning, and no unexplained fold failure.
+2. **Late-risk hedge:** modestly conservative decision-risk policy chosen from
+   pre-declared OOF/calibration stresses, not from public score alone.
+3. **Shift/logistics hedge:** stronger defer and batching behavior that remains
+   competitive when event prevalence is lower or travel/capacity burden is
+   higher than train.
+
+Do not submit three near-identical seeds. Diversity should come from defensible
+private-distribution hypotheses. Confirm the organizer's exact final-ranking
+treatment of multiple selected submissions before selection.
+
+### 15.3 Win gates
+
+- First remove avoidable daily/weekly threshold penalties in the oracle and OOF
+  planners; the public top four show this is a material open opportunity.
+- Then reduce timing cost without giving the gain back through isolated visits,
+  overtime, or week overload.
+- A public score below the snapshot leader is necessary to lead the visible
+  board, but a candidate is final-worthy only if its OOF and stress-test evidence
+  also supports private generalization.

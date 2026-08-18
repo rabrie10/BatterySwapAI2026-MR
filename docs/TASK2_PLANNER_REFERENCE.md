@@ -76,6 +76,13 @@ Important evaluator behavior from local inspection:
   evaluator adds an emergency visit.
 - The technician starts each worked day at the base and returns to base at the
   end of that day.
+- A missing hidden EOL is excluded from emergency visits. If that battery is
+  planned, version 0.3.4 scores its timing against
+  `locations.end_time + settings.unobserved_eol_days`; if it is deferred, it
+  contributes no swap or timing cost.
+- Deferred due batteries are processed after the horizon in sorted battery-ID
+  order, one synthetic emergency day per battery. Their late and weekly costs
+  are therefore coupled rather than independent.
 
 ## Cost Components
 
@@ -130,6 +137,27 @@ Planning implication: travel/route cost is real, but timing penalties dominate
 when a high-risk battery is missed. A strong planner must combine risk selection
 with batching and route ordering.
 
+## Public Leaderboard Signal
+
+Snapshot observed 2026-08-18:
+
+| Rank | Total | Early + late | Execution/capacity | Approx. swaps/scenario |
+|---:|---:|---:|---:|---:|
+| 1 | 1899.53 | 1594.84 | 304.69 | 19.52 |
+| 2 | 1938.15 | 1368.57 | 569.58 | 14.88 |
+| 3 | 1964.29 | 1532.61 | 431.68 | 11.71 |
+| 4 | 2167.11 | 1295.34 | 871.76 | 20.62 |
+
+Rank 2 currently has lower timing cost than rank 1 but loses more than that gain
+to logistics and capacity. Rank 1 also still averages about one daily-limit hit
+and half a weekly-limit hit per scenario. This makes exact batching, routing,
+and threshold repair a first-order opportunity, while the 84% timing share of
+rank 1 confirms that Task 1 quality remains essential.
+
+Treat this only as directional evidence. Tune against local OOF scenarios and
+use public submissions for pre-declared coarse ablations, never hidden-label
+reconstruction.
+
 ## Prediction-To-Planning Contract
 
 Task 2 should not require a single point RUL estimate. It should consume a
@@ -149,7 +177,8 @@ Columns:
 
 Meaning:
 
-- `failure_cdf = P(EOL <= forecast_date | alive at prediction_origin, observed data)`
+- `failure_cdf = P(evaluator-observed EOL <= forecast_date | alive at
+  prediction_origin, causal data)`
 - one row per battery/date inside the planning horizon;
 - CDF must be monotone non-decreasing for each battery;
 - values must be clipped to `[0, 1]`;
@@ -161,16 +190,23 @@ Columns:
 
 - `scenario`
 - `battery_id`
-- `prob_survive_horizon`
-- `mean_excess_rul_days_given_survival`
+- `prob_observed_after_horizon`
+- `mean_excess_rul_days_given_observed_after_horizon`
+- `prob_unobserved_eol`
+- `prob_no_observed_eol_by_horizon`
 
 Meaning:
 
-- probability the battery survives beyond the planning horizon;
-- expected extra lifetime beyond horizon, conditional on survival.
+- `prob_observed_after_horizon` is the chance of an evaluator-observed EOL after
+  the planning horizon;
+- its conditional mean excess locates that observed tail;
+- `prob_unobserved_eol` is the chance the evaluator receives a missing EOL;
+- `prob_no_observed_eol_by_horizon` equals the sum of the two tail probabilities.
 
-This is needed because early replacement cost depends on how much useful life is
-lost, including batteries that survive past the horizon.
+The final CDF plus `prob_observed_after_horizon` plus `prob_unobserved_eol` must
+sum to one. This three-state mixture is required because the evaluator uses a
+fixed proxy date only for planned batteries with missing EOL and charges nothing
+when those batteries are deferred.
 
 ### Optional diagnostics
 
@@ -192,6 +228,7 @@ timing cost:
 - early cost if service happens before true EOL;
 - late cost if service happens after true EOL;
 - tail early cost if EOL is likely beyond the planning horizon.
+- evaluator-proxy timing cost weighted by `prob_unobserved_eol`.
 
 Core idea:
 
@@ -212,6 +249,21 @@ c_early / (c_early + c_late) = 0.5 / 10.5 = 0.0476
 
 That means a fixed `p10` deadline is often too aggressive. The service threshold
 should emerge from expected official cost, not from a hard-coded percentile.
+
+For the evaluator-unobserved state, add:
+
+```text
+proxy_date = locations.end_time + settings.unobserved_eol_days
+
+prob_unobserved_eol * (
+    early_penalty * max(proxy_date - d, 0)
+  + late_penalty  * max(d - proxy_date, 0)
+)
+```
+
+For defer, do not use this timing formula. Only observed in-horizon EOL outcomes
+enter the emergency queue; observed post-horizon and unobserved outcomes cost
+zero when deferred.
 
 ## Defer Decision
 
@@ -270,11 +322,17 @@ Practical rules:
 
 - keep normal days near but preferably below 8 hours unless late-risk savings
   justify overtime;
-- avoid exceeding 24 hours/day;
-- avoid exceeding 24 hours/week;
+- avoid exceeding 24 hours/day; version 0.3.4 penalizes only `> 24`;
+- keep weekly work strictly below 24 hours; version 0.3.4 penalizes `>= 24`;
 - prefer moving lower-risk same-building batteries earlier/later to smooth
   workload;
 - treat capacity as a score tradeoff during search, not just a final repair.
+
+The 100-point threshold penalties are discontinuous. Search must explicitly
+prioritize moves that cross a workload from the penalized to the unpenalized
+side, even when their ordinary timing delta is slightly worse. Compute week
+buckets from the scenario calendar and replay the evaluator's exact boundary
+logic; do not assume six interchangeable seven-day bins.
 
 ## Emergency Cost Awareness
 
@@ -288,6 +346,12 @@ Task 2 should estimate emergency exposure from the forecast distribution:
 - nearby planned visits reduce marginal cost of adding a battery;
 - deferring high-risk isolated batteries may still be bad if late penalty is
   large.
+
+The fast planner replay must reproduce the exact post-horizon emergency queue.
+Use analytical expectations for linear terms, then compare close candidate plans
+on a small fixed set of seeded outcome scenarios with common random numbers.
+This captures sorted-queue and weekly-threshold coupling without making the main
+search noisy.
 
 ## Validation Baselines
 
@@ -323,6 +387,8 @@ P0 tests:
 P1 tests:
 
 - expected timing cost matches hand-calculated toy examples;
+- evaluator-unobserved proxy cost matches the official evaluator;
+- emergency queue expectation matches exhaustive enumeration on tiny cases;
 - monotone CDF and tail validation catches bad Task 1 outputs;
 - local search never returns an invalid plan;
 - fallback plan is always valid if forecast data is missing or broken.
@@ -340,17 +406,21 @@ P0:
 
 P1:
 
-- expected-cost decision rule using full CDF and tail;
-- route-aware local search;
+- evaluator-aligned three-state expected-cost decision rule;
+- candidate-day CP-SAT with building/room activation;
+- Held-Karp routes for small daily building sets and deterministic routing
+  fallback for larger sets;
+- exact daily/weekly threshold repair and route-aware local search;
+- seeded stochastic acceptance for emergency-queue coupling;
 - workload smoothing;
 - stronger synthetic scenario validation;
 - submission-time safety fallback.
 
 P2:
 
-- OR-Tools / CP-SAT for selected subproblems if measured runtime allows;
-- exact small-day route DP;
-- ensemble or bootstrap risk uncertainty transforms;
+- building/day large-neighborhood search if P1 leaves a measured planner gap;
+- correlated building-risk scenarios only if residual evidence supports them;
+- broader ensemble/bootstrap risk stress tests;
 - multiple final submission profiles with different risk aversion.
 
 ## Common Mistakes To Avoid
