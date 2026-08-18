@@ -226,10 +226,56 @@ regime.
 
 ## 5. Validation results
 
-See `docs/task1_training_report.json` for the exact numbers from the most
-recent training run (selected family/penalizer, causal grouped OOF
-concordance and Brier/log-loss by horizon, the full grid search, calibrator
-parameters, and the diagnostic-only time-holdout metrics).
+Full numbers are in `docs/task1_training_report.json`; this is the 2026-08-18
+training run (`data/raw/train`, `synthetic_step_days=21`, `n_folds=5`,
+`seed=20260818`): **48,059** `(device, cutoff)` examples from all 461
+devices, **6,236** person-period rows with an in-window observed event
+(pooled from the dataset's 82 unique physical EOL events across many
+cutoffs). Elapsed training time (grid search + final fit): ~7,685s
+(~2.1h) — an offline, one-time cost, not part of the competition's
+per-scenario runtime budget.
+
+**Grid search** (mean OOF Brier across the six horizons, causal
+building-grouped 5-fold CV):
+
+| Family | penalizer=0.1 | penalizer=0.5 | penalizer=1.0 |
+| --- | ---: | ---: | ---: |
+| Weibull | 0.01029 (conc. 0.902) | 0.01035 | 0.01064 |
+| LogNormal | **0.00972 (conc. 0.900)** ← selected | 0.01024 | 0.01059 |
+| LogLogistic | 0.00986 (conc. 0.900) | 0.01028 | 0.01065 |
+
+All nine configurations land in a narrow band (concordance 0.889-0.902,
+mean Brier 0.0097-0.0106) — the family/penalizer choice is not fragile, which
+is itself a useful robustness signal given only 82 physical events.
+
+**Selected model** (LogNormal AFT, penalizer=0.1), causal grouped
+out-of-fold, by horizon:
+
+| Horizon (days) | Brier | Log loss |
+| ---: | ---: | ---: |
+| 7 | 0.00317 | 0.01783 |
+| 14 | 0.00609 | 0.02594 |
+| 21 | 0.00884 | 0.03417 |
+| 28 | 0.01129 | 0.04140 |
+| 35 | 0.01341 | 0.04729 |
+| 42 | 0.01554 | 0.05392 |
+
+Concordance index: **0.900**.
+
+**Calibrator**: Platt slope=0.761, intercept=0.286 — a real, non-trivial
+adjustment (not a no-op), consistent with the design spec's expectation that
+raw AFT probabilities need recalibration before being treated as evaluator
+outcome probabilities.
+
+**Time holdout (diagnostic only, not used for fitting/calibration)** — the
+temporally latest 20% of cutoffs (9,807 examples): Brier degrades from
+0.00371 (7d) to 0.02341 (42d), roughly 1.2-1.5x the causal building-grouped
+OOF numbers at the same horizons. This is an expected, moderate gap (later
+cutoffs see building/seasonal conditions the earlier training period covers
+less densely) — not a red flag, but it is the reason Sec 10 of
+`docs/SOLUTION_DESIGN_SPEC.md` (competition tuning protocol) and the honest
+tradeoff noted in Sec 1 above should be kept in mind before trusting long-tail
+extrapolation on a materially different private split.
 
 ## 6. Runtime and packaging
 

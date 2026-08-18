@@ -1,0 +1,7 @@
+Selected model: lognormal (penalizer=0.1)
+CV concordance: 0.9000
+CV brier by horizon: {7: 0.003173383811469961, 14: 0.006087094146727511, 21: 0.008836259030509176, 28: 0.01129451804444585, 35: 0.013407565280792101, 42: 0.015539103100383972}
+Examples: 48059 rows, 461 devices, 6236 events
+Saved forecaster -> models\risk_forecaster.pkl
+Saved report -> docs\task1_training_report.json
+Elapsed: 7684.6s

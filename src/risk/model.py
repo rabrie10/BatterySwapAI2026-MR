@@ -54,16 +54,8 @@ HORIZONS_FOR_METRICS: tuple[int, ...] = (7, 14, 21, 28, 35, 42)
 CURATED_FEATURES: tuple[str, ...] = (
     "latest_voltage",
     "voltage_slope_28d",
-    "voltage_slope_90d",
-    "voltage_std_28d",
-    "crossing_days_log",
-    "temp_mean_28d",
     "frac_low_voltage_28d",
-    "completeness_90d",
     "age_days",
-    "days_since_last_reading",
-    "building_loo_latest_voltage",
-    "building_loo_voltage_slope_28d",
     "not_yet_deployed",
     "cold_start",
 )
