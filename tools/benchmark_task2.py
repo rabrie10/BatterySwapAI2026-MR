@@ -7,6 +7,7 @@ submission because public/private EOL labels are not available to the planner.
 from __future__ import annotations
 
 import argparse
+import pickle
 from pathlib import Path
 import time
 import warnings
@@ -132,7 +133,13 @@ def main() -> None:
     parser.add_argument("--solver-seconds", type=float, default=2.0)
     parser.add_argument("--local-search", type=int, default=160)
     parser.add_argument("--robust-samples", type=int, default=4)
-    parser.add_argument("--mode", choices=["oracle", "fallback"], default="oracle")
+    parser.add_argument("--mode", choices=["oracle", "fallback", "real"], default="oracle")
+    parser.add_argument(
+        "--forecaster-path",
+        type=Path,
+        default=Path("models/risk_forecaster.pkl"),
+        help="Task 1 artifact used only when --mode=real",
+    )
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--scenario-index", type=int)
     parser.add_argument("--show-plan", action="store_true")
@@ -150,7 +157,13 @@ def main() -> None:
             break
         if args.limit and scenario_index >= args.limit:
             break
-        forecaster = OracleForecaster(active_eol) if args.mode == "oracle" else None
+        if args.mode == "oracle":
+            forecaster = OracleForecaster(active_eol)
+        elif args.mode == "real":
+            with args.forecaster_path.open("rb") as handle:
+                forecaster = pickle.load(handle)
+        else:
+            forecaster = None
         config = PlannerConfig(
             local_search_evaluations=args.local_search,
             robust_emergency_samples=args.robust_samples,
