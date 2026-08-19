@@ -1,0 +1,56 @@
+{
+  "selected_regularization": 1.0,
+  "n_unique_events": 82,
+  "n_unique_devices": 461,
+  "features": [
+    "latest_voltage",
+    "voltage_slope_28d",
+    "voltage_slope_90d",
+    "voltage_std_28d",
+    "frac_low_voltage_28d",
+    "crossing_days_log",
+    "age_days_log",
+    "history_days_log",
+    "remaining_observation_days_log",
+    "cold_start"
+  ],
+  "grouped_cv": {
+    "0.01": {
+      "brier": 0.1370147903739319,
+      "log_loss": 0.4380754183106004,
+      "mean_probability": 0.18690955112446628,
+      "event_rate": 0.17787418655097617
+    },
+    "0.1": {
+      "brier": 0.1209092665279352,
+      "log_loss": 0.3848704818153936,
+      "mean_probability": 0.1881585963255125,
+      "event_rate": 0.17787418655097617
+    },
+    "1.0": {
+      "brier": 0.11020921785727592,
+      "log_loss": 0.35289505748335526,
+      "mean_probability": 0.18841491851967085,
+      "event_rate": 0.17787418655097617
+    }
+  },
+  "config": {
+    "dataset_path": "dataset\\train",
+    "base_forecaster": "models\\risk_forecaster.pkl",
+    "synthetic_step_days": 21,
+    "n_folds": 4,
+    "seed": 20260818,
+    "regularization_grid": [
+      0.01,
+      0.1,
+      1.0
+    ],
+    "observation_end": "2026-08-01 00:00:00",
+    "physical_uncertainty_days": 1.0,
+    "physical_risk_weight": 0.25,
+    "physical_shape_min_remaining_days": 210.0,
+    "model_version": "task1-mixture-cure/v2"
+  },
+  "n_examples": 48059,
+  "elapsed_seconds": 64.40655129999504
+}

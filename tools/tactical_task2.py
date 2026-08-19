@@ -75,7 +75,12 @@ def all_defer_plan(
     )
 
 
-def override_uncertainty(forecaster, uncertainty_days: float):
+def override_physical_prior(
+    forecaster,
+    uncertainty_days: float,
+    physical_risk_weight: float,
+    physical_shape_min_remaining_days: float,
+):
     if not is_dataclass(forecaster) or not hasattr(
         forecaster, "physical_uncertainty_days"
     ):
@@ -85,12 +90,15 @@ def override_uncertainty(forecaster, uncertainty_days: float):
     return replace(
         forecaster,
         physical_uncertainty_days=float(uncertainty_days),
+        physical_risk_weight=float(physical_risk_weight),
+        physical_shape_min_remaining_days=float(physical_shape_min_remaining_days),
     )
 
 
 def build_config(args: argparse.Namespace) -> PlannerConfig:
     return PlannerConfig(
         late_risk_multiplier=float(args.late_risk_multiplier),
+        minimum_expected_improvement=float(args.minimum_expected_improvement),
         local_search_evaluations=int(args.local_search),
         uncertain_local_search_evaluations=int(args.uncertain_local_search),
         robust_emergency_samples=int(args.robust_samples),
@@ -122,6 +130,8 @@ def battery_diagnostics(
     *,
     experiment: str,
     uncertainty_days: float,
+    physical_risk_weight: float,
+    physical_shape_min_remaining_days: float,
     scenario_index: int,
     scenario,
     locations: pd.DataFrame,
@@ -178,6 +188,10 @@ def battery_diagnostics(
         row = {
             "experiment": experiment,
             "physical_uncertainty_days": float(uncertainty_days),
+            "physical_risk_weight": float(physical_risk_weight),
+            "physical_shape_min_remaining_days": float(
+                physical_shape_min_remaining_days
+            ),
             "scenario_index": scenario_index,
             "scenario": scenario["name"],
             "scenario_start": start,
@@ -217,12 +231,15 @@ def scenario_diagnostics(
     *,
     experiment: str,
     uncertainty_days: float,
+    physical_risk_weight: float,
+    physical_shape_min_remaining_days: float,
     scenario_index: int,
     scenario,
     battery_rows: pd.DataFrame,
     score: pd.Series,
     all_defer_score: pd.Series,
     runtime_seconds: float,
+    expected_improvement: float,
 ) -> dict:
     planned_swaps = int(battery_rows["planned"].sum())
     actual_due = int(battery_rows["due_in_horizon"].sum())
@@ -233,6 +250,10 @@ def scenario_diagnostics(
     row = {
         "experiment": experiment,
         "physical_uncertainty_days": float(uncertainty_days),
+        "physical_risk_weight": float(physical_risk_weight),
+        "physical_shape_min_remaining_days": float(
+            physical_shape_min_remaining_days
+        ),
         "scenario_index": scenario_index,
         "scenario": scenario["name"],
         "scenario_start": pd.Timestamp(scenario["start_time"]),
@@ -245,6 +266,7 @@ def scenario_diagnostics(
         "due_recall": recall,
         "planned_precision": precision,
         "runtime_seconds": float(runtime_seconds),
+        "expected_improvement": float(expected_improvement),
         "all_defer_total_cost": float(all_defer_score["total_cost"]),
     }
     row.update({component: float(score[component]) for component in cost_components})
@@ -288,6 +310,7 @@ def run_experiment(
     *,
     args: argparse.Namespace,
     uncertainty_days: float,
+    physical_risk_weight: float,
     locations: pd.DataFrame,
     timeseries: pd.DataFrame,
     eol_times: pd.Series,
@@ -295,8 +318,13 @@ def run_experiment(
     base_forecaster,
     selected_indices: set[int] | None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    experiment = f"{args.run_name}-u{uncertainty_days:g}"
-    forecaster = override_uncertainty(base_forecaster, uncertainty_days)
+    experiment = f"{args.run_name}-u{uncertainty_days:g}-w{physical_risk_weight:g}"
+    forecaster = override_physical_prior(
+        base_forecaster,
+        uncertainty_days,
+        physical_risk_weight,
+        args.physical_shape_min_remaining_days,
+    )
     config = build_config(args)
     scenario_rows: list[dict] = []
     battery_frames: list[pd.DataFrame] = []
@@ -341,6 +369,8 @@ def run_experiment(
         battery_rows = battery_diagnostics(
             experiment=experiment,
             uncertainty_days=uncertainty_days,
+            physical_risk_weight=physical_risk_weight,
+            physical_shape_min_remaining_days=args.physical_shape_min_remaining_days,
             scenario_index=scenario_index,
             scenario=scenario,
             locations=locs,
@@ -352,12 +382,15 @@ def run_experiment(
         row = scenario_diagnostics(
             experiment=experiment,
             uncertainty_days=uncertainty_days,
+            physical_risk_weight=physical_risk_weight,
+            physical_shape_min_remaining_days=args.physical_shape_min_remaining_days,
             scenario_index=scenario_index,
             scenario=scenario,
             battery_rows=battery_rows,
             score=score,
             all_defer_score=defer_score,
             runtime_seconds=runtime_seconds,
+            expected_improvement=planner.last_expected_improvement,
         )
         scenario_rows.append(row)
         battery_frames.append(battery_rows)
@@ -378,11 +411,16 @@ def run_experiment(
         "experiment": experiment,
         "model_version": str(forecaster.model_version),
         "physical_uncertainty_days": float(uncertainty_days),
+        "physical_risk_weight": float(physical_risk_weight),
+        "physical_shape_min_remaining_days": float(
+            args.physical_shape_min_remaining_days
+        ),
         "scenario_indices": scenario_frame["scenario_index"].astype(int).tolist(),
         "scenario_count": int(len(scenario_frame)),
         "elapsed_seconds": float(time.perf_counter() - experiment_started),
         "planner_config": {
             "late_risk_multiplier": float(args.late_risk_multiplier),
+            "minimum_expected_improvement": float(args.minimum_expected_improvement),
             "solver_seconds": float(args.solver_seconds),
             "local_search": int(args.local_search),
             "uncertain_local_search": int(args.uncertain_local_search),
@@ -429,6 +467,15 @@ def main() -> None:
         default=[20.0],
     )
     parser.add_argument(
+        "--physical-risk-weight",
+        type=float,
+        nargs="+",
+        default=[1.0],
+    )
+    parser.add_argument(
+        "--physical-shape-min-remaining-days", type=float, default=0.0
+    )
+    parser.add_argument(
         "--scenario-indices",
         help="Comma-separated zero-based indices. Omit to run all scenarios.",
     )
@@ -439,42 +486,47 @@ def main() -> None:
     parser.add_argument("--uncertain-local-search", type=int, default=70)
     parser.add_argument("--robust-samples", type=int, default=4)
     parser.add_argument("--late-risk-multiplier", type=float, default=1.0)
+    parser.add_argument("--minimum-expected-improvement", type=float, default=0.0)
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
     if any(value <= 0 for value in args.physical_uncertainty_days):
         parser.error("--physical-uncertainty-days values must be positive")
+    if any(not 0.0 <= value <= 1.0 for value in args.physical_risk_weight):
+        parser.error("--physical-risk-weight values must be between 0 and 1")
     selected_indices = parse_indices(args.scenario_indices)
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset_path)
     with args.forecaster_path.open("rb") as handle:
         base_forecaster = pickle.load(handle)
 
     for uncertainty_days in args.physical_uncertainty_days:
-        scenarios_frame, batteries_frame, summary = run_experiment(
-            args=args,
-            uncertainty_days=uncertainty_days,
-            locations=locations,
-            timeseries=timeseries,
-            eol_times=eol_times,
-            scenarios=scenarios,
-            base_forecaster=base_forecaster,
-            selected_indices=selected_indices,
-        )
-        experiment = summary["experiment"]
-        run_dir = write_results(
-            args.output_dir,
-            experiment,
-            scenarios_frame,
-            batteries_frame,
-            summary,
-        )
-        mean = summary["metrics"]["total_cost"]["mean"]
-        p90 = summary["metrics"]["total_cost"]["p90"]
-        print(
-            f"completed {experiment}: mean={mean:.3f} p90={p90:.3f} "
-            f"output={run_dir}",
-            flush=True,
-        )
+        for physical_risk_weight in args.physical_risk_weight:
+            scenarios_frame, batteries_frame, summary = run_experiment(
+                args=args,
+                uncertainty_days=uncertainty_days,
+                physical_risk_weight=physical_risk_weight,
+                locations=locations,
+                timeseries=timeseries,
+                eol_times=eol_times,
+                scenarios=scenarios,
+                base_forecaster=base_forecaster,
+                selected_indices=selected_indices,
+            )
+            experiment = summary["experiment"]
+            run_dir = write_results(
+                args.output_dir,
+                experiment,
+                scenarios_frame,
+                batteries_frame,
+                summary,
+            )
+            mean = summary["metrics"]["total_cost"]["mean"]
+            p90 = summary["metrics"]["total_cost"]["p90"]
+            print(
+                f"completed {experiment}: mean={mean:.3f} p90={p90:.3f} "
+                f"output={run_dir}",
+                flush=True,
+            )
 
 
 if __name__ == "__main__":

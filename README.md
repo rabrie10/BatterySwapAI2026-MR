@@ -36,6 +36,19 @@ The exact v1 schema is defined in `batteryswap_solution/forecast.py` and
 the planner uses `VoltageTrendForecaster`; that fallback is for operational
 safety and parallel development, not the intended final leaderboard model.
 
+The production artifact is trained in two explicit stages. Stage 1 fits the
+censoring-aware AFT timing model; stage 2 attaches the grouped-CV incidence
+model and writes the final mixture-cure artifact in place:
+
+```powershell
+python -m src.risk.train
+python tools/fit_incidence_model.py
+```
+
+The stage-2 defaults reproduce the validated configuration: one-day physical
+timing uncertainty, `0.25` physical timing weight, and a 210-day survivor gate.
+Training diagnostics are written to `docs/incidence_training_report.json`.
+
 ## Tests
 
 ```powershell
@@ -74,6 +87,7 @@ The official run uses `public,private`. Optional environment controls are:
 - `BATTERYSWAP_FORECASTER_PATH`
 - `BATTERYSWAP_PLANNER_PATH`
 - `BATTERYSWAP_LATE_RISK_MULTIPLIER`
+- `BATTERYSWAP_MINIMUM_EXPECTED_IMPROVEMENT`
 - `BATTERYSWAP_SOLVER_SECONDS`
 - `BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS`
 - `BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS`

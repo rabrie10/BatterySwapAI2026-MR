@@ -95,3 +95,51 @@ among 2577 planned batteries without an observed in-horizon EOL, the median
 predicted day-42 failure CDF is 0.841. The next one-variable experiment should
 therefore reduce or gate the physical term in `max(AFT CDF, physical CDF)` while
 holding `physical_uncertainty_days=1` and every planner setting fixed.
+
+## 2026-08-19 mixture-cure correction
+
+The next experiments confirmed that reducing the physical floor alone did not
+solve the late-scenario error. AFT-only predictions still overserviced devices
+that had survived deep into the observation window. The root cause was model
+structure: one survival curve was being asked both whether EOL would be
+observed and when it would occur.
+
+The v2 model separates those decisions. A building-grouped logistic incidence
+model owns `P(EOL by observation end)`; AFT and physical extrapolation only
+shape event timing conditional on EOL. Each battery has total training weight
+one across synthetic cutoffs. Grouped CV selected `C=1.0`, with weighted Brier
+`0.110209`, log loss `0.352895`, mean probability `0.188415`, and event rate
+`0.177874` across 82 events and 461 devices.
+
+Physical timing weight `0.25` was selected on representative early scenarios.
+A 210-day remaining-observation gate then disables it for survivor-heavy late
+scenarios. The threshold was selected on scenarios 14, 16, 18, 20, and 22;
+scenarios 24..47 remained locked until final confirmation.
+
+| Metric | Original E0 | Mixture-cure candidate | All defer |
+| --- | ---: | ---: | ---: |
+| Mean total cost, 48 scenarios | 6023.61 | 2880.87 | 3324.68 |
+| P90 total cost | 11095.99 | 4400.34 | - |
+| Maximum total cost | 14248.23 | 6261.86 | - |
+| Early swap | 4562.57 | 610.78 | - |
+| Late swap | 278.12 | 1913.12 | - |
+| Operational cost | 1182.91 | 356.97 | - |
+| Planned swaps | 71.08 | 10.35 | - |
+
+The candidate reduced mean cost by 52.2% versus E0 and 13.3% versus all defer,
+won 41 of 48 paired comparisons against E0, and averaged 17.60 seconds per
+scenario. On the locked scenarios 24..47 it scored 2271.08 versus 2309.48 for
+all defer. This is the first production checkpoint, not evidence that further
+Task 1/Task 2 calibration has saturated.
+
+Reproduce the artifact and full audit with:
+
+```powershell
+python -m src.risk.train
+python tools/fit_incidence_model.py
+python tools/tactical_task2.py `
+  --run-name cure-adaptive-full-20260819 `
+  --physical-uncertainty-days 1 `
+  --physical-risk-weight 0.25 `
+  --physical-shape-min-remaining-days 210
+```

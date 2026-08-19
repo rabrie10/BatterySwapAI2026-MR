@@ -39,6 +39,9 @@ def load_competition_planner() -> Planner:
         forecaster = _load_pickle(forecaster_path)
 
     risk_multiplier = float(os.environ.get("BATTERYSWAP_LATE_RISK_MULTIPLIER", "1.0"))
+    minimum_improvement = float(
+        os.environ.get("BATTERYSWAP_MINIMUM_EXPECTED_IMPROVEMENT", "0.0")
+    )
     solver_seconds = float(os.environ.get("BATTERYSWAP_SOLVER_SECONDS", "2.0"))
     local_search = int(os.environ.get("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", "160"))
     uncertain_search = int(
@@ -47,6 +50,7 @@ def load_competition_planner() -> Planner:
     robust_samples = int(os.environ.get("BATTERYSWAP_ROBUST_SAMPLES", "4"))
     config = PlannerConfig(
         late_risk_multiplier=risk_multiplier,
+        minimum_expected_improvement=minimum_improvement,
         local_search_evaluations=local_search,
         uncertain_local_search_evaluations=uncertain_search,
         robust_emergency_samples=robust_samples,
