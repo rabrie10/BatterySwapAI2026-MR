@@ -55,6 +55,7 @@ from .features import (
 
 MODEL_VERSION = "task1-aft-survival-blended/v1"
 CURE_MODEL_VERSION = "task1-mixture-cure-cutoff-balanced/v3"
+ROBUST_CURE_MODEL_VERSION = "task1-mixture-cure-shift-guard/v4"
 
 AFT_FAMILIES = {
     "weibull": WeibullAFTFitter,
@@ -166,6 +167,141 @@ def fit_feature_transform(design: pd.DataFrame, columns: Iterable[str]) -> Featu
     means = filled.mean().to_dict()
     stds = {c: (v if v > 1e-9 else 1.0) for c, v in filled.std(ddof=0).to_dict().items()}
     return FeatureTransform(columns=tuple(columns), medians=medians, means=means, stds=stds)
+
+
+@dataclass(frozen=True)
+class HorizonRateCalibrator:
+    """Upper-bound scenario event mass under unseen-building prior shift.
+
+    The incidence classifier ranks individual batteries. This calibrator only
+    changes its global intercept when the aggregate 42-day event mass exceeds
+    a smoothed temporal prior learned from labeled training scenarios. It is
+    intentionally one-sided: a weak-risk scenario is never made riskier.
+    """
+
+    remaining_observation_days: tuple[float, ...]
+    event_rates: tuple[float, ...]
+    cap_multiplier: float = 1.0
+    smoothing_window: int = 9
+    activation_ratio: float = 1.0
+
+    def target_rate(self, remaining_days: float) -> float:
+        if not self.remaining_observation_days:
+            return 1.0
+        rate = float(
+            np.interp(
+                float(remaining_days),
+                np.asarray(self.remaining_observation_days, dtype=float),
+                np.asarray(self.event_rates, dtype=float),
+            )
+        )
+        return float(np.clip(rate * self.cap_multiplier, 0.0, 1.0))
+
+    def cap_incidence(
+        self,
+        incidence_probability: np.ndarray,
+        horizon_timing_probability: np.ndarray,
+        remaining_days: float,
+    ) -> np.ndarray:
+        """Shift incidence logits until aggregate horizon risk meets the cap."""
+
+        incidence = np.clip(
+            np.asarray(incidence_probability, dtype=float), 1e-8, 1.0 - 1e-8
+        )
+        timing = np.clip(
+            np.asarray(horizon_timing_probability, dtype=float), 0.0, 1.0
+        )
+        target_mass = self.target_rate(remaining_days) * len(incidence)
+        raw_mass = float(np.dot(incidence, timing))
+        if raw_mass <= target_mass * float(self.activation_ratio) + 1e-12:
+            return incidence
+
+        logits = np.log(incidence / (1.0 - incidence))
+        low, high = -30.0, 0.0
+        for _ in range(60):
+            offset = 0.5 * (low + high)
+            shifted = 1.0 / (
+                1.0 + np.exp(-np.clip(logits + offset, -40.0, 40.0))
+            )
+            if float(np.dot(shifted, timing)) > target_mass:
+                high = offset
+            else:
+                low = offset
+        offset = 0.5 * (low + high)
+        return 1.0 / (
+            1.0 + np.exp(-np.clip(logits + offset, -40.0, 40.0))
+        )
+
+
+def fit_horizon_rate_calibrator(
+    locations: pd.DataFrame,
+    eol_times: pd.Series,
+    scenarios: Iterable[dict],
+    observation_end: pd.Timestamp,
+    *,
+    smoothing_window: int = 9,
+    cap_multiplier: float = 1.0,
+    activation_ratio: float = 1.0,
+) -> tuple[HorizonRateCalibrator, pd.DataFrame]:
+    """Fit a smoothed calendar-time prior for in-horizon observed EOL rate."""
+
+    if smoothing_window < 1 or smoothing_window % 2 == 0:
+        raise ValueError("smoothing_window must be a positive odd integer")
+    if activation_ratio < 1.0:
+        raise ValueError("activation_ratio must be at least 1.0")
+    id_column = "battery_id" if "battery_id" in locations else "battery"
+    battery_ids = locations[id_column].astype(str)
+    eol = pd.to_datetime(eol_times.reindex(battery_ids).to_numpy())
+    end = pd.Timestamp(observation_end)
+    if end.tzinfo is not None:
+        end = end.tz_localize(None)
+    end = end.normalize()
+
+    rows = []
+    for scenario in scenarios:
+        start = pd.Timestamp(scenario["start_time"])
+        if start.tzinfo is not None:
+            start = start.tz_localize(None)
+        start = start.normalize()
+        horizon_days = float(scenario["settings"].planning_window_days)
+        horizon_end = start + pd.Timedelta(days=horizon_days)
+        active = pd.isna(eol) | (eol > start)
+        due = active & pd.notna(eol) & (eol <= horizon_end)
+        active_count = int(active.sum())
+        rows.append(
+            {
+                "scenario_start": start,
+                "remaining_observation_days": float(
+                    (end - start) / pd.Timedelta(days=1)
+                ),
+                "active_batteries": active_count,
+                "observed_events": int(due.sum()),
+                "event_rate": float(due.sum() / max(active_count, 1)),
+            }
+        )
+
+    calibration = pd.DataFrame(rows).sort_values("scenario_start").reset_index(
+        drop=True
+    )
+    min_periods = min(max((smoothing_window + 1) // 3, 1), len(calibration))
+    calibration["smoothed_event_rate"] = calibration["event_rate"].rolling(
+        smoothing_window, center=True, min_periods=min_periods
+    ).mean()
+    calibration["smoothed_event_rate"] = calibration[
+        "smoothed_event_rate"
+    ].fillna(calibration["event_rate"])
+
+    ordered = calibration.sort_values("remaining_observation_days")
+    calibrator = HorizonRateCalibrator(
+        remaining_observation_days=tuple(
+            ordered["remaining_observation_days"].astype(float)
+        ),
+        event_rates=tuple(ordered["smoothed_event_rate"].astype(float)),
+        cap_multiplier=float(cap_multiplier),
+        smoothing_window=int(smoothing_window),
+        activation_ratio=float(activation_ratio),
+    )
+    return calibrator, calibration
 
 
 def incidence_sample_weights(table: pd.DataFrame, mode: str) -> np.ndarray:
@@ -296,6 +432,106 @@ def fit_incidence_classifier(
         "metric_weighting": "cutoff",
         "n_unique_events": int(table.loc[table["event"] == 1, "device_id"].nunique()),
         "n_unique_devices": int(table["device_id"].nunique()),
+        "features": list(INCIDENCE_FEATURES),
+        "grouped_cv": {str(key): value for key, value in results.items()},
+        "oof_event_count": {
+            "mean_absolute_error": float(count_error.abs().mean()),
+            "mean_bias": float(count_error.mean()),
+            "correlation": float(
+                counts["expected_events"].corr(counts["actual_events"])
+            ),
+            "n_cutoffs": int(len(counts)),
+        },
+    }
+    return model, transform, report
+
+
+def fit_horizon_classifier(
+    table: pd.DataFrame,
+    observation_end: pd.Timestamp,
+    *,
+    horizon_days: int = 42,
+    n_folds: int = 4,
+    seed: int = 20260818,
+    regularization_grid: Iterable[float] = (0.01, 0.1, 1.0, 10.0),
+) -> tuple[object, FeatureTransform, dict]:
+    """Fit P(evaluator-observed EOL inside the planning window) directly.
+
+    Missing EOL is a known negative for the competition decision, even when
+    the physical lifetime is right-censored. That is different from fitting a
+    survival endpoint and is the reason this head is separate from the AFT.
+    """
+
+    design = derive_incidence_design(table, observation_end)
+    label = (
+        (table["event"].to_numpy(dtype=int) == 1)
+        & (table["duration_days"].to_numpy(dtype=float) <= int(horizon_days))
+    ).astype(int)
+    weights = incidence_sample_weights(table, "cutoff")
+    folds = assign_building_folds(table, n_folds=n_folds, seed=seed).to_numpy()
+    results: dict[float, dict[str, float]] = {}
+    oof_predictions: dict[float, np.ndarray] = {}
+
+    for regularization in regularization_grid:
+        predictions = np.full(len(table), np.nan, dtype=float)
+        for fold in range(n_folds):
+            test_mask = folds == fold
+            train_mask = ~test_mask
+            if test_mask.sum() == 0 or len(np.unique(label[train_mask])) < 2:
+                continue
+            transform = fit_feature_transform(
+                design.loc[train_mask], INCIDENCE_FEATURES
+            )
+            model = LogisticRegression(
+                C=float(regularization), solver="lbfgs", max_iter=2000
+            )
+            model.fit(
+                transform.transform(design.loc[train_mask]),
+                label[train_mask],
+                sample_weight=weights[train_mask],
+            )
+            predictions[test_mask] = model.predict_proba(
+                transform.transform(design.loc[test_mask])
+            )[:, 1]
+
+        valid = np.isfinite(predictions)
+        if not valid.any():
+            continue
+        y = label[valid].astype(float)
+        p = np.clip(predictions[valid], 1e-8, 1.0 - 1e-8)
+        w = weights[valid]
+        results[float(regularization)] = {
+            "brier": float(np.average((p - y) ** 2, weights=w)),
+            "log_loss": float(
+                np.average(-y * np.log(p) - (1.0 - y) * np.log(1.0 - p), weights=w)
+            ),
+            "mean_probability": float(np.average(p, weights=w)),
+            "event_rate": float(np.average(y, weights=w)),
+        }
+        oof_predictions[float(regularization)] = predictions
+
+    if not results:
+        raise RuntimeError("No direct horizon classifier configuration converged")
+    selected = min(results, key=lambda value: results[value]["brier"])
+    transform = fit_feature_transform(design, INCIDENCE_FEATURES)
+    model = LogisticRegression(C=selected, solver="lbfgs", max_iter=2000)
+    model.fit(transform.transform(design), label, sample_weight=weights)
+
+    selected_oof = oof_predictions[selected]
+    diagnostics = pd.DataFrame(
+        {
+            "cutoff": table["cutoff"],
+            "label": label,
+            "prediction": selected_oof,
+        }
+    ).dropna(subset=["prediction"])
+    counts = diagnostics.groupby("cutoff").agg(
+        actual_events=("label", "sum"), expected_events=("prediction", "sum")
+    )
+    count_error = counts["expected_events"] - counts["actual_events"]
+    report = {
+        "horizon_days": int(horizon_days),
+        "selected_regularization": selected,
         "features": list(INCIDENCE_FEATURES),
         "grouped_cv": {str(key): value for key, value in results.items()},
         "oof_event_count": {
@@ -510,6 +746,11 @@ class Task1Forecaster:
     incidence_model: object | None = None
     incidence_transform: FeatureTransform | None = None
     incidence_weighting: str = "device"
+    horizon_rate_calibrator: HorizonRateCalibrator | None = None
+    horizon_model: object | None = None
+    horizon_transform: FeatureTransform | None = None
+    direct_horizon_days: int = 42
+    direct_horizon_weight: float = 0.0
 
     def _scenario_table(
         self, battery_data: pd.DataFrame, locations: pd.DataFrame, origin: pd.Timestamp
@@ -646,9 +887,105 @@ class Task1Forecaster:
             timing_cdf = np.maximum(
                 aft_timing, effective_physical_weight * physical_timing
             )
-            combined_matrix = incidence_probability[None, :] * np.clip(
-                timing_cdf, 0.0, 1.0
+            horizon_rate_calibrator = getattr(
+                self, "horizon_rate_calibrator", None
             )
+            horizon_timing_row = rows_for(
+                np.array([eval_offsets_curve[-1]])
+            )[0]
+            horizon_model = getattr(self, "horizon_model", None)
+            horizon_transform = getattr(self, "horizon_transform", None)
+            direct_horizon_days = int(getattr(self, "direct_horizon_days", 42))
+            if (
+                horizon_model is not None
+                and horizon_transform is not None
+                and horizon_days == direct_horizon_days
+            ):
+                horizon_design = derive_incidence_design(table, observation_end)
+                direct_horizon_probability = np.clip(
+                    horizon_model.predict_proba(
+                        horizon_transform.transform(horizon_design)
+                    )[:, 1],
+                    1e-8,
+                    1.0 - 1e-8,
+                )
+                direct_weight = float(
+                    getattr(self, "direct_horizon_weight", 0.0)
+                )
+                if not 0.0 <= direct_weight <= 1.0:
+                    raise ValueError("direct_horizon_weight must be between 0 and 1")
+                legacy_horizon_probability = np.clip(
+                    incidence_probability * timing_cdf[horizon_timing_row, :],
+                    1e-8,
+                    1.0 - 1e-8,
+                )
+                horizon_probability = (
+                    direct_weight * direct_horizon_probability
+                    + (1.0 - direct_weight) * legacy_horizon_probability
+                )
+                if horizon_rate_calibrator is not None:
+                    horizon_probability = horizon_rate_calibrator.cap_incidence(
+                        horizon_probability,
+                        np.ones_like(horizon_probability),
+                        c_offset,
+                    )
+
+                horizon_timing = timing_cdf[horizon_timing_row, :]
+                before_ratio = np.divide(
+                    timing_cdf,
+                    horizon_timing[None, :],
+                    out=np.zeros_like(timing_cdf),
+                    where=horizon_timing[None, :] > 1e-9,
+                )
+                effective_horizon = max(float(eval_offsets_curve[-1]), MIN_DURATION_DAYS)
+                zero_horizon_timing = horizon_timing <= 1e-9
+                if zero_horizon_timing.any():
+                    linear_before = np.clip(
+                        all_times / effective_horizon, 0.0, 1.0
+                    )
+                    before_ratio[:, zero_horizon_timing] = linear_before[:, None]
+                before_ratio = np.clip(before_ratio, 0.0, 1.0)
+
+                if c_offset > horizon_days:
+                    total_probability = np.maximum(
+                        incidence_probability, horizon_probability
+                    )
+                else:
+                    total_probability = horizon_probability
+                after_ratio = np.divide(
+                    timing_cdf - horizon_timing[None, :],
+                    1.0 - horizon_timing[None, :],
+                    out=np.zeros_like(timing_cdf),
+                    where=(1.0 - horizon_timing[None, :]) > 1e-9,
+                )
+                saturated = (1.0 - horizon_timing) <= 1e-9
+                if saturated.any() and c_offset > effective_horizon:
+                    linear_after = np.clip(
+                        (all_times - effective_horizon)
+                        / (c_offset - effective_horizon),
+                        0.0,
+                        1.0,
+                    )
+                    after_ratio[:, saturated] = linear_after[:, None]
+                after_ratio = np.clip(after_ratio, 0.0, 1.0)
+                before_horizon = all_times[:, None] <= effective_horizon + 1e-9
+                combined_matrix = np.where(
+                    before_horizon,
+                    horizon_probability[None, :] * before_ratio,
+                    horizon_probability[None, :]
+                    + (total_probability - horizon_probability)[None, :]
+                    * after_ratio,
+                )
+            else:
+                if horizon_rate_calibrator is not None:
+                    incidence_probability = horizon_rate_calibrator.cap_incidence(
+                        incidence_probability,
+                        timing_cdf[horizon_timing_row, :],
+                        c_offset,
+                    )
+                combined_matrix = incidence_probability[None, :] * np.clip(
+                    timing_cdf, 0.0, 1.0
+                )
         else:
             combined_matrix = np.maximum(
                 calibrated_matrix, physical_risk_weight * physical_cdf_matrix

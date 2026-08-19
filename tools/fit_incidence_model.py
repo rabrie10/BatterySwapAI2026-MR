@@ -22,9 +22,11 @@ from batteryswap_public.utils import load_dataset
 from src.risk.cutoffs import build_cutoff_grid, build_example_table
 from src.risk.features import build_feature_series
 from src.risk.model import (
-    CURE_MODEL_VERSION,
     INCIDENCE_WEIGHTING_MODES,
+    ROBUST_CURE_MODEL_VERSION,
+    fit_horizon_classifier,
     fit_incidence_classifier,
+    fit_horizon_rate_calibrator,
 )
 
 
@@ -54,10 +56,25 @@ def main() -> None:
     parser.add_argument(
         "--physical-shape-min-remaining-days", type=float, default=210.0
     )
+    parser.add_argument("--horizon-rate-smoothing-window", type=int, default=9)
+    parser.add_argument("--horizon-rate-cap-multiplier", type=float, default=1.0)
+    parser.add_argument("--horizon-rate-activation-ratio", type=float, default=1.9)
+    parser.add_argument("--direct-horizon-weight", type=float, default=0.0)
     args = parser.parse_args()
 
     if not 0.0 <= args.physical_risk_weight <= 1.0:
         parser.error("--physical-risk-weight must be between 0 and 1")
+    if (
+        args.horizon_rate_smoothing_window < 1
+        or args.horizon_rate_smoothing_window % 2 == 0
+    ):
+        parser.error("--horizon-rate-smoothing-window must be a positive odd integer")
+    if args.horizon_rate_cap_multiplier <= 0.0:
+        parser.error("--horizon-rate-cap-multiplier must be positive")
+    if args.horizon_rate_activation_ratio < 1.0:
+        parser.error("--horizon-rate-activation-ratio must be at least 1.0")
+    if not 0.0 <= args.direct_horizon_weight <= 1.0:
+        parser.error("--direct-horizon-weight must be between 0 and 1")
 
     started = time.perf_counter()
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset_path)
@@ -86,6 +103,23 @@ def main() -> None:
         regularization_grid=args.regularization,
         weighting=args.incidence_weighting,
     )
+    horizon_model, horizon_transform, horizon_report = fit_horizon_classifier(
+        table,
+        observation_end,
+        horizon_days=42,
+        n_folds=args.n_folds,
+        seed=args.seed,
+        regularization_grid=args.regularization,
+    )
+    horizon_rate_calibrator, horizon_rate_table = fit_horizon_rate_calibrator(
+        locations,
+        eol_times,
+        scenarios,
+        observation_end,
+        smoothing_window=args.horizon_rate_smoothing_window,
+        cap_multiplier=args.horizon_rate_cap_multiplier,
+        activation_ratio=args.horizon_rate_activation_ratio,
+    )
 
     with args.base_forecaster.open("rb") as handle:
         forecaster = pickle.load(handle)
@@ -93,7 +127,7 @@ def main() -> None:
         raise TypeError("Base forecaster must be a dataclass artifact")
     forecaster = replace(
         forecaster,
-        model_version=CURE_MODEL_VERSION,
+        model_version=ROBUST_CURE_MODEL_VERSION,
         physical_uncertainty_days=float(args.physical_uncertainty_days),
         physical_risk_weight=float(args.physical_risk_weight),
         physical_shape_min_remaining_days=float(
@@ -102,6 +136,11 @@ def main() -> None:
         incidence_model=incidence_model,
         incidence_transform=incidence_transform,
         incidence_weighting=args.incidence_weighting,
+        horizon_rate_calibrator=horizon_rate_calibrator,
+        horizon_model=horizon_model,
+        horizon_transform=horizon_transform,
+        direct_horizon_days=42,
+        direct_horizon_weight=float(args.direct_horizon_weight),
     )
 
     report["config"] = {
@@ -116,8 +155,16 @@ def main() -> None:
         "physical_uncertainty_days": args.physical_uncertainty_days,
         "physical_risk_weight": args.physical_risk_weight,
         "physical_shape_min_remaining_days": args.physical_shape_min_remaining_days,
-        "model_version": CURE_MODEL_VERSION,
+        "horizon_rate_smoothing_window": args.horizon_rate_smoothing_window,
+        "horizon_rate_cap_multiplier": args.horizon_rate_cap_multiplier,
+        "horizon_rate_activation_ratio": args.horizon_rate_activation_ratio,
+        "direct_horizon_weight": args.direct_horizon_weight,
+        "model_version": ROBUST_CURE_MODEL_VERSION,
     }
+    report["horizon_rate_calibration"] = horizon_rate_table.to_dict(
+        orient="records"
+    )
+    report["direct_horizon_model"] = horizon_report
     report["n_examples"] = int(len(table))
     report["elapsed_seconds"] = float(time.perf_counter() - started)
 

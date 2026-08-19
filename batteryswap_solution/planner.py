@@ -13,7 +13,7 @@ from batteryswap_public.interfaces import Planner
 
 from .costs import CostTables, build_expected_cost_tables, isolated_emergency_costs
 from .forecast import RiskForecaster, VoltageTrendForecaster, validate_forecast
-from .optimizer import OptimizationConfig, optimize_assignments
+from .optimizer import OptimizationConfig, optimize_assignments, planned_swap_limit
 from .replay import ReplayContext, build_replay_context, replay_operational_cost
 from .routing import order_assignments
 
@@ -129,6 +129,18 @@ class CompetitionPlanner(Planner):
         start: pd.Timestamp,
         replay_context: ReplayContext | None = None,
     ) -> float:
+        limit = planned_swap_limit(
+            len(costs.battery_ids), self.config.optimizer.max_planned_rate
+        )
+        if limit is not None:
+            planned_count = int(
+                pd.to_datetime(plan["day"])
+                .dt.normalize()
+                .isin(costs.candidate_dates)
+                .sum()
+            )
+            if planned_count > limit:
+                return float("inf")
         date_to_index = {date: index for index, date in enumerate(costs.candidate_dates)}
         plan_days = plan.set_index("battery")["day"]
         expected_timing = 0.0

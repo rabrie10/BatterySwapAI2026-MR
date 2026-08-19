@@ -15,7 +15,7 @@ from batteryswap_solution.forecast import (
     RiskForecast,
     validate_forecast,
 )
-from batteryswap_solution.optimizer import OptimizationConfig
+from batteryswap_solution.optimizer import OptimizationConfig, planned_swap_limit
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 from batteryswap_solution.replay import replay_operational_cost
 from batteryswap_solution.routing import route_buildings
@@ -135,6 +135,12 @@ class ForecastContractTests(unittest.TestCase):
 
 
 class CostAndRoutingTests(unittest.TestCase):
+    def test_planned_swap_limit_scales_with_scenario_size(self):
+        self.assertIsNone(planned_swap_limit(460, None))
+        self.assertEqual(planned_swap_limit(460, 0.04), 19)
+        with self.assertRaises(ValueError):
+            planned_swap_limit(460, 0.0)
+
     def test_asymmetric_timing_cost_prefers_early_quantile(self):
         dates = pd.date_range(START, START + pd.Timedelta(days=6), freq="D")
         forecast = validate_forecast(
