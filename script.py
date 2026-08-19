@@ -42,10 +42,10 @@ def load_competition_planner() -> Planner:
     minimum_improvement = float(
         os.environ.get("BATTERYSWAP_MINIMUM_EXPECTED_IMPROVEMENT", "0.0")
     )
-    solver_seconds = float(os.environ.get("BATTERYSWAP_SOLVER_SECONDS", "2.0"))
-    local_search = int(os.environ.get("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", "160"))
+    solver_seconds = float(os.environ.get("BATTERYSWAP_SOLVER_SECONDS", "1.0"))
+    local_search = int(os.environ.get("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", "80"))
     uncertain_search = int(
-        os.environ.get("BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS", "70")
+        os.environ.get("BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS", "35")
     )
     robust_samples = int(os.environ.get("BATTERYSWAP_ROBUST_SAMPLES", "4"))
     config = PlannerConfig(

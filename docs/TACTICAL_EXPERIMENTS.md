@@ -182,6 +182,20 @@ cost by another 8.1%, improved the maximum, and remained below the 30-minute
 evaluation limit at 17.6 minutes for all 48 scenarios. Against the original E0
 pipeline, cumulative mean reduction is 56.0%; against all defer it is 20.3%.
 
+### Submission runtime profile
+
+The full-search v3 profile (`2.0` CP-SAT seconds, 160 local-search evaluations,
+70 uncertain-case evaluations) took 1058.1 seconds on 48 train scenarios. That
+was too close to the 30-minute limit when conservatively projecting both public
+and private splits.
+
+The submission profile uses `1.0 / 80 / 35`. On all 48 scenarios it scored
+2644.87 versus 2648.61 for full search: 44 plans tied, 3 improved, and 1
+regressed. Mean scenario runtime fell from 20.90 to 16.09 seconds, maximum
+runtime fell from 37.19 to 20.39 seconds, and measured wall time was 827.8
+seconds. A 96-scenario projection is 25.75 minutes by summed scenario runtime,
+or 27.6 minutes by conservatively doubling measured wall time.
+
 Reproduce v3 with the default commands:
 
 ```powershell

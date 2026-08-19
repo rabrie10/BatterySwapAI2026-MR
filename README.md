@@ -94,5 +94,7 @@ The official run uses `public,private`. Optional environment controls are:
 - `BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS`
 - `BATTERYSWAP_ROBUST_SAMPLES`
 
-Keep the default runtime profile until a full public/private-equivalent local
-run confirms that a larger search budget remains comfortably below 30 minutes.
+The submission defaults use the validated runtime-safe profile: one second of
+CP-SAT, 80 local-search evaluations, and 35 uncertain-case evaluations. The
+full 48-scenario train audit took 13.8 minutes wall time; a conservative doubled
+projection remains below the 30-minute public/private limit.
