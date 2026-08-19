@@ -143,3 +143,53 @@ python tools/tactical_task2.py `
   --physical-risk-weight 0.25 `
   --physical-shape-min-remaining-days 210
 ```
+
+## 2026-08-19 cutoff-balanced incidence and timing v3
+
+The v2 incidence classifier weighted all landmark rows so each device had total
+mass one. That objective is appropriate for lifetime-level model fitting but
+biased the repeated planning problem: early-failure batteries had few,
+high-weight rows, while late failures were diluted across many low-weight rows.
+On grouped OOF predictions, v2 overpredicted observed event counts by 18.56 per
+cutoff and had event-count MAE 19.35.
+
+V3 gives every landmark cutoff equal total training mass, matching the
+competition's repeated scenario objective. Under the same cutoff-balanced OOF
+metric, Brier improved from 0.092589 to 0.090562, log loss from 0.307080 to
+0.299888, event-count bias from 18.56 to 3.25, and event-count MAE from 19.35
+to 9.17. The grouped OOF event-count correlation is 0.918.
+
+Cutoff balancing exposed a second error: the conditional AFT curve put too
+little of the calibrated total event mass inside the 42-day horizon. Physical
+timing weights `0.4`, `0.5`, `0.6`, `0.75`, and `0.9` were screened with the
+210-day gate fixed. Weight `0.6` won the tuning bracket, then improved a
+separate ten-scenario early holdout by 250.47 mean and 457.55 P90 versus v2.
+
+| Metric | Mixture-cure v2 | Cutoff-balanced v3 | All defer |
+| --- | ---: | ---: | ---: |
+| Mean total cost, 48 scenarios | 2880.87 | 2648.61 | 3324.68 |
+| P90 total cost | 4400.34 | 4360.44 | - |
+| Maximum total cost | 6261.86 | 5851.71 | - |
+| Early swap | 610.78 | 614.60 | - |
+| Late swap | 1913.12 | 1700.00 | - |
+| Operational cost | 356.97 | 334.00 | - |
+| Planned swaps | 10.35 | 10.98 | - |
+| Due recall | 0.251 | 0.296 | - |
+| Runtime per scenario | 17.60 s | 20.90 s | - |
+
+V3 won 32 paired scenarios, lost 13, and tied 3 versus v2. It reduced mean
+cost by another 8.1%, improved the maximum, and remained below the 30-minute
+evaluation limit at 17.6 minutes for all 48 scenarios. Against the original E0
+pipeline, cumulative mean reduction is 56.0%; against all defer it is 20.3%.
+
+Reproduce v3 with the default commands:
+
+```powershell
+python -m src.risk.train
+python tools/fit_incidence_model.py
+python tools/tactical_task2.py `
+  --run-name cure-cutoff-balanced-full-20260819 `
+  --physical-uncertainty-days 1 `
+  --physical-risk-weight 0.6 `
+  --physical-shape-min-remaining-days 210
+```

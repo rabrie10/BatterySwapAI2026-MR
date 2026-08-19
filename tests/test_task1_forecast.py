@@ -26,6 +26,7 @@ from src.risk.model import (
     PlattCalibrator,
     Task1Forecaster,
     FeatureTransform,
+    incidence_sample_weights,
     masked_labels_at_horizon,
     select_and_fit,
 )
@@ -207,6 +208,33 @@ class BuildingFoldTests(unittest.TestCase):
         for building_id, group in table.groupby("building_id"):
             assigned = folds.loc[group.index].unique()
             self.assertEqual(len(assigned), 1)
+
+
+class IncidenceWeightTests(unittest.TestCase):
+    def setUp(self):
+        self.table = pd.DataFrame(
+            {
+                "device_id": ["d1", "d2", "d2", "d2"],
+                "cutoff": pd.to_datetime(
+                    ["2025-01-01", "2025-01-01", "2025-01-08", "2025-01-15"]
+                ),
+                "sample_weight": [1.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0],
+            }
+        )
+
+    def test_device_weighting_gives_each_device_equal_total_mass(self):
+        weights = pd.Series(
+            incidence_sample_weights(self.table, "device"), index=self.table.index
+        )
+        totals = weights.groupby(self.table["device_id"]).sum()
+        np.testing.assert_allclose(totals.to_numpy(), [1.0, 1.0])
+
+    def test_cutoff_weighting_gives_each_cutoff_equal_total_mass(self):
+        weights = pd.Series(
+            incidence_sample_weights(self.table, "cutoff"), index=self.table.index
+        )
+        totals = weights.groupby(self.table["cutoff"]).sum()
+        np.testing.assert_allclose(totals.to_numpy(), np.full(3, 2.0 / 3.0))
 
 
 class TerminalTimeTests(unittest.TestCase):

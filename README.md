@@ -45,9 +45,10 @@ python -m src.risk.train
 python tools/fit_incidence_model.py
 ```
 
-The stage-2 defaults reproduce the validated configuration: one-day physical
-timing uncertainty, `0.25` physical timing weight, and a 210-day survivor gate.
-Training diagnostics are written to `docs/incidence_training_report.json`.
+The stage-2 defaults reproduce the validated v3 configuration: cutoff-balanced
+incidence training, one-day physical timing uncertainty, `0.6` physical timing
+weight, and a 210-day survivor gate. Training diagnostics are written to
+`docs/incidence_training_report.json`.
 
 ## Tests
 

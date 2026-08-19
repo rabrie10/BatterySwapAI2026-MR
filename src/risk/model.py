@@ -54,7 +54,7 @@ from .features import (
 )
 
 MODEL_VERSION = "task1-aft-survival-blended/v1"
-CURE_MODEL_VERSION = "task1-mixture-cure/v2"
+CURE_MODEL_VERSION = "task1-mixture-cure-cutoff-balanced/v3"
 
 AFT_FAMILIES = {
     "weibull": WeibullAFTFitter,
@@ -87,6 +87,7 @@ INCIDENCE_FEATURES: tuple[str, ...] = (
 )
 
 MIN_DURATION_DAYS = 0.5
+INCIDENCE_WEIGHTING_MODES: tuple[str, ...] = ("device", "row", "cutoff")
 
 
 def derive_design(table: pd.DataFrame) -> pd.DataFrame:
@@ -167,6 +168,29 @@ def fit_feature_transform(design: pd.DataFrame, columns: Iterable[str]) -> Featu
     return FeatureTransform(columns=tuple(columns), medians=medians, means=means, stds=stds)
 
 
+def incidence_sample_weights(table: pd.DataFrame, mode: str) -> np.ndarray:
+    """Return incidence-fit weights with the same total mass across modes."""
+
+    if mode not in INCIDENCE_WEIGHTING_MODES:
+        raise ValueError(
+            f"Unknown incidence weighting {mode!r}; expected one of "
+            f"{INCIDENCE_WEIGHTING_MODES}"
+        )
+    if table.empty:
+        return np.array([], dtype=float)
+
+    if mode == "device":
+        raw = table["sample_weight"].to_numpy(dtype=float)
+    elif mode == "row":
+        raw = np.ones(len(table), dtype=float)
+    else:
+        rows_per_cutoff = table.groupby("cutoff")["cutoff"].transform("size")
+        raw = 1.0 / rows_per_cutoff.to_numpy(dtype=float)
+
+    target_mass = float(table["device_id"].nunique())
+    return raw * (target_mass / max(float(raw.sum()), 1e-12))
+
+
 def fit_incidence_classifier(
     table: pd.DataFrame,
     observation_end: pd.Timestamp,
@@ -174,18 +198,22 @@ def fit_incidence_classifier(
     n_folds: int = 4,
     seed: int = 20260818,
     regularization_grid: Iterable[float] = (0.01, 0.1, 1.0),
+    weighting: str = "device",
 ) -> tuple[object, FeatureTransform, dict]:
     """Fit the cure-incidence component with building-grouped validation.
 
-    Each device contributes total weight one across its landmark cutoffs, so
-    long histories cannot dominate the 82 observed device-level events.
+    Training weights are configurable so landmark-date and device-balanced
+    objectives can be compared without changing the feature/model family.
+    Model selection is always measured with equal total mass per cutoff.
     """
 
     design = derive_incidence_design(table, observation_end)
     label = table["event"].to_numpy(dtype=int)
-    weight = table["sample_weight"].to_numpy(dtype=float)
+    fit_weight = incidence_sample_weights(table, weighting)
+    metric_weight = incidence_sample_weights(table, "cutoff")
     folds = assign_building_folds(table, n_folds=n_folds, seed=seed).to_numpy()
     results: dict[float, dict[str, float]] = {}
+    oof_predictions: dict[float, np.ndarray] = {}
 
     for regularization in regularization_grid:
         predictions = np.full(len(table), np.nan, dtype=float)
@@ -205,7 +233,7 @@ def fit_incidence_classifier(
             model.fit(
                 transform.transform(design.loc[train_mask]),
                 label[train_mask],
-                sample_weight=weight[train_mask],
+                sample_weight=fit_weight[train_mask],
             )
             predictions[test_mask] = model.predict_proba(
                 transform.transform(design.loc[test_mask])
@@ -214,7 +242,7 @@ def fit_incidence_classifier(
         valid = np.isfinite(predictions)
         if not valid.any():
             continue
-        valid_weight = weight[valid]
+        valid_weight = metric_weight[valid]
         valid_label = label[valid].astype(float)
         valid_prediction = np.clip(predictions[valid], 1e-8, 1.0 - 1e-8)
         brier = float(
@@ -233,6 +261,7 @@ def fit_incidence_classifier(
             "mean_probability": float(np.average(valid_prediction, weights=valid_weight)),
             "event_rate": float(np.average(valid_label, weights=valid_weight)),
         }
+        oof_predictions[float(regularization)] = predictions
 
     if not results:
         raise RuntimeError("No incidence classifier configuration converged")
@@ -243,14 +272,40 @@ def fit_incidence_classifier(
     model.fit(
         transform.transform(design),
         label,
-        sample_weight=weight,
+        sample_weight=fit_weight,
     )
+    selected_oof = oof_predictions[selected]
+    count_diagnostics = pd.DataFrame(
+        {
+            "cutoff": table["cutoff"],
+            "label": label,
+            "prediction": selected_oof,
+        }
+    )
+    count_diagnostics = count_diagnostics.loc[
+        np.isfinite(count_diagnostics["prediction"])
+    ]
+    counts = count_diagnostics.groupby("cutoff").agg(
+        actual_events=("label", "sum"),
+        expected_events=("prediction", "sum"),
+    )
+    count_error = counts["expected_events"] - counts["actual_events"]
     report = {
         "selected_regularization": selected,
+        "training_weighting": weighting,
+        "metric_weighting": "cutoff",
         "n_unique_events": int(table.loc[table["event"] == 1, "device_id"].nunique()),
         "n_unique_devices": int(table["device_id"].nunique()),
         "features": list(INCIDENCE_FEATURES),
         "grouped_cv": {str(key): value for key, value in results.items()},
+        "oof_event_count": {
+            "mean_absolute_error": float(count_error.abs().mean()),
+            "mean_bias": float(count_error.mean()),
+            "correlation": float(
+                counts["expected_events"].corr(counts["actual_events"])
+            ),
+            "n_cutoffs": int(len(counts)),
+        },
     }
     return model, transform, report
 
@@ -454,6 +509,7 @@ class Task1Forecaster:
     physical_shape_min_remaining_days: float = 0.0
     incidence_model: object | None = None
     incidence_transform: FeatureTransform | None = None
+    incidence_weighting: str = "device"
 
     def _scenario_table(
         self, battery_data: pd.DataFrame, locations: pd.DataFrame, origin: pd.Timestamp

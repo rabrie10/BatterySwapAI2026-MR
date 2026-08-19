@@ -410,6 +410,9 @@ def run_experiment(
     summary = {
         "experiment": experiment,
         "model_version": str(forecaster.model_version),
+        "incidence_weighting": str(
+            getattr(forecaster, "incidence_weighting", "legacy")
+        ),
         "physical_uncertainty_days": float(uncertainty_days),
         "physical_risk_weight": float(physical_risk_weight),
         "physical_shape_min_remaining_days": float(

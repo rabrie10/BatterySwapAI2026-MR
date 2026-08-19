@@ -21,7 +21,11 @@ from batteryswap_public.utils import load_dataset
 
 from src.risk.cutoffs import build_cutoff_grid, build_example_table
 from src.risk.features import build_feature_series
-from src.risk.model import CURE_MODEL_VERSION, fit_incidence_classifier
+from src.risk.model import (
+    CURE_MODEL_VERSION,
+    INCIDENCE_WEIGHTING_MODES,
+    fit_incidence_classifier,
+)
 
 
 def main() -> None:
@@ -40,8 +44,13 @@ def main() -> None:
     parser.add_argument("--n-folds", type=int, default=4)
     parser.add_argument("--seed", type=int, default=20260818)
     parser.add_argument("--regularization", type=float, nargs="+", default=[0.01, 0.1, 1.0])
+    parser.add_argument(
+        "--incidence-weighting",
+        choices=INCIDENCE_WEIGHTING_MODES,
+        default="cutoff",
+    )
     parser.add_argument("--physical-uncertainty-days", type=float, default=1.0)
-    parser.add_argument("--physical-risk-weight", type=float, default=0.25)
+    parser.add_argument("--physical-risk-weight", type=float, default=0.6)
     parser.add_argument(
         "--physical-shape-min-remaining-days", type=float, default=210.0
     )
@@ -75,6 +84,7 @@ def main() -> None:
         n_folds=args.n_folds,
         seed=args.seed,
         regularization_grid=args.regularization,
+        weighting=args.incidence_weighting,
     )
 
     with args.base_forecaster.open("rb") as handle:
@@ -91,6 +101,7 @@ def main() -> None:
         ),
         incidence_model=incidence_model,
         incidence_transform=incidence_transform,
+        incidence_weighting=args.incidence_weighting,
     )
 
     report["config"] = {
@@ -100,6 +111,7 @@ def main() -> None:
         "n_folds": args.n_folds,
         "seed": args.seed,
         "regularization_grid": args.regularization,
+        "incidence_weighting": args.incidence_weighting,
         "observation_end": observation_end,
         "physical_uncertainty_days": args.physical_uncertainty_days,
         "physical_risk_weight": args.physical_risk_weight,
