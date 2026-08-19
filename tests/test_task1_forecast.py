@@ -26,6 +26,7 @@ from src.risk.model import (
     PlattCalibrator,
     Task1Forecaster,
     FeatureTransform,
+    incidence_sample_weights,
     masked_labels_at_horizon,
     select_and_fit,
 )
@@ -209,6 +210,33 @@ class BuildingFoldTests(unittest.TestCase):
             self.assertEqual(len(assigned), 1)
 
 
+class IncidenceWeightTests(unittest.TestCase):
+    def setUp(self):
+        self.table = pd.DataFrame(
+            {
+                "device_id": ["d1", "d2", "d2", "d2"],
+                "cutoff": pd.to_datetime(
+                    ["2025-01-01", "2025-01-01", "2025-01-08", "2025-01-15"]
+                ),
+                "sample_weight": [1.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0],
+            }
+        )
+
+    def test_device_weighting_gives_each_device_equal_total_mass(self):
+        weights = pd.Series(
+            incidence_sample_weights(self.table, "device"), index=self.table.index
+        )
+        totals = weights.groupby(self.table["device_id"]).sum()
+        np.testing.assert_allclose(totals.to_numpy(), [1.0, 1.0])
+
+    def test_cutoff_weighting_gives_each_cutoff_equal_total_mass(self):
+        weights = pd.Series(
+            incidence_sample_weights(self.table, "cutoff"), index=self.table.index
+        )
+        totals = weights.groupby(self.table["cutoff"]).sum()
+        np.testing.assert_allclose(totals.to_numpy(), np.full(3, 2.0 / 3.0))
+
+
 class TerminalTimeTests(unittest.TestCase):
     def test_observed_eol_used_as_terminal_time(self):
         locations = pd.DataFrame(
@@ -240,6 +268,15 @@ class FakeAFTModel:
         values = np.exp(-times / 100.0)
         data = np.tile(values.reshape(-1, 1), (1, len(X)))
         return pd.DataFrame(data, index=times, columns=X.index)
+
+
+class FakeConstantIncidenceModel:
+    def __init__(self, probability: float) -> None:
+        self.probability = float(probability)
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        probability = np.full(len(X), self.probability)
+        return np.column_stack([1.0 - probability, probability])
 
 
 class ContractMathTests(unittest.TestCase):
@@ -332,6 +369,37 @@ class ContractMathTests(unittest.TestCase):
         self.assertAlmostEqual(tail["mean_excess_rul_days_given_observed_after_horizon"], 0.0, places=6)
         self.assertGreater(tail["prob_unobserved_eol"], 0.0)
 
+    def test_cure_incidence_owns_total_observed_probability(self):
+        forecaster = self._forecaster()
+        forecaster.incidence_model = FakeConstantIncidenceModel(0.2)
+        forecaster.incidence_transform = FeatureTransform(
+            columns=(), medians={}, means={}, stds={}
+        )
+        forecaster.physical_risk_weight = 1.0
+        forecaster.physical_shape_min_remaining_days = 60.0
+        origin = pd.Timestamp("2025-06-01")
+        horizon_days = 20
+        observation_end = origin + pd.Timedelta(days=60)
+
+        forecast = forecaster.predict(
+            pd.DataFrame(columns=["device_id", "end_time", "voltage", "temperature"]),
+            self._locations(),
+            prediction_origin=origin,
+            horizon_days=horizon_days,
+            evaluation_observation_end=observation_end,
+        )
+
+        expected_horizon = 0.2 * (
+            (1.0 - np.exp(-20.0 / 100.0)) / (1.0 - np.exp(-60.0 / 100.0))
+        )
+        final_curve_value = float(forecast.curves.iloc[-1]["failure_cdf"])
+        tail = forecast.tail.iloc[0]
+        self.assertAlmostEqual(final_curve_value, expected_horizon, places=6)
+        self.assertAlmostEqual(tail["prob_unobserved_eol"], 0.8, places=6)
+        self.assertAlmostEqual(
+            final_curve_value + tail["prob_observed_after_horizon"], 0.2, places=6
+        )
+
 
 class FakeZeroRiskAFTModel:
     """Stand-in AFT model that always predicts zero risk (S(t)=1 for all t).
@@ -347,7 +415,11 @@ class FakeZeroRiskAFTModel:
 
 
 class PhysicalPriorBlendTests(unittest.TestCase):
-    def _forecaster(self, physical_uncertainty_days: float = 10.0) -> Task1Forecaster:
+    def _forecaster(
+        self,
+        physical_uncertainty_days: float = 10.0,
+        physical_risk_weight: float = 1.0,
+    ) -> Task1Forecaster:
         columns = tuple(CURATED_FEATURES)
         transform = FeatureTransform(
             columns=columns,
@@ -362,6 +434,7 @@ class PhysicalPriorBlendTests(unittest.TestCase):
             transform=transform,
             calibrator=PlattCalibrator(slope=1.0, intercept=0.0),
             physical_uncertainty_days=physical_uncertainty_days,
+            physical_risk_weight=physical_risk_weight,
         )
 
     def _locations(self, battery_id: str, origin: pd.Timestamp) -> pd.DataFrame:
@@ -409,6 +482,36 @@ class PhysicalPriorBlendTests(unittest.TestCase):
         )
         final_cdf = forecast.curves.iloc[-1]["failure_cdf"]
         self.assertLess(final_cdf, 0.05)
+
+    def test_physical_prior_weight_reduces_only_the_physical_floor(self):
+        origin = pd.Timestamp("2025-06-01")
+        n = 40
+        voltage = 3.0 - 0.03 * np.arange(n)
+        battery_data = _synthetic_readings(
+            "d_decline", origin - pd.Timedelta(days=n), n, voltage
+        )
+        locations = self._locations("d_decline", origin)
+
+        full = self._forecaster(physical_risk_weight=1.0).predict(
+            battery_data,
+            locations,
+            prediction_origin=origin,
+            horizon_days=42,
+            evaluation_observation_end=origin + pd.Timedelta(days=100),
+        )
+        reduced = self._forecaster(physical_risk_weight=0.25).predict(
+            battery_data,
+            locations,
+            prediction_origin=origin,
+            horizon_days=42,
+            evaluation_observation_end=origin + pd.Timedelta(days=100),
+        )
+
+        full_final = float(full.curves.iloc[-1]["failure_cdf"])
+        reduced_final = float(reduced.curves.iloc[-1]["failure_cdf"])
+        self.assertGreater(full_final, 0.9)
+        self.assertLess(reduced_final, full_final)
+        self.assertAlmostEqual(reduced_final, 0.25 * full_final, places=6)
 
 
 class EndToEndSyntheticFitTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-"""Task 1 survival model: causal AFT hazard model, calibration, and the v1 contract producer.
+"""Task 1 mixture-cure survival model and Task 1 -> Task 2 contract producer.
 
 Model family: a single censoring-aware parametric AFT model (Weibull /
 LogNormal / LogLoglogistic, selected by out-of-fold Brier score) over a small,
@@ -13,10 +13,11 @@ covariates) is a deliberately conservative choice given that event count —
 even smaller than an earlier 14-covariate version, after integration testing
 against the real Task 2 planner showed the extra covariates were diluting
 signal without buying identification (see docs/TASK1_IMPLEMENTATION.md Sec
-5.2). The AFT curve is also not used alone: `Task1Forecaster.predict()`
-blends it with a sharp deterministic physical-extrapolation prior (Sec 4.5 of
-that document) that was needed to fix under-prediction of near-term risk
-for a specific, common failure pattern.
+5.2). In the v2 artifact, a grouped-CV logistic incidence model estimates
+whether EOL is observed by the dataset boundary. The AFT and deterministic
+physical-extrapolation curves then allocate that probability mass over time.
+This separates long-lived/cured-device probability from failure timing and
+prevents the physical curve from inflating total failure probability.
 
 Everything Task 1 needs to reproduce evaluator-aligned outcome probabilities
 from one calibrated conditional survival curve is:
@@ -25,10 +26,10 @@ from one calibrated conditional survival curve is:
     prob_observed_after_horizon  = max(G(C) - G(horizon_end), 0)
     prob_unobserved_eol          = max(1 - G(C), 0)
 
-where G is the calibrated conditional CDF and C is evaluation_observation_end
-(both measured as day offsets from prediction_origin). These three sum to one
-by construction for any monotone G, which is why `predict()` below evaluates
-G at capped time arguments rather than post-hoc patching the tail.
+where G is the final mixture-cure CDF and C is evaluation_observation_end (both
+measured as day offsets from prediction_origin). These three sum to one by
+construction for any monotone G, which is why `predict()` below evaluates G at
+capped time arguments rather than post-hoc patching the tail.
 """
 
 from __future__ import annotations
@@ -53,6 +54,7 @@ from .features import (
 )
 
 MODEL_VERSION = "task1-aft-survival-blended/v1"
+CURE_MODEL_VERSION = "task1-mixture-cure-cutoff-balanced/v3"
 
 AFT_FAMILIES = {
     "weibull": WeibullAFTFitter,
@@ -71,7 +73,21 @@ CURATED_FEATURES: tuple[str, ...] = (
     "cold_start",
 )
 
+INCIDENCE_FEATURES: tuple[str, ...] = (
+    "latest_voltage",
+    "voltage_slope_28d",
+    "voltage_slope_90d",
+    "voltage_std_28d",
+    "frac_low_voltage_28d",
+    "crossing_days_log",
+    "age_days_log",
+    "history_days_log",
+    "remaining_observation_days_log",
+    "cold_start",
+)
+
 MIN_DURATION_DAYS = 0.5
+INCIDENCE_WEIGHTING_MODES: tuple[str, ...] = ("device", "row", "cutoff")
 
 
 def derive_design(table: pd.DataFrame) -> pd.DataFrame:
@@ -91,6 +107,37 @@ def derive_design(table: pd.DataFrame) -> pd.DataFrame:
     out["building_loo_latest_voltage"] = table["building_loo_latest_voltage"]
     out["building_loo_voltage_slope_28d"] = table["building_loo_voltage_slope_28d"]
     out["not_yet_deployed"] = table["not_yet_deployed"].astype(float)
+    out["cold_start"] = table["cold_start"].astype(float)
+    return out
+
+
+def derive_incidence_design(
+    table: pd.DataFrame, observation_end: pd.Timestamp
+) -> pd.DataFrame:
+    """Features for P(observed EOL before the published observation end)."""
+
+    cutoff = pd.to_datetime(table["cutoff"])
+    if cutoff.dt.tz is not None:
+        cutoff = cutoff.dt.tz_localize(None)
+    end = pd.Timestamp(observation_end)
+    if end.tzinfo is not None:
+        end = end.tz_localize(None)
+    remaining = ((end.normalize() - cutoff.dt.normalize()) / pd.Timedelta(days=1)).clip(
+        lower=0.0
+    )
+
+    out = pd.DataFrame(index=table.index)
+    out["latest_voltage"] = table["latest_voltage"]
+    out["voltage_slope_28d"] = table["voltage_slope_28d"]
+    out["voltage_slope_90d"] = table["voltage_slope_90d"]
+    out["voltage_std_28d"] = table["voltage_std_28d"]
+    out["frac_low_voltage_28d"] = table["frac_low_voltage_28d"]
+    out["crossing_days_log"] = np.log1p(table["crossing_days_extrapolated"])
+    out["age_days_log"] = np.log1p(table["age_days"].clip(lower=0.0))
+    out["history_days_log"] = np.log1p(
+        table["history_days_available"].clip(lower=0.0)
+    )
+    out["remaining_observation_days_log"] = np.log1p(remaining)
     out["cold_start"] = table["cold_start"].astype(float)
     return out
 
@@ -119,6 +166,148 @@ def fit_feature_transform(design: pd.DataFrame, columns: Iterable[str]) -> Featu
     means = filled.mean().to_dict()
     stds = {c: (v if v > 1e-9 else 1.0) for c, v in filled.std(ddof=0).to_dict().items()}
     return FeatureTransform(columns=tuple(columns), medians=medians, means=means, stds=stds)
+
+
+def incidence_sample_weights(table: pd.DataFrame, mode: str) -> np.ndarray:
+    """Return incidence-fit weights with the same total mass across modes."""
+
+    if mode not in INCIDENCE_WEIGHTING_MODES:
+        raise ValueError(
+            f"Unknown incidence weighting {mode!r}; expected one of "
+            f"{INCIDENCE_WEIGHTING_MODES}"
+        )
+    if table.empty:
+        return np.array([], dtype=float)
+
+    if mode == "device":
+        raw = table["sample_weight"].to_numpy(dtype=float)
+    elif mode == "row":
+        raw = np.ones(len(table), dtype=float)
+    else:
+        rows_per_cutoff = table.groupby("cutoff")["cutoff"].transform("size")
+        raw = 1.0 / rows_per_cutoff.to_numpy(dtype=float)
+
+    target_mass = float(table["device_id"].nunique())
+    return raw * (target_mass / max(float(raw.sum()), 1e-12))
+
+
+def fit_incidence_classifier(
+    table: pd.DataFrame,
+    observation_end: pd.Timestamp,
+    *,
+    n_folds: int = 4,
+    seed: int = 20260818,
+    regularization_grid: Iterable[float] = (0.01, 0.1, 1.0),
+    weighting: str = "device",
+) -> tuple[object, FeatureTransform, dict]:
+    """Fit the cure-incidence component with building-grouped validation.
+
+    Training weights are configurable so landmark-date and device-balanced
+    objectives can be compared without changing the feature/model family.
+    Model selection is always measured with equal total mass per cutoff.
+    """
+
+    design = derive_incidence_design(table, observation_end)
+    label = table["event"].to_numpy(dtype=int)
+    fit_weight = incidence_sample_weights(table, weighting)
+    metric_weight = incidence_sample_weights(table, "cutoff")
+    folds = assign_building_folds(table, n_folds=n_folds, seed=seed).to_numpy()
+    results: dict[float, dict[str, float]] = {}
+    oof_predictions: dict[float, np.ndarray] = {}
+
+    for regularization in regularization_grid:
+        predictions = np.full(len(table), np.nan, dtype=float)
+        for fold in range(n_folds):
+            test_mask = folds == fold
+            train_mask = ~test_mask
+            if test_mask.sum() == 0 or len(np.unique(label[train_mask])) < 2:
+                continue
+            transform = fit_feature_transform(
+                design.loc[train_mask], INCIDENCE_FEATURES
+            )
+            model = LogisticRegression(
+                C=float(regularization),
+                solver="lbfgs",
+                max_iter=2000,
+            )
+            model.fit(
+                transform.transform(design.loc[train_mask]),
+                label[train_mask],
+                sample_weight=fit_weight[train_mask],
+            )
+            predictions[test_mask] = model.predict_proba(
+                transform.transform(design.loc[test_mask])
+            )[:, 1]
+
+        valid = np.isfinite(predictions)
+        if not valid.any():
+            continue
+        valid_weight = metric_weight[valid]
+        valid_label = label[valid].astype(float)
+        valid_prediction = np.clip(predictions[valid], 1e-8, 1.0 - 1e-8)
+        brier = float(
+            np.average((valid_prediction - valid_label) ** 2, weights=valid_weight)
+        )
+        log_loss = float(
+            np.average(
+                -valid_label * np.log(valid_prediction)
+                - (1.0 - valid_label) * np.log(1.0 - valid_prediction),
+                weights=valid_weight,
+            )
+        )
+        results[float(regularization)] = {
+            "brier": brier,
+            "log_loss": log_loss,
+            "mean_probability": float(np.average(valid_prediction, weights=valid_weight)),
+            "event_rate": float(np.average(valid_label, weights=valid_weight)),
+        }
+        oof_predictions[float(regularization)] = predictions
+
+    if not results:
+        raise RuntimeError("No incidence classifier configuration converged")
+
+    selected = min(results, key=lambda value: results[value]["brier"])
+    transform = fit_feature_transform(design, INCIDENCE_FEATURES)
+    model = LogisticRegression(C=selected, solver="lbfgs", max_iter=2000)
+    model.fit(
+        transform.transform(design),
+        label,
+        sample_weight=fit_weight,
+    )
+    selected_oof = oof_predictions[selected]
+    count_diagnostics = pd.DataFrame(
+        {
+            "cutoff": table["cutoff"],
+            "label": label,
+            "prediction": selected_oof,
+        }
+    )
+    count_diagnostics = count_diagnostics.loc[
+        np.isfinite(count_diagnostics["prediction"])
+    ]
+    counts = count_diagnostics.groupby("cutoff").agg(
+        actual_events=("label", "sum"),
+        expected_events=("prediction", "sum"),
+    )
+    count_error = counts["expected_events"] - counts["actual_events"]
+    report = {
+        "selected_regularization": selected,
+        "training_weighting": weighting,
+        "metric_weighting": "cutoff",
+        "n_unique_events": int(table.loc[table["event"] == 1, "device_id"].nunique()),
+        "n_unique_devices": int(table["device_id"].nunique()),
+        "features": list(INCIDENCE_FEATURES),
+        "grouped_cv": {str(key): value for key, value in results.items()},
+        "oof_event_count": {
+            "mean_absolute_error": float(count_error.abs().mean()),
+            "mean_bias": float(count_error.mean()),
+            "correlation": float(
+                counts["expected_events"].corr(counts["actual_events"])
+            ),
+            "n_cutoffs": int(len(counts)),
+        },
+    }
+    return model, transform, report
 
 
 @dataclass(frozen=True)
@@ -299,26 +488,13 @@ def _conditional_logistic_cdf(days: np.ndarray, location: np.ndarray, scale: flo
 class Task1Forecaster:
     """Fitted Task 1 artifact implementing ``RiskForecaster.predict()`` (contract v1).
 
-    The final curve is ``max(calibrated AFT CDF, physical crossing-day CDF)``
-    at every evaluated time, not the AFT curve alone. This blend is a
-    deliberate correction, not an afterthought: with only 82 physical EOL
-    events in the whole dataset, the AFT model's per-covariate coefficients
-    are necessarily heavily shrunk toward the population baseline (every
-    covariate has p > 0.25 even alone — see docs/TASK1_IMPLEMENTATION.md Sec
-    1/4), which was measured (via the real Task 2 planner, not just
-    Brier/concordance) to under-predict near-term risk for batteries whose
-    voltage has plateaued just above the 2.4V threshold rather than declined
-    smoothly — precisely because a plateau produces a near-zero trailing
-    slope and therefore a large, physically-wrong crossing-day extrapolation
-    if left to the AFT's weak covariate fit alone. Taking the pointwise
-    maximum with the sharp, low-variance physical extrapolation
-    (``crossing_days_extrapolated``, the same estimator this module derives
-    for the AFT covariate, evaluated as a direct logistic location) recovers
-    the sharpness the AFT cannot supply from 82 events, while the AFT model
-    still supplies calibration, the observed/unobserved tail split, and
-    monotonicity everywhere the physical estimate is less informative (e.g.
-    genuinely cold-start batteries, where crossing_days_extrapolated falls
-    back to the population median and stops dominating).
+    Legacy v1 artifacts use the pointwise maximum of the calibrated AFT CDF
+    and a weighted physical crossing-time CDF. A v2 artifact additionally has
+    an incidence classifier: its probability owns the total mass at the
+    observation boundary, while AFT and the physical prior determine only the
+    conditional timing of that mass. The physical timing term can be gated by
+    remaining observation time because it helped early scenarios but became
+    overconfident for the survivor-heavy late scenarios.
     """
 
     model_family: str
@@ -329,6 +505,11 @@ class Task1Forecaster:
     model_version: str = MODEL_VERSION
     max_integration_points: int = 220
     physical_uncertainty_days: float = 20.0
+    physical_risk_weight: float = 1.0
+    physical_shape_min_remaining_days: float = 0.0
+    incidence_model: object | None = None
+    incidence_transform: FeatureTransform | None = None
+    incidence_weighting: str = "device"
 
     def _scenario_table(
         self, battery_data: pd.DataFrame, locations: pd.DataFrame, origin: pd.Timestamp
@@ -421,19 +602,63 @@ class Task1Forecaster:
         physical_cdf_matrix = _conditional_logistic_cdf(
             all_times[:, None], crossing_days[None, :], self.physical_uncertainty_days
         )
-        combined_matrix = np.maximum(calibrated_matrix, physical_cdf_matrix)
-        calibrated_matrix = np.maximum.accumulate(combined_matrix, axis=0)
-
+        # getattr keeps artifacts pickled before this parameter was introduced
+        # fully backward compatible. The weight represents confidence that the
+        # extrapolated crossing time is informative for this battery cohort.
+        physical_risk_weight = float(getattr(self, "physical_risk_weight", 1.0))
+        if not 0.0 <= physical_risk_weight <= 1.0:
+            raise ValueError("physical_risk_weight must be between 0 and 1")
         time_index = {round(float(t), 6): i for i, t in enumerate(all_times)}
 
         def rows_for(times_array: np.ndarray) -> np.ndarray:
             return np.array([time_index[round(float(t), 6)] for t in times_array])
 
+        c_row = rows_for(c_point)[0]
+        incidence_model = getattr(self, "incidence_model", None)
+        incidence_transform = getattr(self, "incidence_transform", None)
+        if incidence_model is not None and incidence_transform is not None:
+            incidence_design = derive_incidence_design(table, observation_end)
+            incidence_probability = np.clip(
+                incidence_model.predict_proba(
+                    incidence_transform.transform(incidence_design)
+                )[:, 1],
+                1e-8,
+                1.0 - 1e-8,
+            )
+
+            # The incidence model owns total probability mass G(C). AFT and
+            # physical extrapolation only determine when that mass arrives.
+            aft_at_c = calibrated_matrix[c_row, :]
+            aft_timing = calibrated_matrix / np.maximum(aft_at_c[None, :], 1e-9)
+            physical_at_c = physical_cdf_matrix[c_row, :]
+            physical_timing = np.divide(
+                physical_cdf_matrix,
+                physical_at_c[None, :],
+                out=np.zeros_like(physical_cdf_matrix),
+                where=physical_at_c[None, :] > 1e-9,
+            )
+            minimum_remaining = float(
+                getattr(self, "physical_shape_min_remaining_days", 0.0)
+            )
+            effective_physical_weight = (
+                physical_risk_weight if c_offset > minimum_remaining else 0.0
+            )
+            timing_cdf = np.maximum(
+                aft_timing, effective_physical_weight * physical_timing
+            )
+            combined_matrix = incidence_probability[None, :] * np.clip(
+                timing_cdf, 0.0, 1.0
+            )
+        else:
+            combined_matrix = np.maximum(
+                calibrated_matrix, physical_risk_weight * physical_cdf_matrix
+            )
+        calibrated_matrix = np.maximum.accumulate(combined_matrix, axis=0)
+
         curve_rows_idx = rows_for(eval_offsets_curve)
         curve_cdf = calibrated_matrix[curve_rows_idx, :]  # (n_dates, n_batteries)
 
         horizon_row = rows_for(np.array([eval_offsets_curve[-1]]))[0]
-        c_row = rows_for(c_point)[0]
         cdf_at_horizon = calibrated_matrix[horizon_row, :]
         cdf_at_c = calibrated_matrix[c_row, :]
 
@@ -575,6 +800,7 @@ def fit_task1_forecaster(
     families: Iterable[str] = tuple(AFT_FAMILIES),
     penalizers: Iterable[float] = PENALIZER_GRID,
     physical_uncertainty_days: float = 20.0,
+    physical_risk_weight: float = 1.0,
 ) -> tuple[Task1Forecaster, dict]:
     """End-to-end: causal features -> example table -> model selection -> calibration."""
 
@@ -585,7 +811,14 @@ def fit_task1_forecaster(
     forecaster, report = select_and_fit(
         table, n_folds=n_folds, seed=seed, families=families, penalizers=penalizers
     )
-    if physical_uncertainty_days != forecaster.physical_uncertainty_days:
-        forecaster = replace(forecaster, physical_uncertainty_days=physical_uncertainty_days)
+    if (
+        physical_uncertainty_days != forecaster.physical_uncertainty_days
+        or physical_risk_weight != forecaster.physical_risk_weight
+    ):
+        forecaster = replace(
+            forecaster,
+            physical_uncertainty_days=physical_uncertainty_days,
+            physical_risk_weight=physical_risk_weight,
+        )
     report["table_rows"] = int(len(table))
     return forecaster, report

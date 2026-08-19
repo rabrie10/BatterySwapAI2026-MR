@@ -24,6 +24,7 @@ LOGGER = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class PlannerConfig:
     late_risk_multiplier: float = 1.0
+    minimum_expected_improvement: float = 0.0
     local_search_evaluations: int = 160
     uncertain_local_search_evaluations: int = 70
     robust_emergency_samples: int = 4
@@ -55,6 +56,7 @@ class CompetitionPlanner(Planner):
         self.forecaster = forecaster or VoltageTrendForecaster()
         self.fallback_forecaster = VoltageTrendForecaster()
         self.config = config or PlannerConfig()
+        self.last_expected_improvement = float("nan")
 
     @staticmethod
     def _planning_clock(
@@ -576,6 +578,12 @@ class CompetitionPlanner(Planner):
                     break
             if not accepted:
                 break
+        self.last_expected_improvement = max(all_defer_score - incumbent_score, 0.0)
+        if (
+            self.last_expected_improvement + 1e-9
+            < float(self.config.minimum_expected_improvement)
+        ):
+            return all_defer
         return incumbent
 
     def plan(

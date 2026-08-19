@@ -86,7 +86,16 @@ def main() -> None:
         help="Logistic scale for the deterministic physical crossing-day prior blended into "
         "predict() (see docs/TASK1_IMPLEMENTATION.md Sec 4.5/5.2 for why this blend exists).",
     )
+    parser.add_argument(
+        "--physical-risk-weight",
+        type=float,
+        default=1.0,
+        help="Confidence weight in [0, 1] for the physical crossing-day CDF floor.",
+    )
     args = parser.parse_args()
+
+    if not 0.0 <= args.physical_risk_weight <= 1.0:
+        parser.error("--physical-risk-weight must be between 0 and 1")
 
     started = time.perf_counter()
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset_path)
@@ -114,6 +123,7 @@ def main() -> None:
         families=families,
         penalizers=penalizers,
         physical_uncertainty_days=args.physical_uncertainty_days,
+        physical_risk_weight=args.physical_risk_weight,
     )
 
     feature_series = build_feature_series(timeseries)
@@ -128,6 +138,7 @@ def main() -> None:
         "families": list(families),
         "penalizers": list(penalizers),
         "physical_uncertainty_days": args.physical_uncertainty_days,
+        "physical_risk_weight": args.physical_risk_weight,
         "n_official_scenarios": len(scenario_starts),
         "n_cutoff_dates": int(len(cutoff_dates)),
         "curated_features": list(forecaster.transform.columns),
