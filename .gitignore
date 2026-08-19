@@ -3,7 +3,9 @@ data/
 dataset/
 
 venv/
-.venv/
+.
+.venv*/
 
 __pycache__/
 .claude/
+.claude//de/

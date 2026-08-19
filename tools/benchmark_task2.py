@@ -9,11 +9,16 @@ from __future__ import annotations
 import argparse
 import pickle
 from pathlib import Path
+import sys
 import time
 import warnings
 
 import numpy as np
 import pandas as pd
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from batteryswap_public.evaluate import cost_components, evaluate_plan
 from batteryswap_public.utils import iterate_scenarios, load_dataset
