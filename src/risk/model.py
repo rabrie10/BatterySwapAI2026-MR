@@ -95,7 +95,12 @@ def derive_design(table: pd.DataFrame) -> pd.DataFrame:
     out["voltage_slope_28d"] = table["voltage_slope_28d"]
     out["voltage_slope_90d"] = table["voltage_slope_90d"]
     out["voltage_std_28d"] = table["voltage_std_28d"]
-    out["crossing_days_log"] = np.log1p(table["crossing_days_extrapolated"])
+    # crossing_days_extrapolated may now be negative (already past the EOL
+    # voltage); clamp before log1p so this stays finite. Not currently in
+    # CURATED_FEATURES, but kept available for feature-set experiments.
+    out["crossing_days_log"] = np.log1p(
+        table["crossing_days_extrapolated"].clip(lower=0.0)
+    )
     out["temp_mean_28d"] = table["temp_mean_28d"]
     out["frac_low_voltage_28d"] = table["frac_low_voltage_28d"]
     out["completeness_90d"] = table["completeness_90d"].fillna(0.0)

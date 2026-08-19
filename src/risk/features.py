@@ -22,6 +22,14 @@ EOL_VOLTAGE = 2.4
 NEAR_THRESHOLD_BAND = 0.1
 MIN_DECLINE_PER_DAY = 0.0005
 MAX_CROSSING_DAYS = 3650.0
+# Batteries already *below* the EOL voltage get a negative crossing-day
+# estimate. Clipping those to 0 (as an earlier version did) made every
+# already-crossed battery numerically identical, which erased the ordering
+# between "just dipped below threshold" and "far below it and still falling"
+# -- the planner then saw a block of tied batteries and swapped all of them.
+# Allowing a bounded negative value keeps that ordering; the bound stops a
+# single noisy slope estimate from producing an unbounded urgency score.
+MIN_CROSSING_DAYS = -90.0
 ROLLING_WINDOWS_DAYS: tuple[int, ...] = (7, 14, 28, 56, 90, 180)
 SLOPE_WINDOWS_DAYS: tuple[int, ...] = (14, 28, 90)
 
@@ -127,7 +135,7 @@ def compute_rolling_features(panel: pd.DataFrame) -> pd.DataFrame:
     long_slope = out[f"voltage_slope_{SLOPE_WINDOWS_DAYS[-1]}d"]
     decline = (-long_slope).clip(lower=MIN_DECLINE_PER_DAY)
     out["crossing_days_extrapolated"] = (out["distance_to_threshold"] / decline).clip(
-        lower=0.0, upper=MAX_CROSSING_DAYS
+        lower=MIN_CROSSING_DAYS, upper=MAX_CROSSING_DAYS
     )
 
     return out
@@ -303,7 +311,9 @@ def compute_features_asof(panel: pd.DataFrame, as_of: pd.Timestamp) -> dict[str,
     else:
         decline = max(-long_slope, MIN_DECLINE_PER_DAY)
         result["crossing_days_extrapolated"] = float(
-            np.clip(result["distance_to_threshold"] / decline, 0.0, MAX_CROSSING_DAYS)
+            np.clip(
+                result["distance_to_threshold"] / decline, MIN_CROSSING_DAYS, MAX_CROSSING_DAYS
+            )
         )
 
     result["days_since_last_reading"] = float((as_of - last_date).days)
