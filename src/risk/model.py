@@ -40,6 +40,7 @@ import numpy as np
 import pandas as pd
 from lifelines import LogLogisticAFTFitter, LogNormalAFTFitter, WeibullAFTFitter
 from lifelines.utils import concordance_index
+from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 
 from batteryswap_solution.forecast import CONTRACT_VERSION, ForecastMetadata, RiskForecast
@@ -61,6 +62,18 @@ AFT_FAMILIES = {
 }
 PENALIZER_GRID: tuple[float, ...] = (0.1, 0.5)
 HORIZONS_FOR_METRICS: tuple[int, ...] = (7, 14, 21, 28, 35, 42)
+
+# Calibration is fit over a much longer horizon range than the 42-day planning
+# window. `predict()` must evaluate the survival curve all the way out to
+# `evaluation_observation_end` (up to ~334 days past the origin on early train
+# scenarios) to split observed-tail vs unobserved-EOL mass. Calibrating only on
+# <=42-day labels and then applying that map at 334 days is extrapolation far
+# outside the fitted range, and was measured to leave `prob_unobserved_eol`
+# badly under-predicted (0.69 predicted vs 0.91 actual). The masked-label rule
+# handles censoring correctly at every one of these horizons.
+CALIBRATION_HORIZONS: tuple[int, ...] = (
+    7, 14, 21, 28, 35, 42, 60, 90, 120, 180, 240, 300, 365,
+)
 
 CURATED_FEATURES: tuple[str, ...] = (
     "latest_voltage",
@@ -152,6 +165,184 @@ def fit_platt_calibrator(raw_cdf: np.ndarray, label: np.ndarray, weight: np.ndar
     return PlattCalibrator(slope=slope, intercept=intercept)
 
 
+def _conditional_logistic_cdf(days: np.ndarray, location: np.ndarray, scale: float) -> np.ndarray:
+    """P(T <= days | T > 0) under a logistic location-scale model, vectorized.
+
+    Same functional form as ``forecast.VoltageTrendForecaster``'s physical
+    extrapolation. Used as a sharp, low-variance floor under the survival
+    model's raw curve (see ``physical_blend``): with only 82 physical events,
+    the AFT's covariate coefficients are heavily shrunk (Sec 1/4 of
+    docs/TASK1_IMPLEMENTATION.md), which under-predicts near-term risk for
+    batteries whose voltage has plateaued just above the EOL threshold rather
+    than declining smoothly — exactly the physical situation
+    ``crossing_days_extrapolated`` flags directly.
+    """
+
+    raw = 1.0 / (1.0 + np.exp(-np.clip((days - location) / scale, -40.0, 40.0)))
+    at_origin = 1.0 / (1.0 + np.exp(-np.clip((-location) / scale, -40.0, 40.0)))
+    conditioned = (raw - at_origin) / np.maximum(1.0 - at_origin, 1e-9)
+    return np.clip(conditioned, 0.0, 1.0)
+
+
+@dataclass(frozen=True)
+class IsotonicCalibrator:
+    """Monotone (isotonic) recalibration, stored as an interpolation table.
+
+    Preferred over Platt when the raw model is *saturated* rather than merely
+    shifted: Platt is a logit shift/scale, so it cannot pull a cluster of
+    near-1.0 predictions down to the ~15% frequency actually observed in that
+    group. Isotonic can, because it maps each predicted level directly onto
+    its observed event frequency. That was exactly the failure mode measured
+    here (~60 batteries/scenario predicted high-risk against ~9 real events;
+    sweeping the Platt slope 0.711 -> 1.5 barely moved the mean).
+
+    Being monotone non-decreasing, it preserves the CDF's monotonicity in time
+    when applied pointwise, which the v1 contract requires.
+    """
+
+    thresholds: tuple[float, ...]
+    values: tuple[float, ...]
+
+    def apply(self, raw_cdf: np.ndarray) -> np.ndarray:
+        x = np.asarray(self.thresholds, dtype=float)
+        y = np.asarray(self.values, dtype=float)
+        return np.clip(np.interp(np.asarray(raw_cdf, dtype=float), x, y), 0.0, 1.0)
+
+
+def fit_isotonic_calibrator(
+    raw_cdf: np.ndarray, label: np.ndarray, weight: np.ndarray
+) -> IsotonicCalibrator:
+    if len(raw_cdf) == 0 or len(np.unique(label)) < 2:
+        return IsotonicCalibrator(thresholds=(0.0, 1.0), values=(0.0, 1.0))
+    model = IsotonicRegression(y_min=0.0, y_max=1.0, increasing=True, out_of_bounds="clip")
+    model.fit(raw_cdf, label, sample_weight=weight)
+    # Materialize as a compact lookup table so the artifact does not depend on
+    # sklearn internals at unpickle time.
+    grid = np.unique(
+        np.concatenate([np.linspace(0.0, 1.0, 501), np.quantile(raw_cdf, np.linspace(0, 1, 200))])
+    )
+    grid = np.clip(grid, 0.0, 1.0)
+    mapped = np.maximum.accumulate(np.clip(model.predict(grid), 0.0, 1.0))
+    return IsotonicCalibrator(thresholds=tuple(grid.tolist()), values=tuple(mapped.tolist()))
+
+
+@dataclass(frozen=True)
+class HorizonIsotonicCalibrator:
+    """Isotonic calibration fit separately per horizon, interpolated in between.
+
+    A single pooled calibration map is wrong here because the event rate is a
+    strong function of horizon: measured on this dataset it runs from 0.32% at
+    7 days to 16.45% at 365 days (a ~50x spread). One pooled map is calibrated
+    to the pooled average (~4.2%), so applying it at the 42-day planning
+    horizon (true rate ~1.9%) over-predicts by roughly 2x -- which is precisely
+    the residual over-prediction that kept the planner over-swapping after the
+    pooled-isotonic fix.
+
+    Conditioning the map on horizon removes that conflation. Each per-horizon
+    map is monotone in the raw value, and `predict()` applies a running maximum
+    over time afterwards, so the emitted CDF stays monotone as the contract
+    requires even where two neighbouring maps disagree slightly.
+    """
+
+    horizons: tuple[float, ...]
+    thresholds: tuple[tuple[float, ...], ...]
+    values: tuple[tuple[float, ...], ...]
+    tie_break_weight: float = 0.02
+
+    def _apply_one(self, index: int, raw: np.ndarray) -> np.ndarray:
+        mapped = np.interp(
+            raw,
+            np.asarray(self.thresholds[index], dtype=float),
+            np.asarray(self.values[index], dtype=float),
+        )
+        # Isotonic regression is a step function, so it maps whole groups of
+        # batteries onto one identical probability. That silently destroys the
+        # model's within-group ranking (AUC 0.93) exactly where the planner
+        # needs it most: faced with 40 tied batteries just above its decision
+        # threshold, it cannot prefer the riskiest few and swaps all of them.
+        # Mixing a small amount of the raw score back in preserves the
+        # calibrated level to within `tie_break_weight` while restoring a
+        # strict ordering inside each plateau. Both terms are monotone in the
+        # raw value, so the blend stays monotone.
+        if self.tie_break_weight <= 0.0:
+            return mapped
+        return (1.0 - self.tie_break_weight) * mapped + self.tie_break_weight * raw
+
+    def apply(self, raw_cdf: np.ndarray, times: np.ndarray | None = None) -> np.ndarray:
+        raw = np.asarray(raw_cdf, dtype=float)
+        horizons = np.asarray(self.horizons, dtype=float)
+        if times is None:
+            # No horizon context: fall back to the map nearest the planning
+            # horizon rather than silently averaging across all of them.
+            index = int(np.argmin(np.abs(horizons - 42.0)))
+            return np.clip(self._apply_one(index, raw), 0.0, 1.0)
+
+        times = np.asarray(times, dtype=float)
+        out = np.empty_like(raw)
+        for row, t in enumerate(times):
+            position = int(np.searchsorted(horizons, t))
+            if position <= 0:
+                mapped = self._apply_one(0, raw[row])
+            elif position >= len(horizons):
+                mapped = self._apply_one(len(horizons) - 1, raw[row])
+            else:
+                low, high = horizons[position - 1], horizons[position]
+                weight = 0.0 if high <= low else (t - low) / (high - low)
+                mapped = (1.0 - weight) * self._apply_one(position - 1, raw[row]) + \
+                    weight * self._apply_one(position, raw[row])
+            out[row] = mapped
+        return np.clip(out, 0.0, 1.0)
+
+
+def fit_horizon_isotonic_calibrator(
+    table: pd.DataFrame, oof_predictions: dict[int, np.ndarray]
+) -> HorizonIsotonicCalibrator:
+    weight = table["sample_weight"].to_numpy()
+    horizons, thresholds, values = [], [], []
+    for horizon in sorted(oof_predictions):
+        predicted = oof_predictions[horizon]
+        mask, label = masked_labels_at_horizon(table, horizon)
+        valid = mask & np.isfinite(predicted)
+        if valid.sum() < 100 or len(np.unique(label[valid])) < 2:
+            continue
+        calibrator = fit_isotonic_calibrator(predicted[valid], label[valid], weight[valid])
+        horizons.append(float(horizon))
+        thresholds.append(calibrator.thresholds)
+        values.append(calibrator.values)
+    if not horizons:
+        return HorizonIsotonicCalibrator(
+            horizons=(42.0,), thresholds=((0.0, 1.0),), values=((0.0, 1.0),)
+        )
+    return HorizonIsotonicCalibrator(
+        horizons=tuple(horizons), thresholds=tuple(thresholds), values=tuple(values)
+    )
+
+
+def physical_blend(
+    raw_cdf: np.ndarray, times: np.ndarray, crossing_days: np.ndarray, scale: float
+) -> np.ndarray:
+    """Pointwise max of the raw survival CDF and the physical crossing-day CDF.
+
+    Applied to *raw* (pre-calibration) values in both training and inference so
+    the calibrator sees, and can correct, the same blended distribution it will
+    be applied to. Blending after calibration -- as an earlier version did --
+    silently invalidates the calibration it was fit for.
+
+    `raw_cdf` is (n_times, n_rows), `times` is (n_times,), `crossing_days` is
+    (n_rows,). Rows with no crossing-day estimate (cold start) get a distance
+    far outside any horizon, so the physical term contributes nothing and the
+    survival model alone determines their forecast.
+    """
+
+    if scale <= 0:
+        return raw_cdf
+    crossing = np.where(np.isfinite(crossing_days), crossing_days, 1.0e4)
+    physical = _conditional_logistic_cdf(
+        np.asarray(times, dtype=float)[:, None], crossing[None, :], scale
+    )
+    return np.maximum(raw_cdf, physical)
+
+
 def _build_lifelines_frame(scaled_design: pd.DataFrame, table: pd.DataFrame) -> pd.DataFrame:
     frame = scaled_design.copy()
     frame["duration_days"] = table["duration_days"].to_numpy()
@@ -210,12 +401,22 @@ def run_cross_validation(
     penalizer: float,
     n_folds: int = 5,
     seed: int = 20260818,
+    physical_uncertainty_days: float = 0.0,
 ) -> dict:
-    """Causal grouped (unseen-building) out-of-fold CV for one model configuration."""
+    """Causal grouped (unseen-building) out-of-fold CV for one model configuration.
+
+    Predictions are produced at ``CALIBRATION_HORIZONS`` (well past the 42-day
+    planning window) and, when ``physical_uncertainty_days > 0``, already carry
+    the physical blend. Both matter because these OOF values are what the
+    calibrator is fit on: it must see the same blended values, over the same
+    horizon range, that ``predict()`` will later apply it to.
+    """
 
     folds = assign_building_folds(table, n_folds=n_folds, seed=seed).to_numpy()
-    oof_predictions = {h: np.full(len(table), np.nan) for h in HORIZONS_FOR_METRICS}
+    horizons = tuple(sorted(CALIBRATION_HORIZONS))
+    oof_predictions = {h: np.full(len(table), np.nan) for h in horizons}
     fold_concordances: list[float] = []
+    crossing_days_all = table["crossing_days_extrapolated"].to_numpy(dtype=float)
 
     for fold in range(n_folds):
         test_mask = folds == fold
@@ -229,11 +430,15 @@ def run_cross_validation(
         frame = _build_lifelines_frame(train_scaled, table.loc[train_mask])
         model = fit_aft(family, frame, penalizer)
 
-        times = np.array(sorted(HORIZONS_FOR_METRICS), dtype=float)
+        times = np.array(horizons, dtype=float)
         survival = model.predict_survival_function(test_scaled, times=times)
         raw_cdf = 1.0 - survival.to_numpy()
         test_positions = np.where(test_mask)[0]
-        for row_index, horizon in enumerate(sorted(HORIZONS_FOR_METRICS)):
+        if physical_uncertainty_days > 0:
+            raw_cdf = physical_blend(
+                raw_cdf, times, crossing_days_all[test_positions], physical_uncertainty_days
+            )
+        for row_index, horizon in enumerate(horizons):
             oof_predictions[horizon][test_positions] = raw_cdf[row_index, :]
 
         median_survival = model.predict_median(test_scaled).to_numpy()
@@ -246,7 +451,11 @@ def run_cross_validation(
             )
         )
 
-    metrics = evaluate_predictions(table, oof_predictions)
+    # Headline metrics stay on the planning-relevant horizons; the longer
+    # horizons exist to give the calibrator coverage out to the observation end.
+    metrics = evaluate_predictions(
+        table, {h: oof_predictions[h] for h in HORIZONS_FOR_METRICS if h in oof_predictions}
+    )
     concordance = float(np.mean(fold_concordances)) if fold_concordances else float("nan")
     return {
         "concordance": concordance,
@@ -273,26 +482,6 @@ def build_calibration_pool(
     if not raws:
         return np.array([]), np.array([]), np.array([])
     return np.concatenate(raws), np.concatenate(labels), np.concatenate(weights)
-
-
-def _conditional_logistic_cdf(days: np.ndarray, location: np.ndarray, scale: float) -> np.ndarray:
-    """P(T <= days | T > 0) under a logistic location-scale model, vectorized.
-
-    Same functional form as ``forecast.VoltageTrendForecaster``'s physical
-    extrapolation. Used as a sharp, low-variance safety floor on top of the
-    AFT model's calibrated curve (see ``Task1Forecaster.predict`` docstring
-    for why): with only 82 physical events, the AFT's covariate coefficients
-    are necessarily heavily shrunk (Sec 1/4 of docs/TASK1_IMPLEMENTATION.md),
-    which under-predicts near-term risk specifically for batteries whose
-    voltage has plateaued just above the EOL threshold rather than declining
-    smoothly — exactly the physical situation ``crossing_days_extrapolated``
-    is designed to flag directly.
-    """
-
-    raw = 1.0 / (1.0 + np.exp(-np.clip((days - location) / scale, -40.0, 40.0)))
-    at_origin = 1.0 / (1.0 + np.exp(-np.clip((-location) / scale, -40.0, 40.0)))
-    conditioned = (raw - at_origin) / np.maximum(1.0 - at_origin, 1e-9)
-    return np.clip(conditioned, 0.0, 1.0)
 
 
 @dataclass
@@ -411,18 +600,21 @@ class Task1Forecaster:
         all_times = np.unique(np.concatenate([eval_offsets_curve, tail_grid, c_point]))
         survival = self.aft_model.predict_survival_function(scaled, times=all_times)
         raw_cdf_matrix = 1.0 - survival.to_numpy()
-        calibrated_matrix = self.calibrator.apply(raw_cdf_matrix)
 
-        # Cold-start batteries (no crossing-day estimate available) get a huge
-        # placeholder distance so the physical term contributes ~0 and the
-        # AFT+calibration curve alone determines their forecast, which is the
-        # right behavior when there is no voltage history to extrapolate from.
-        crossing_days = table["crossing_days_extrapolated"].fillna(1.0e4).to_numpy(dtype=float)
-        physical_cdf_matrix = _conditional_logistic_cdf(
-            all_times[:, None], crossing_days[None, :], self.physical_uncertainty_days
+        # Blend BEFORE calibrating, matching how the calibrator's training pool
+        # was built (see run_cross_validation). Blending afterwards would push
+        # values off the calibrated scale the calibrator was fit to produce.
+        blended_matrix = physical_blend(
+            raw_cdf_matrix,
+            all_times,
+            table["crossing_days_extrapolated"].to_numpy(dtype=float),
+            self.physical_uncertainty_days,
         )
-        combined_matrix = np.maximum(calibrated_matrix, physical_cdf_matrix)
-        calibrated_matrix = np.maximum.accumulate(combined_matrix, axis=0)
+        if isinstance(self.calibrator, HorizonIsotonicCalibrator):
+            mapped = self.calibrator.apply(blended_matrix, all_times)
+        else:
+            mapped = self.calibrator.apply(blended_matrix)
+        calibrated_matrix = np.maximum.accumulate(mapped, axis=0)
 
         time_index = {round(float(t), 6): i for i, t in enumerate(all_times)}
 
@@ -498,21 +690,39 @@ class Task1Forecaster:
         return RiskForecast(metadata, curve_rows, tail_rows, summaries)
 
 
+def _weighted_log_loss(p: np.ndarray, y: np.ndarray, w: np.ndarray) -> float:
+    p = np.clip(p, 1e-6, 1.0 - 1e-6)
+    return float(np.average(-(y * np.log(p) + (1.0 - y) * np.log(1.0 - p)), weights=w))
+
+
 def select_and_fit(
     table: pd.DataFrame,
     n_folds: int = 5,
     seed: int = 20260818,
     families: Iterable[str] = tuple(AFT_FAMILIES),
     penalizers: Iterable[float] = PENALIZER_GRID,
+    physical_uncertainty_days: float = 20.0,
 ) -> tuple[Task1Forecaster, dict]:
-    """Model-family/penalizer selection by causal grouped OOF Brier, then final refit."""
+    """Model-family/penalizer selection by causal grouped OOF Brier, then final refit.
+
+    The calibrator is *selected*, not assumed: Platt and isotonic are both fit
+    on the same out-of-fold pool and the one with better OOF weighted log loss
+    wins. This matters because a saturated raw model (many predictions pushed
+    near 1.0) cannot be corrected by Platt's logit shift/scale at all, and
+    silently keeping Platt there produced a model whose Brier was worse than
+    predicting the base rate.
+    """
 
     design = derive_design(table)
     grid_results: dict[tuple[str, float], dict] = {}
     for family in families:
         for penalizer in penalizers:
             try:
-                cv = run_cross_validation(table, design, family, penalizer, n_folds=n_folds, seed=seed)
+                cv = run_cross_validation(
+                    table, design, family, penalizer,
+                    n_folds=n_folds, seed=seed,
+                    physical_uncertainty_days=physical_uncertainty_days,
+                )
             except Exception:  # noqa: BLE001 - some configurations may fail to converge
                 continue
             if not cv["brier"]:
@@ -528,7 +738,38 @@ def select_and_fit(
     best_cv = grid_results[best_key]
 
     raw_pool, label_pool, weight_pool = build_calibration_pool(table, best_cv["oof_predictions"])
-    calibrator = fit_platt_calibrator(raw_pool, label_pool, weight_pool)
+    candidates = {
+        "identity": PlattCalibrator(slope=1.0, intercept=0.0),
+        "platt": fit_platt_calibrator(raw_pool, label_pool, weight_pool),
+        "isotonic": fit_isotonic_calibrator(raw_pool, label_pool, weight_pool),
+        "horizon_isotonic": fit_horizon_isotonic_calibrator(table, best_cv["oof_predictions"]),
+    }
+    # Score every candidate the way it will actually be used: horizon-aware
+    # calibrators get the horizon of each pooled row, so a map that is right
+    # per-horizon is not penalised for disagreeing with the pooled average.
+    weight_all = table["sample_weight"].to_numpy()
+    horizon_of_row: list[np.ndarray] = []
+    for horizon in sorted(best_cv["oof_predictions"]):
+        predicted = best_cv["oof_predictions"][horizon]
+        mask, _ = masked_labels_at_horizon(table, horizon)
+        valid = mask & np.isfinite(predicted)
+        horizon_of_row.append(np.full(int(valid.sum()), float(horizon)))
+    pool_horizons = np.concatenate(horizon_of_row) if horizon_of_row else np.array([])
+
+    calibration_scores = {}
+    for name, cal in candidates.items():
+        if isinstance(cal, HorizonIsotonicCalibrator):
+            mapped = np.empty_like(raw_pool)
+            for horizon in np.unique(pool_horizons):
+                selector = pool_horizons == horizon
+                mapped[selector] = cal.apply(
+                    raw_pool[selector][None, :], np.array([horizon])
+                )[0]
+        else:
+            mapped = cal.apply(raw_pool)
+        calibration_scores[name] = _weighted_log_loss(mapped, label_pool, weight_pool)
+    calibrator_name = min(calibration_scores, key=calibration_scores.get)
+    calibrator = candidates[calibrator_name]
 
     final_transform = fit_feature_transform(design, CURATED_FEATURES)
     final_scaled = final_transform.transform(design)
@@ -541,6 +782,7 @@ def select_and_fit(
         aft_model=final_model,
         transform=final_transform,
         calibrator=calibrator,
+        physical_uncertainty_days=physical_uncertainty_days,
     )
     report = {
         "selected_family": best_family,
@@ -552,8 +794,13 @@ def select_and_fit(
         "n_examples": int(len(table)),
         "n_devices": int(table["device_id"].nunique()),
         "n_events": int(table["event"].sum()),
-        "calibrator_slope": calibrator.slope,
-        "calibrator_intercept": calibrator.intercept,
+        "calibrator_selected": calibrator_name,
+        "calibrator_oof_log_loss": calibration_scores,
+        "calibration_pool_size": int(len(raw_pool)),
+        "calibration_pool_event_rate": float(np.average(label_pool, weights=weight_pool))
+        if len(raw_pool)
+        else float("nan"),
+        "physical_uncertainty_days": physical_uncertainty_days,
         "grid_search": {
             f"{family}/{penalizer}": {
                 "mean_brier": result["mean_brier"],

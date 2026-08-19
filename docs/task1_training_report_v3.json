@@ -1,0 +1,42 @@
+{
+  "selected_family": "lognormal",
+  "selected_penalizer": 0.1,
+  "cv_n_folds_used": 4,
+  "cv_concordance": 0.9057935106848625,
+  "cv_brier_by_horizon": {
+    "7": 0.0030942628471873354,
+    "14": 0.0064539544854062235,
+    "21": 0.010524737523894675,
+    "28": 0.015007326170571343,
+    "35": 0.01998209263871135,
+    "42": 0.025174429241436126
+  },
+  "cv_log_loss_by_horizon": {
+    "7": 0.013534115016755291,
+    "14": 0.025183655322968214,
+    "21": 0.03737060831355735,
+    "28": 0.049543726291857645,
+    "35": 0.0628079920385104,
+    "42": 0.0770383370997811
+  },
+  "n_examples": 48059,
+  "n_devices": 461,
+  "n_events": 6236,
+  "calibrator_selected": "isotonic",
+  "calibrator_oof_log_loss": {
+    "identity": 0.2038559613610288,
+    "platt": 0.09415287194704455,
+    "isotonic": 0.08505938902055224
+  },
+  "calibration_pool_size": 522532,
+  "calibration_pool_event_rate": 0.04197354646239981,
+  "physical_uncertainty_days": 20.0,
+  "grid_search": {
+    "lognormal/0.1": {
+      "mean_brier": 0.013372800484534509,
+      "concordance": 0.9057935106848625
+    }
+  },
+  "table_rows": 48059,
+  "elapsed_seconds": 849.8113244999986
+}

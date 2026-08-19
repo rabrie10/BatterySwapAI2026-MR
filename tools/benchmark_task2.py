@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import pickle
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 import time
 import warnings
@@ -117,6 +119,79 @@ class OracleForecaster:
         )
 
 
+def _git_commit_sha() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except Exception:
+        return "unknown"
+
+
+LOG_COLUMNS = [
+    "timestamp_utc",
+    "commit",
+    "mode",
+    "model_version",
+    "n_scenarios",
+    "total_cost",
+    "all_defer",
+    "battery_swap",
+    "building_change",
+    "room_change",
+    "travel",
+    "overtime",
+    "daily_limit",
+    "weekly_limit",
+    "late_swap",
+    "early_swap",
+    "swaps",
+    "elapsed_seconds",
+    "label",
+]
+
+
+def record_benchmark(
+    log_path: Path,
+    mean_row: pd.Series,
+    *,
+    mode: str,
+    model_version: str,
+    n_scenarios: int,
+    elapsed_seconds: float,
+    label: str,
+) -> None:
+    """Append one comparable row to a local, human-readable benchmark log.
+
+    Columns match the official leaderboard's cost-component breakdown
+    exactly, so a local train-split run and a real public/private leaderboard
+    entry can be compared column-for-column. Meant to let iteration happen
+    against the local evaluator (unlimited runs) instead of the 5/day
+    official submission limit.
+    """
+
+    entry = {
+        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "commit": _git_commit_sha(),
+        "mode": mode,
+        "model_version": model_version,
+        "n_scenarios": n_scenarios,
+        "elapsed_seconds": round(float(elapsed_seconds), 1),
+        "label": label,
+    }
+    for column in LOG_COLUMNS:
+        if column in entry:
+            continue
+        entry[column] = round(float(mean_row[column]), 4) if column in mean_row else ""
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not log_path.exists()
+    with log_path.open("a", encoding="utf-8") as handle:
+        if write_header:
+            handle.write(",".join(LOG_COLUMNS) + "\n")
+        handle.write(",".join(str(entry[column]) for column in LOG_COLUMNS) + "\n")
+
+
 def all_defer_plan(locations: pd.DataFrame, start: pd.Timestamp, settings) -> pd.DataFrame:
     day = start.normalize() + pd.Timedelta(
         f"{float(settings.planning_window_days) + 1} days"
@@ -133,6 +208,13 @@ def main() -> None:
     parser.add_argument("--solver-seconds", type=float, default=2.0)
     parser.add_argument("--local-search", type=int, default=160)
     parser.add_argument("--robust-samples", type=int, default=4)
+    parser.add_argument(
+        "--late-risk-multiplier",
+        type=float,
+        default=1.0,
+        help="Task 2 decision-risk policy: scales the late-swap penalty in the expected-cost "
+        "model. <1 makes the planner more conservative about swapping (fewer, later swaps).",
+    )
     parser.add_argument("--mode", choices=["oracle", "fallback", "real"], default="oracle")
     parser.add_argument(
         "--forecaster-path",
@@ -143,10 +225,24 @@ def main() -> None:
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--scenario-index", type=int)
     parser.add_argument("--show-plan", action="store_true")
+    parser.add_argument(
+        "--record",
+        type=Path,
+        default=None,
+        help="Append the mean-row result to this CSV log (e.g. docs/local_benchmark_log.csv) "
+        "for tracking improvements across changes without spending official submissions.",
+    )
+    parser.add_argument(
+        "--label",
+        type=str,
+        default="",
+        help="Short free-text note stored alongside a --record entry (e.g. 'baseline', 'after X fix').",
+    )
     args = parser.parse_args()
 
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset_path)
     rows = []
+    model_version = args.mode
     started = time.perf_counter()
     for scenario_index, (scenario, locs, cut, active_eol) in enumerate(
         iterate_scenarios(locations, timeseries, eol_times, scenarios)
@@ -162,9 +258,11 @@ def main() -> None:
         elif args.mode == "real":
             with args.forecaster_path.open("rb") as handle:
                 forecaster = pickle.load(handle)
+            model_version = getattr(forecaster, "model_version", "real")
         else:
             forecaster = None
         config = PlannerConfig(
+            late_risk_multiplier=args.late_risk_multiplier,
             local_search_evaluations=args.local_search,
             robust_emergency_samples=args.robust_samples,
             optimizer=OptimizationConfig(solver_seconds=args.solver_seconds),
@@ -333,9 +431,22 @@ def main() -> None:
     if result.empty:
         raise RuntimeError("No scenarios were benchmarked")
     numeric = result.select_dtypes(include="number")
+    total_elapsed = time.perf_counter() - started
     print("MEAN")
     print(numeric.mean().to_string())
-    print(f"elapsed_seconds {time.perf_counter() - started:.3f}")
+    print(f"elapsed_seconds {total_elapsed:.3f}")
+
+    if args.record is not None:
+        record_benchmark(
+            args.record,
+            numeric.mean(),
+            mode=args.mode,
+            model_version=str(model_version),
+            n_scenarios=len(result),
+            elapsed_seconds=total_elapsed,
+            label=args.label,
+        )
+        print(f"Recorded -> {args.record}")
 
 
 if __name__ == "__main__":
