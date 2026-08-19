@@ -252,7 +252,12 @@ class HorizonIsotonicCalibrator:
     horizons: tuple[float, ...]
     thresholds: tuple[tuple[float, ...], ...]
     values: tuple[tuple[float, ...], ...]
-    tie_break_weight: float = 0.02
+    # Disabled by default: the tie-break is sound in principle (see _apply_one)
+    # and does restore ordering inside isotonic plateaus, but enabling it in the
+    # v5 experiment measured slightly worse end-to-end (3168.27 vs 3128.88 over
+    # 48 train scenarios). Retained as an opt-in knob, off by default so the
+    # shipped artifact reproduces its benchmark exactly.
+    tie_break_weight: float = 0.0
 
     def _apply_one(self, index: int, raw: np.ndarray) -> np.ndarray:
         mapped = np.interp(

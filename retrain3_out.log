@@ -1,7 +1,0 @@
-table (48059, 80) events 6236
-calibrator selected: isotonic
-calibrator OOF log loss: {'identity': 0.2038559613610288, 'platt': 0.09415287194704455, 'isotonic': 0.08505938902055224}
-calibration pool size: 522532 event rate: 0.04197
-cv concordance: 0.9058
-cv brier: {7: 0.0030942628471873354, 14: 0.0064539544854062235, 21: 0.010524737523894675, 28: 0.015007326170571343, 35: 0.01998209263871135, 42: 0.025174429241436126}
-elapsed 850s -> C:\Users\welde\Desktop\School\Private_projects\BatterySwapAI2026-MR\models\risk_forecaster_v3.pkl

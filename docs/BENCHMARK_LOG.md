@@ -51,11 +51,27 @@ directly, to see what a change actually did.
 | `all_defer` | the trivial "defer everything" baseline's cost on the *same* scenarios, for context |
 | `label` | your free-text note — always fill this in |
 
-## Baseline entry
+## Recorded history (all 48 train scenarios)
 
-The first `mode=real` row in the log (label: `"current-pushed-model (blend+speed fix)"`)
-is the model currently pushed to Hugging Face as of 2026-08-19 — i.e. what
-produced (or should produce, if submitted again) the corrected leaderboard
-result following the physical-prior blend fix and the feature-computation
-speed fix described in `docs/TASK1_IMPLEMENTATION.md`. Compare future rows
-against this one first.
+| Row label | `total_cost` | swaps | Note |
+|---|---:|---:|---|
+| `current-pushed-model (blend+speed fix)` | 6023.61 | 71.1 | v1/v2 — the model behind the 7389.39 leaderboard entry |
+| `v3: isotonic cal + blend-before-cal + long-horizon cal` | 4005.33 | 43.1 | |
+| `v4: horizon-conditional isotonic calibration` | **3128.88** | 28.0 | **shipped** — first to beat all-defer |
+| `v5: tie-break + negative crossing-days` | 3168.27 | 28.3 | rejected, 1.3% worse |
+
+Reference points on the same 48 scenarios: **all-defer = 3324.68**, and the
+train-label **oracle ceiling ≈ 78**. Those bracket the achievable range — a
+model above 3324.68 is worse than doing nothing, which is exactly how the
+v1/v2 problem was caught.
+
+Compare any new row against **3128.88** first, then against all-defer.
+`docs/TASK1_MODEL_INVESTIGATION.md` explains what changed between each row.
+
+## Caveat: these numbers are in-sample
+
+The artifact is trained on all 461 train devices and benchmarked on train
+scenarios, so these figures are optimistic. Model/calibrator selection is
+honest (building-grouped OOF), but the end-to-end costs are not. Treat the
+log as a *relative* instrument for comparing changes, not as a leaderboard
+prediction. See `docs/TASK1_IMPLEMENTATION.md` Sec 6.

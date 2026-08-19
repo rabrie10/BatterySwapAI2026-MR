@@ -2,3 +2,4 @@ timestamp_utc,commit,mode,model_version,n_scenarios,total_cost,all_defer,battery
 2026-08-19 16:09:32,2662102,real,task1-aft-survival-blended/v1,48,6023.6101,3324.6789,18.0729,50.0417,31.9479,142.9877,277.362,318.75,343.75,278.125,4562.5729,71.0833,566.0,current-pushed-model (blend+speed fix)
 2026-08-19 16:59:35,2662102,real,task1-aft-survival-blended/v1,48,4005.3281,3324.6789,11.5156,30.3333,19.3958,81.4327,160.2964,181.25,210.4167,712.9167,2597.7708,43.1042,499.8,v3: isotonic cal + blend-before-cal + long-horizon cal
 2026-08-19 17:41:11,13fe887,real,task1-aft-survival-blended/v1,48,3128.884,3324.6789,8.026,20.8333,13.375,55.9957,108.0185,108.3333,152.0833,1072.5,1589.7188,27.9583,556.2,v4: horizon-conditional isotonic calibration
+2026-08-19 18:09:26,04eacef,real,task1-aft-survival-blended/v1,48,3168.2736,3324.6789,8.1094,23.9792,14.2396,61.902,111.4185,102.0833,175.0,1050.0,1621.5417,28.3333,511.7,v5: tie-break + negative crossing-days

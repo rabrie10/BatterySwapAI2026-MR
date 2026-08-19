@@ -22,14 +22,18 @@ EOL_VOLTAGE = 2.4
 NEAR_THRESHOLD_BAND = 0.1
 MIN_DECLINE_PER_DAY = 0.0005
 MAX_CROSSING_DAYS = 3650.0
-# Batteries already *below* the EOL voltage get a negative crossing-day
-# estimate. Clipping those to 0 (as an earlier version did) made every
-# already-crossed battery numerically identical, which erased the ordering
-# between "just dipped below threshold" and "far below it and still falling"
-# -- the planner then saw a block of tied batteries and swapped all of them.
-# Allowing a bounded negative value keeps that ordering; the bound stops a
-# single noisy slope estimate from producing an unbounded urgency score.
-MIN_CROSSING_DAYS = -90.0
+# Lower bound for the crossing-day estimate. Batteries already *below* the EOL
+# voltage produce a negative raw value; clipping at 0 collapses them all onto
+# one number, which erases the ordering between "just dipped below threshold"
+# and "far below it and still falling".
+#
+# Allowing a bounded negative value (-90) to preserve that ordering was tried
+# in the v5 experiment and measured *slightly worse* end-to-end (3168.27 vs
+# 3128.88 over 48 train scenarios), so the 0 bound is retained. See
+# docs/TASK1_MODEL_INVESTIGATION.md Sec 6. Kept as a named constant because
+# the reasoning is sound and it is worth re-testing if the model's
+# discrimination improves.
+MIN_CROSSING_DAYS = 0.0
 ROLLING_WINDOWS_DAYS: tuple[int, ...] = (7, 14, 28, 56, 90, 180)
 SLOPE_WINDOWS_DAYS: tuple[int, ...] = (14, 28, 90)
 
