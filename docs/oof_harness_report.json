@@ -1,0 +1,19 @@
+{
+  "template_version": "task1-mixture-cure-cutoff-balanced/v3",
+  "n_folds": 4,
+  "folds_fitted": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "n_buildings": 24,
+  "buildings_per_fold": {
+    "0": 6,
+    "1": 6,
+    "2": 6,
+    "3": 6
+  },
+  "n_examples": 48059,
+  "elapsed_seconds": 653.2421144999971
+}

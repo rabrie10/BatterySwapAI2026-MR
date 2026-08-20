@@ -112,9 +112,22 @@ def derive_design(table: pd.DataFrame) -> pd.DataFrame:
 
 
 def derive_incidence_design(
-    table: pd.DataFrame, observation_end: pd.Timestamp
+    table: pd.DataFrame,
+    observation_end: pd.Timestamp,
+    *,
+    use_remaining_window: bool = True,
 ) -> pd.DataFrame:
-    """Features for P(observed EOL before the published observation end)."""
+    """Features for P(observed EOL before the published observation end).
+
+    `use_remaining_window=False` drops `remaining_observation_days_log`. That
+    feature is genuinely predictive on train -- a battery observed for only a
+    few more days is unlikely to have an *observed* EOL -- but it encodes the
+    data-collection window rather than the battery's condition, so a split
+    whose window geometry differs from train's forces the classifier to
+    extrapolate along it. Dropping it makes incidence a statement about the
+    device; the window then enters the forecast only through the survival
+    curve's own time argument, which handles it correctly by construction.
+    """
 
     cutoff = pd.to_datetime(table["cutoff"])
     if cutoff.dt.tz is not None:
@@ -137,7 +150,8 @@ def derive_incidence_design(
     out["history_days_log"] = np.log1p(
         table["history_days_available"].clip(lower=0.0)
     )
-    out["remaining_observation_days_log"] = np.log1p(remaining)
+    if use_remaining_window:
+        out["remaining_observation_days_log"] = np.log1p(remaining)
     out["cold_start"] = table["cold_start"].astype(float)
     return out
 
@@ -199,6 +213,7 @@ def fit_incidence_classifier(
     seed: int = 20260818,
     regularization_grid: Iterable[float] = (0.01, 0.1, 1.0),
     weighting: str = "device",
+    use_remaining_window: bool = True,
 ) -> tuple[object, FeatureTransform, dict]:
     """Fit the cure-incidence component with building-grouped validation.
 
@@ -207,7 +222,9 @@ def fit_incidence_classifier(
     Model selection is always measured with equal total mass per cutoff.
     """
 
-    design = derive_incidence_design(table, observation_end)
+    design = derive_incidence_design(
+        table, observation_end, use_remaining_window=use_remaining_window
+    )
     label = table["event"].to_numpy(dtype=int)
     fit_weight = incidence_sample_weights(table, weighting)
     metric_weight = incidence_sample_weights(table, "cutoff")
@@ -507,9 +524,24 @@ class Task1Forecaster:
     physical_uncertainty_days: float = 20.0
     physical_risk_weight: float = 1.0
     physical_shape_min_remaining_days: float = 0.0
+    # Width of the smooth ramp around `physical_shape_min_remaining_days`.
+    # 0.0 reproduces the original hard step (kept for exact reproducibility of
+    # earlier artifacts); a positive value spreads the transition so the
+    # forecast is continuous in observation-window geometry. See predict().
+    physical_shape_ramp_days: float = 0.0
     incidence_model: object | None = None
     incidence_transform: FeatureTransform | None = None
     incidence_weighting: str = "device"
+    # Uniform shrinkage applied to predicted incidence at inference. 1.0 is a
+    # no-op (reproduces earlier artifacts exactly); < 1.0 hedges against the
+    # over-prediction the model shows on unseen buildings. See predict().
+    incidence_scale: float = 1.0
+    # When False, the incidence design drops `remaining_observation_days_log`.
+    # That feature makes P(EOL observed) depend directly on how much data
+    # collection window is left -- a property of the dataset, not the battery --
+    # and is therefore extrapolated rather than interpolated whenever a split's
+    # window geometry differs from train's. See derive_incidence_design().
+    incidence_uses_remaining_window: bool = True
 
     def _scenario_table(
         self, battery_data: pd.DataFrame, locations: pd.DataFrame, origin: pd.Timestamp
@@ -617,7 +649,13 @@ class Task1Forecaster:
         incidence_model = getattr(self, "incidence_model", None)
         incidence_transform = getattr(self, "incidence_transform", None)
         if incidence_model is not None and incidence_transform is not None:
-            incidence_design = derive_incidence_design(table, observation_end)
+            incidence_design = derive_incidence_design(
+                table,
+                observation_end,
+                use_remaining_window=bool(
+                    getattr(self, "incidence_uses_remaining_window", True)
+                ),
+            )
             incidence_probability = np.clip(
                 incidence_model.predict_proba(
                     incidence_transform.transform(incidence_design)
@@ -625,6 +663,34 @@ class Task1Forecaster:
                 1e-8,
                 1.0 - 1e-8,
             )
+            # Distribution-shift hedge on unseen buildings.
+            #
+            # The incidence classifier is fit and selected with building-grouped
+            # CV, but its confidence still degrades on buildings outside the
+            # training population, and it degrades in one direction: it
+            # over-predicts, so the planner over-swaps. Measured on train, the
+            # planned swap count rises monotonically with unfamiliarity --
+            # 10.98 in-sample, 15.06 out-of-fold, ~41 on the public split.
+            #
+            # The cost function punishes that asymmetrically: an unnecessary
+            # swap of a battery that never fails costs up to ~182 (early
+            # penalty over the days to its proxy EOL) while deferring it costs
+            # nothing, so shrinking incidence is much cheaper than inflating it.
+            # `incidence_scale < 1` shrinks predicted event mass uniformly,
+            # which is the mildest intervention that reduces swap count without
+            # touching the model's ranking or the timing shape.
+            #
+            # Select this on the OOF harness (tools/fit_oof_forecasters.py),
+            # never on leaderboard feedback -- and prefer the conservative side
+            # of the OOF optimum, because the harness understates the true
+            # shift (it reproduced only ~14% of the observed public gap).
+            incidence_scale = float(getattr(self, "incidence_scale", 1.0))
+            if not 0.0 < incidence_scale <= 1.0:
+                raise ValueError("incidence_scale must be in (0, 1]")
+            if incidence_scale != 1.0:
+                incidence_probability = np.clip(
+                    incidence_probability * incidence_scale, 1e-8, 1.0 - 1e-8
+                )
 
             # The incidence model owns total probability mass G(C). AFT and
             # physical extrapolation only determine when that mass arrives.
@@ -637,12 +703,37 @@ class Task1Forecaster:
                 out=np.zeros_like(physical_cdf_matrix),
                 where=physical_at_c[None, :] > 1e-9,
             )
+            # Smooth ramp rather than a hard threshold.
+            #
+            # A step gate (`weight if c_offset > 210 else 0`) makes the whole
+            # forecast discontinuous in a quantity that describes the *data
+            # collection window*, not the battery. Measured on train, it swings
+            # the number of batteries above 25% predicted risk by ~6x (19.4
+            # above the threshold vs 3.2 below it). Train happens to contain
+            # many low-remaining scenarios, so the aggressive side of that step
+            # is diluted in the mean; a split weighted toward high-remaining
+            # scenarios sits entirely on the aggressive side. That is the most
+            # likely explanation for this model scoring 2880 locally but ~4252
+            # on the public split with ~4x the swap count.
+            #
+            # The ramp keeps the same intent -- trust the physical
+            # extrapolation less when little observation window remains, since
+            # a projected crossing far beyond the window cannot be observed --
+            # but removes the cliff, so behaviour degrades gracefully instead
+            # of flipping regime.
             minimum_remaining = float(
                 getattr(self, "physical_shape_min_remaining_days", 0.0)
             )
-            effective_physical_weight = (
-                physical_risk_weight if c_offset > minimum_remaining else 0.0
-            )
+            ramp_days = float(getattr(self, "physical_shape_ramp_days", 0.0))
+            if minimum_remaining <= 0.0:
+                ramp_fraction = 1.0
+            elif ramp_days <= 0.0:
+                ramp_fraction = 1.0 if c_offset > minimum_remaining else 0.0
+            else:
+                ramp_fraction = float(
+                    np.clip((c_offset - minimum_remaining) / ramp_days + 0.5, 0.0, 1.0)
+                )
+            effective_physical_weight = physical_risk_weight * ramp_fraction
             timing_cdf = np.maximum(
                 aft_timing, effective_physical_weight * physical_timing
             )

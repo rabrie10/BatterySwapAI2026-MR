@@ -54,6 +54,20 @@ def main() -> None:
     parser.add_argument(
         "--physical-shape-min-remaining-days", type=float, default=210.0
     )
+    parser.add_argument(
+        "--physical-shape-ramp-days",
+        type=float,
+        default=0.0,
+        help="Width of the smooth ramp around the min-remaining threshold. 0 keeps the "
+        "original hard step; a positive value makes the physical weight continuous in "
+        "observation-window geometry (recommended for cross-split robustness).",
+    )
+    parser.add_argument(
+        "--incidence-drop-remaining-window",
+        action="store_true",
+        help="Drop remaining_observation_days_log from the incidence features so "
+        "P(EOL observed) describes the battery rather than the data-collection window.",
+    )
     args = parser.parse_args()
 
     if not 0.0 <= args.physical_risk_weight <= 1.0:
@@ -78,6 +92,7 @@ def main() -> None:
 
     feature_series = build_feature_series(timeseries)
     table = build_example_table(locations, eol_times, feature_series, cutoff_dates)
+    use_remaining_window = not args.incidence_drop_remaining_window
     incidence_model, incidence_transform, report = fit_incidence_classifier(
         table,
         observation_end,
@@ -85,6 +100,7 @@ def main() -> None:
         seed=args.seed,
         regularization_grid=args.regularization,
         weighting=args.incidence_weighting,
+        use_remaining_window=use_remaining_window,
     )
 
     with args.base_forecaster.open("rb") as handle:
@@ -99,9 +115,11 @@ def main() -> None:
         physical_shape_min_remaining_days=float(
             args.physical_shape_min_remaining_days
         ),
+        physical_shape_ramp_days=float(args.physical_shape_ramp_days),
         incidence_model=incidence_model,
         incidence_transform=incidence_transform,
         incidence_weighting=args.incidence_weighting,
+        incidence_uses_remaining_window=use_remaining_window,
     )
 
     report["config"] = {
@@ -116,6 +134,8 @@ def main() -> None:
         "physical_uncertainty_days": args.physical_uncertainty_days,
         "physical_risk_weight": args.physical_risk_weight,
         "physical_shape_min_remaining_days": args.physical_shape_min_remaining_days,
+        "physical_shape_ramp_days": args.physical_shape_ramp_days,
+        "incidence_uses_remaining_window": use_remaining_window,
         "model_version": CURE_MODEL_VERSION,
     }
     report["n_examples"] = int(len(table))
