@@ -252,39 +252,86 @@ values as directional.)
 
 ## 3. Task 1: the model
 
-### 3.1 The reframing that unlocks the data
+### 3.1 Curve forecasting: tested, and it is a peer — not a step change
 
-Event-based survival models are trained on **82 events**. But EOL is a
-deterministic threshold on a curve we can forecast directly, and the 379
-censored devices have fully observed *voltage futures* even though they never
-cross. Forecasting the curve instead of the event turns a tiny-label survival
-problem into a **385,153 device-day regression problem**, and uses every device
-at full weight instead of as a weak right-censoring bound.
+Event-based survival models train on **82 events**. EOL is a deterministic
+threshold on a curve we can forecast directly, and the 379 censored devices
+have fully observed *voltage futures* even though they never cross. Forecasting
+the curve instead of the event turns a tiny-label survival problem into a
+385,153 device-day regression problem.
 
-That is the centrepiece of V6.
+I drafted this as V6's centrepiece and then measured it. It is not a
+centrepiece.
 
-### 3.2 Four heads, stacked
+42-day voltage-change forecast, out-of-fold by building, 92,586 samples:
 
-- **H1 — discrete-time hazard GBM.** One classifier over stacked
-  `(sample, horizon)` rows with horizon as an explicit feature, monotone
+| | MAE (V) |
+|---|---:|
+| learned Δ42 forecast | **0.02777** |
+| persist the 30-day slope | 0.03474 |
+| predict the mean change | 0.03184 |
+| learned, near-EOL subset (V < 2.60) | 0.05828 |
+
+Converted into a first-passage score against 2.4 V:
+
+| score | AUC | PR-AUC |
+|---|---:|---:|
+| current voltage alone | 0.9829 | 0.4205 |
+| predicted V(t+42), point | 0.9862 | 0.4784 |
+| **Gaussian on the q10/q90 band** | **0.9872** | **0.5048** |
+| **H1 direct hazard, for comparison** | 0.9849 | **0.5260** |
+
+Three conclusions, all of which survive the caveat that H1 and H2 are scored on
+overlapping-but-different samples (H2 needs an observed 42-day future, so it
+loses rows near the data end: 755 positives against H1's 1025):
+
+1. **H2 is a peer of H1, not its superior.** The reframing does not unlock a
+   step change, and the plan should not be built on the claim that it does.
+2. **The distributional form matters more than the point forecast** — the
+   q10/q90 band beats the point estimate by 0.027 PR-AUC. This is the same
+   lesson as §1.4: never collapse to a point.
+3. **The dynamics are genuinely learnable** — 20 % better than persisting the
+   30-day slope. Near-EOL MAE of 0.0583 V against a typical 0.0035 V/day slope
+   implies about **16.7 days** of timing error, which lines up with the σ ≈ 14
+   row of the V5 sensitivity study.
+
+H2 therefore earns its place as a **decorrelated ensemble member** — a
+regression view of a curve versus a classification view of an event, which
+should fail in different places — not as the foundation.
+
+### 3.2 Four heads, stacked — in measured priority order
+
+- **H1 — discrete-time hazard GBM. The foundation.** One classifier over
+  stacked `(sample, horizon)` rows with horizon as an explicit feature, monotone
   constrained in horizon. Horizons run to the full remaining observation window
   (up to ~334 days), not 180. A row contributes to a horizon only if it is
-  informative for it: crossed within it, or observed alive past it.
-- **H2 — voltage-path forecaster.** Quantile regression of
-  `ΔV(t → t+h)` for a grid of `h`, from which the first-passage distribution
-  follows by path simulation against the 2.4 V threshold. Trained on every
-  device-day of every device.
+  informative for it: crossed within it, or observed alive past it. Measured:
+  PR-AUC 0.526 at a 1.0 % base rate. Improvements here are: better horizon
+  handling, monotonicity, isotonic calibration per band, and more cutoffs.
+- **H4 — seasonal-physical head. Highest expected value of the additions.**
+  Temperature-compensated state, plus each device's own estimated seasonal
+  temperature profile projected across the planning window, plus an AFT/Weibull
+  on remaining charge. This head owns §1.3 and is aimed squarely at §2.4: the
+  residual misses are seasonally structured (0.05–0.13 miss rate on autumn
+  windows against 0.38–0.53 on spring windows), and the prototype has only
+  day-of-year sin/cos to explain that with.
+- **H2 — voltage-path forecaster.** Quantile regression of `ΔV(t → t+h)` for a
+  grid of `h`, first-passage by path simulation against 2.4 V. Measured at
+  PR-AUC 0.505 in its distributional form (§3.1) — a peer of H1 with a
+  different inductive bias, included for decorrelation.
 - **H3 — trajectory matcher.** Cross-fitted k-NN on the last 90 days of
   temperature-compensated curve shape. The library **must exclude every device
-  in the validation building**, otherwise it leaks.
-- **H4 — seasonal-physical head.** Temperature-compensated state, plus each
-  device's own estimated seasonal temperature profile projected across the
-  planning window, plus an AFT/Weibull on remaining charge. This is the head
-  that owns finding 1.3.
+  in the validation building**, otherwise it leaks. Lowest prior of the four;
+  build it last and drop it if the stack does not want it.
 
-Stack the four on grouped out-of-fold predictions. Calibrate with a
-Platt/beta prior *before* isotonic, because 82 events will not support isotonic
-alone.
+Stack on grouped out-of-fold predictions. Calibrate with a Platt/beta prior
+*before* isotonic, because 82 events will not support isotonic alone.
+
+Because §2.4 shows the misses are knee-onset surprises — devices higher on the
+curve and declining *more slowly* that cross anyway — add an explicit
+**knee-onset detector** to the feature set for every head: change-point
+statistics on the slope, time since the slope last doubled, and the residual
+against each device's own historical decline rate.
 
 ### 3.3 Features
 
@@ -471,11 +518,12 @@ Dependency order, not calendar order.
    planner drives daily and weekly limits to 0.0 under oracle risk. Expected
    recovery of most of the 297.7 capacity penalty for integration work only, no
    new modelling. This is the first submission candidate.
-4. **Task 1 heads,** in descending expected value against the 911.7 late cost:
-   H2 (voltage-path — the reframing that turns 82 events into 385 k
-   device-days), then H4 (seasonal-physical, which owns the 1.76× winter
-   effect), then H3, then the stack and calibration, then §3.5 scenario
-   recalibration against the 20.6-vs-9.5 over-prediction.
+4. **Task 1 heads,** in descending measured expected value against the 911.7
+   late cost: harden H1 and add the knee-onset features (§3.2); then H4, which
+   targets the seasonal structure in the residual misses; then H2 for
+   decorrelation; then H3 if the stack still wants it. Then the stack and
+   calibration, then §3.5 scenario recalibration against the 20.6-vs-9.5
+   over-prediction.
 5. **Task 2 objective.** SAA swap-in behind a flag, verified against the current
    objective under oracle risk before it is trusted.
 6. **Candidate selection** by economic gain (§4.4) and the evaluator exploits
@@ -504,6 +552,11 @@ number we see is uninterpretable.
 | τ(v) dispersion table | 82 complete trajectories, days from first level crossing to EOL |
 | pace correlation −0.085 | days 2.70→2.55 against days 2.55→EOL |
 | building EOL rate 0.043–0.833 | events divided by devices, per building |
+| H1 PR-AUC 0.526, precision@20 0.95 | `HistGradientBoostingClassifier`, 1.52 M stacked rows, `GroupKFold(5)` by building |
+| V6 prototype end-to-end 1567.6 | OOF predictions only, decision algebra of §4, naive greedy router, official `evaluate_plan()` over all 48 scenarios |
+| late-multiplier and probability-scale insensitivity | sweeps of 0.6–2.0 and ×0.7–×1.6 on the same pipeline |
+| miss characterisation (§2.4) | 404 due batteries across 48 scenarios, split at `p < 0.05` |
+| H2 Δ42 MAE 0.02777 V, PR-AUC 0.505 | quantile + mean `HistGradientBoostingRegressor`, `GroupKFold(5)` by building, 92,586 samples, cutoffs stopped at the crossing |
 | settings constant except depot | set comparison across all 48 scenario settings blocks |
 | harness overhead 67.7 s per split | timed `load_dataset` plus a full `iterate_scenarios` pass |
 | evaluator mechanics | direct reading of `batteryswap_public` 0.3.4 |
