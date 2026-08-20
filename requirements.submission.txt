@@ -1,0 +1,15 @@
+# Minimal CPU-only runtime for script.py and the serialized forecasters.
+# Keep this separate from the broad development/competition package catalog:
+# installing that catalog downloads Torch/CUDA although this submission never
+# imports them.
+batteryswap_public==0.3.4
+pydantic-settings>=2.14,<2.16
+structlog>=25.5,<27
+numpy>=2.2,<2.3
+pandas>=2.3,<2.4
+fastparquet>=2026.5,<2027
+scikit-learn>=1.7,<1.8
+scipy>=1.15,<1.16
+joblib>=1.5,<1.6
+ortools>=9.15,<9.16
+lifelines>=0.30,<0.31

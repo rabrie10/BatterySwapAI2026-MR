@@ -13,6 +13,10 @@ from batteryswap_solution.optimizer import OptimizationConfig
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 
 
+DEFAULT_HAZARD_FORECASTER_PATH = Path("models/risk_forecaster_discrete_hazard.pkl")
+FALLBACK_AFT_FORECASTER_PATH = Path("models/risk_forecaster.pkl")
+
+
 def _load_pickle(path: Path):
     with path.open("rb") as handle:
         return pickle.load(handle)
@@ -32,9 +36,15 @@ def load_competition_planner() -> Planner:
         return planner
 
     forecaster = None
-    forecaster_path = Path(
-        os.environ.get("BATTERYSWAP_FORECASTER_PATH", "models/risk_forecaster.pkl")
-    )
+    configured_forecaster = os.environ.get("BATTERYSWAP_FORECASTER_PATH")
+    if configured_forecaster:
+        forecaster_path = Path(configured_forecaster)
+    elif DEFAULT_HAZARD_FORECASTER_PATH.exists():
+        forecaster_path = DEFAULT_HAZARD_FORECASTER_PATH
+    else:
+        # Keep the previously shipped AFT model as a recoverable packaging
+        # fallback without overwriting either artifact.
+        forecaster_path = FALLBACK_AFT_FORECASTER_PATH
     if forecaster_path.exists():
         forecaster = _load_pickle(forecaster_path)
 

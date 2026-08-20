@@ -10,19 +10,20 @@ ENV BATTERYSWAP_SPLITS=train
 
 WORKDIR /app
 
-# NOTE: allowed requirements are specified by the competition.
-# WARNING: customizations to requirements.txt are ignored by the official
-# runtime; this local install only approximates it for Docker testing.
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Use the base image's bundled virtual environment and add only the CPU
+# packages imported by this submission. The broad development requirements
+# include Torch/CUDA even though neither Task 1 nor Task 2 imports them.
+ENV PATH="/app/env/bin:${PATH}"
+COPY requirements.submission.txt ./
+RUN /app/env/bin/pip install --no-cache-dir -r requirements.submission.txt
 
 # Copy everything script.py needs at runtime.
-# src/ must be present so unpickling models/risk_forecaster.pkl succeeds:
-# pickle resolves the artifact's class as src.risk.model.Task1Forecaster,
-# which requires src/ to be importable, not just batteryswap_solution/.
+# src/ must be present so the default discrete-hazard artifact (and the AFT
+# rollback artifact) can resolve their src.risk.* classes while unpickling.
 COPY batteryswap_solution/ ./batteryswap_solution
 COPY src/ ./src
-COPY models/ ./models
+COPY models/risk_forecaster_discrete_hazard.pkl ./models/risk_forecaster_discrete_hazard.pkl
+COPY models/risk_forecaster.pkl ./models/risk_forecaster.pkl
 COPY script.py ./
 
 # Default to making submissions.

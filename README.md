@@ -25,11 +25,16 @@ The submitted entry point is `script.py`; the Task 2 implementation lives in
 
 ## Task 1 integration
 
-Task 1 should serialize an object implementing `RiskForecaster.predict()` to:
+The submitted default is the H1 discrete-time hazard challenger implementing
+`RiskForecaster.predict()` at:
 
 ```text
-models/risk_forecaster.pkl
+models/risk_forecaster_discrete_hazard.pkl
 ```
+
+`models/risk_forecaster.pkl` remains the automatic AFT rollback artifact if
+the hazard artifact is absent. `BATTERYSWAP_FORECASTER_PATH` explicitly
+overrides both defaults.
 
 The exact v1 schema is defined in `batteryswap_solution/forecast.py` and
 `docs/SOLUTION_DESIGN_SPEC.md`. If the artifact is absent or fails validation,
@@ -81,3 +86,8 @@ The official run uses `public,private`. Optional environment controls are:
 
 Keep the default runtime profile until a full public/private-equivalent local
 run confirms that a larger search budget remains comfortably below 30 minutes.
+
+`requirements.submission.txt` is the minimal CPU-only Docker runtime. The
+broader `requirements.txt` remains the development/competition package catalog
+and is intentionally not installed into the submission image because it would
+pull unused Torch/CUDA packages.

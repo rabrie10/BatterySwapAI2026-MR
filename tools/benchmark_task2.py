@@ -147,8 +147,26 @@ LOG_COLUMNS = [
     "early_swap",
     "swaps",
     "elapsed_seconds",
+    "forecasting_seconds",
+    "planning_seconds",
     "label",
 ]
+
+
+class TimedForecaster:
+    """Transparent benchmark-only wrapper measuring Task 1 inference time."""
+
+    def __init__(self, forecaster) -> None:
+        self.forecaster = forecaster
+        self.elapsed_seconds = 0.0
+        self.model_version = getattr(forecaster, "model_version", "real")
+
+    def predict(self, *args, **kwargs):
+        started = time.perf_counter()
+        try:
+            return self.forecaster.predict(*args, **kwargs)
+        finally:
+            self.elapsed_seconds += time.perf_counter() - started
 
 
 def record_benchmark(
@@ -257,7 +275,7 @@ def main() -> None:
             forecaster = OracleForecaster(active_eol)
         elif args.mode == "real":
             with args.forecaster_path.open("rb") as handle:
-                forecaster = pickle.load(handle)
+                forecaster = TimedForecaster(pickle.load(handle))
             model_version = getattr(forecaster, "model_version", "real")
         else:
             forecaster = None
@@ -305,7 +323,9 @@ def main() -> None:
             "swaps": in_window,
             "seconds": time.perf_counter() - scenario_started,
             "all_defer": float(baseline_score["total_cost"]),
+            "forecasting_seconds": float(getattr(forecaster, "elapsed_seconds", 0.0)),
         }
+        row["planning_seconds"] = max(row["seconds"] - row["forecasting_seconds"], 0.0)
         row.update({component: float(score[component]) for component in cost_components})
         row["total_cost"] = float(score["total_cost"])
         rows.append(row)
