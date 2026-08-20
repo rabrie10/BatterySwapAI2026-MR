@@ -80,6 +80,9 @@ def override_physical_prior(
     uncertainty_days: float,
     physical_risk_weight: float,
     physical_shape_min_remaining_days: float,
+    horizon_rate_cap_multiplier: float,
+    horizon_rate_activation_ratio: float,
+    direct_horizon_weight: float,
 ):
     if not is_dataclass(forecaster) or not hasattr(
         forecaster, "physical_uncertainty_days"
@@ -87,11 +90,20 @@ def override_physical_prior(
         raise TypeError(
             "The selected forecaster does not expose physical_uncertainty_days"
         )
+    horizon_rate_calibrator = getattr(forecaster, "horizon_rate_calibrator", None)
+    if horizon_rate_calibrator is not None:
+        horizon_rate_calibrator = replace(
+            horizon_rate_calibrator,
+            cap_multiplier=float(horizon_rate_cap_multiplier),
+            activation_ratio=float(horizon_rate_activation_ratio),
+        )
     return replace(
         forecaster,
         physical_uncertainty_days=float(uncertainty_days),
         physical_risk_weight=float(physical_risk_weight),
         physical_shape_min_remaining_days=float(physical_shape_min_remaining_days),
+        horizon_rate_calibrator=horizon_rate_calibrator,
+        direct_horizon_weight=float(direct_horizon_weight),
     )
 
 
@@ -102,7 +114,10 @@ def build_config(args: argparse.Namespace) -> PlannerConfig:
         local_search_evaluations=int(args.local_search),
         uncertain_local_search_evaluations=int(args.uncertain_local_search),
         robust_emergency_samples=int(args.robust_samples),
-        optimizer=OptimizationConfig(solver_seconds=float(args.solver_seconds)),
+        optimizer=OptimizationConfig(
+            solver_seconds=float(args.solver_seconds),
+            max_planned_rate=args.max_planned_rate,
+        ),
     )
 
 
@@ -318,12 +333,22 @@ def run_experiment(
     base_forecaster,
     selected_indices: set[int] | None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    experiment = f"{args.run_name}-u{uncertainty_days:g}-w{physical_risk_weight:g}"
+    cap_label = "none" if args.max_planned_rate is None else f"{args.max_planned_rate:g}"
+    experiment = (
+        f"{args.run_name}-u{uncertainty_days:g}-w{physical_risk_weight:g}"
+        f"-h{args.horizon_rate_cap_multiplier:g}"
+        f"-a{args.horizon_rate_activation_ratio:g}"
+        f"-d{args.direct_horizon_weight:g}"
+        f"-cap{cap_label}"
+    )
     forecaster = override_physical_prior(
         base_forecaster,
         uncertainty_days,
         physical_risk_weight,
         args.physical_shape_min_remaining_days,
+        args.horizon_rate_cap_multiplier,
+        args.horizon_rate_activation_ratio,
+        args.direct_horizon_weight,
     )
     config = build_config(args)
     scenario_rows: list[dict] = []
@@ -428,6 +453,14 @@ def run_experiment(
             "local_search": int(args.local_search),
             "uncertain_local_search": int(args.uncertain_local_search),
             "robust_samples": int(args.robust_samples),
+            "horizon_rate_cap_multiplier": float(
+                args.horizon_rate_cap_multiplier
+            ),
+            "horizon_rate_activation_ratio": float(
+                args.horizon_rate_activation_ratio
+            ),
+            "max_planned_rate": args.max_planned_rate,
+            "direct_horizon_weight": float(args.direct_horizon_weight),
         },
         "metrics": aggregate_summary(scenario_frame),
     }
@@ -478,6 +511,10 @@ def main() -> None:
     parser.add_argument(
         "--physical-shape-min-remaining-days", type=float, default=0.0
     )
+    parser.add_argument("--horizon-rate-cap-multiplier", type=float, default=1.0)
+    parser.add_argument("--horizon-rate-activation-ratio", type=float, default=1.9)
+    parser.add_argument("--direct-horizon-weight", type=float, default=0.0)
+    parser.add_argument("--max-planned-rate", type=float)
     parser.add_argument(
         "--scenario-indices",
         help="Comma-separated zero-based indices. Omit to run all scenarios.",
@@ -497,6 +534,14 @@ def main() -> None:
         parser.error("--physical-uncertainty-days values must be positive")
     if any(not 0.0 <= value <= 1.0 for value in args.physical_risk_weight):
         parser.error("--physical-risk-weight values must be between 0 and 1")
+    if args.horizon_rate_cap_multiplier <= 0.0:
+        parser.error("--horizon-rate-cap-multiplier must be positive")
+    if args.horizon_rate_activation_ratio < 1.0:
+        parser.error("--horizon-rate-activation-ratio must be at least 1.0")
+    if not 0.0 <= args.direct_horizon_weight <= 1.0:
+        parser.error("--direct-horizon-weight must be between 0 and 1")
+    if args.max_planned_rate is not None and not 0.0 < args.max_planned_rate <= 1.0:
+        parser.error("--max-planned-rate must be in (0, 1]")
     selected_indices = parse_indices(args.scenario_indices)
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset_path)
     with args.forecaster_path.open("rb") as handle:

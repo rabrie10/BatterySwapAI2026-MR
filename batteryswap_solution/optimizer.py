@@ -23,6 +23,15 @@ class OptimizationConfig:
     time_scale: int = 1000
     capacity_margin_hours: float = 0.05
     objective_roundtrip_fraction: float = 0.55
+    max_planned_rate: float | None = None
+
+
+def planned_swap_limit(battery_count: int, rate: float | None) -> int | None:
+    if rate is None:
+        return None
+    if not 0.0 < float(rate) <= 1.0:
+        raise ValueError("max_planned_rate must be in (0, 1]")
+    return max(1, int(np.ceil(float(rate) * int(battery_count))))
 
 
 def _columns(locations: pd.DataFrame) -> tuple[str, str, str]:
@@ -38,6 +47,7 @@ def _greedy_assign(
     locations: pd.DataFrame,
     travel_costs: pd.DataFrame,
     settings,
+    config: OptimizationConfig,
 ) -> dict[str, pd.Timestamp | None]:
     """Known-valid deterministic fallback when CP-SAT is unavailable."""
 
@@ -47,7 +57,10 @@ def _greedy_assign(
     loc = loc.set_index(id_column)
     travel = travel_costs.set_index(["from", "to"])["hours"]
     base = str(settings.base_location)
-    assignments: dict[str, pd.Timestamp | None] = {}
+    assignments: dict[str, pd.Timestamp | None] = {
+        battery_id: None for battery_id in costs.battery_ids
+    }
+    beneficial: list[tuple[float, str, pd.Timestamp]] = []
 
     for index, battery_id in enumerate(costs.battery_ids):
         building = str(loc.loc[battery_id, building_column])
@@ -61,9 +74,19 @@ def _greedy_assign(
         service_scores = costs.service_cost[index] + standalone
         best_day = int(np.argmin(service_scores))
         if service_scores[best_day] + 1e-9 < defer_cost[index]:
-            assignments[battery_id] = costs.candidate_dates[best_day]
-        else:
-            assignments[battery_id] = None
+            beneficial.append(
+                (
+                    float(defer_cost[index] - service_scores[best_day]),
+                    battery_id,
+                    costs.candidate_dates[best_day],
+                )
+            )
+    limit = planned_swap_limit(len(costs.battery_ids), config.max_planned_rate)
+    selected = sorted(beneficial, key=lambda item: (-item[0], item[1]))
+    if limit is not None:
+        selected = selected[:limit]
+    for _, battery_id, best_day in selected:
+        assignments[battery_id] = best_day
     return assignments
 
 
@@ -82,7 +105,9 @@ def optimize_assignments(
     )
     defer_cost = costs.defer_cost + costs.horizon_event_probability * emergency_operations
     if cp_model is None:
-        return _greedy_assign(costs, defer_cost, locations, travel_costs, settings)
+        return _greedy_assign(
+            costs, defer_cost, locations, travel_costs, settings, config
+        )
 
     id_column, building_column, room_column = _columns(locations)
     loc = locations.copy()
@@ -103,6 +128,16 @@ def optimize_assignments(
     for battery in range(battery_count):
         model.add(sum(service[battery]) + deferred[battery] == 1)
         model.add_hint(deferred[battery], 1)
+    limit = planned_swap_limit(battery_count, config.max_planned_rate)
+    if limit is not None:
+        model.add(
+            sum(
+                service[battery][day]
+                for battery in range(battery_count)
+                for day in range(day_count)
+            )
+            <= limit
+        )
 
     # The evaluator crashes if its horizon end is also Sunday and work is
     # scheduled exactly on that final calendar day. Keep that pathological day
@@ -223,7 +258,9 @@ def optimize_assignments(
     solver.parameters.log_search_progress = False
     status = solver.solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        return _greedy_assign(costs, defer_cost, locations, travel_costs, settings)
+        return _greedy_assign(
+            costs, defer_cost, locations, travel_costs, settings, config
+        )
 
     assignments: dict[str, pd.Timestamp | None] = {}
     for battery, battery_id in enumerate(costs.battery_ids):

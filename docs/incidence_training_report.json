@@ -58,8 +58,440 @@
     "physical_uncertainty_days": 1.0,
     "physical_risk_weight": 0.6,
     "physical_shape_min_remaining_days": 210.0,
-    "model_version": "task1-mixture-cure-cutoff-balanced/v3"
+    "horizon_rate_smoothing_window": 9,
+    "horizon_rate_cap_multiplier": 1.0,
+    "horizon_rate_activation_ratio": 1.9,
+    "direct_horizon_weight": 0.0,
+    "model_version": "task1-mixture-cure-shift-guard/v4"
+  },
+  "horizon_rate_calibration": [
+    {
+      "scenario_start": "2025-09-01 00:00:00",
+      "remaining_observation_days": 334.0,
+      "active_batteries": 458,
+      "observed_events": 9,
+      "event_rate": 0.019650655021834062,
+      "smoothed_event_rate": 0.03160443825946009
+    },
+    {
+      "scenario_start": "2025-09-08 00:00:00",
+      "remaining_observation_days": 327.0,
+      "active_batteries": 458,
+      "observed_events": 13,
+      "event_rate": 0.028384279475982533,
+      "smoothed_event_rate": 0.03153376536469484
+    },
+    {
+      "scenario_start": "2025-09-15 00:00:00",
+      "remaining_observation_days": 320.0,
+      "active_batteries": 458,
+      "observed_events": 17,
+      "event_rate": 0.03711790393013101,
+      "smoothed_event_rate": 0.03275595414969389
+    },
+    {
+      "scenario_start": "2025-09-22 00:00:00",
+      "remaining_observation_days": 313.0,
+      "active_batteries": 455,
+      "observed_events": 19,
+      "event_rate": 0.041758241758241756,
+      "smoothed_event_rate": 0.03259404415064508
+    },
+    {
+      "scenario_start": "2025-09-29 00:00:00",
+      "remaining_observation_days": 306.0,
+      "active_batteries": 450,
+      "observed_events": 14,
+      "event_rate": 0.03111111111111111,
+      "smoothed_event_rate": 0.03249982055013249
+    },
+    {
+      "scenario_start": "2025-10-06 00:00:00",
+      "remaining_observation_days": 299.0,
+      "active_batteries": 449,
+      "observed_events": 14,
+      "event_rate": 0.031180400890868598,
+      "smoothed_event_rate": 0.03286483441620801
+    },
+    {
+      "scenario_start": "2025-10-13 00:00:00",
+      "remaining_observation_days": 292.0,
+      "active_batteries": 449,
+      "observed_events": 18,
+      "event_rate": 0.0400890868596882,
+      "smoothed_event_rate": 0.03225944556515593
+    },
+    {
+      "scenario_start": "2025-10-20 00:00:00",
+      "remaining_observation_days": 285.0,
+      "active_batteries": 445,
+      "observed_events": 14,
+      "event_rate": 0.03146067415730337,
+      "smoothed_event_rate": 0.030689512433710972
+    },
+    {
+      "scenario_start": "2025-10-27 00:00:00",
+      "remaining_observation_days": 278.0,
+      "active_batteries": 441,
+      "observed_events": 14,
+      "event_rate": 0.031746031746031744,
+      "smoothed_event_rate": 0.02888549021205534
+    },
+    {
+      "scenario_start": "2025-11-03 00:00:00",
+      "remaining_observation_days": 271.0,
+      "active_batteries": 436,
+      "observed_events": 10,
+      "event_rate": 0.022935779816513763,
+      "smoothed_event_rate": 0.029037877711697285
+    },
+    {
+      "scenario_start": "2025-11-10 00:00:00",
+      "remaining_observation_days": 264.0,
+      "active_batteries": 436,
+      "observed_events": 10,
+      "event_rate": 0.022935779816513763,
+      "smoothed_event_rate": 0.028695949223432677
+    },
+    {
+      "scenario_start": "2025-11-17 00:00:00",
+      "remaining_observation_days": 257.0,
+      "active_batteries": 435,
+      "observed_events": 10,
+      "event_rate": 0.022988505747126436,
+      "smoothed_event_rate": 0.02763232089734317
+    },
+    {
+      "scenario_start": "2025-11-24 00:00:00",
+      "remaining_observation_days": 250.0,
+      "active_batteries": 431,
+      "observed_events": 11,
+      "event_rate": 0.025522041763341066,
+      "smoothed_event_rate": 0.02804905350271322
+    },
+    {
+      "scenario_start": "2025-12-01 00:00:00",
+      "remaining_observation_days": 243.0,
+      "active_batteries": 431,
+      "observed_events": 14,
+      "event_rate": 0.03248259860788863,
+      "smoothed_event_rate": 0.028443285269494006
+    },
+    {
+      "scenario_start": "2025-12-08 00:00:00",
+      "remaining_observation_days": 236.0,
+      "active_batteries": 427,
+      "observed_events": 12,
+      "event_rate": 0.02810304449648712,
+      "smoothed_event_rate": 0.028804918199934273
+    },
+    {
+      "scenario_start": "2025-12-15 00:00:00",
+      "remaining_observation_days": 229.0,
+      "active_batteries": 426,
+      "observed_events": 13,
+      "event_rate": 0.03051643192488263,
+      "smoothed_event_rate": 0.02838812625123024
+    },
+    {
+      "scenario_start": "2025-12-22 00:00:00",
+      "remaining_observation_days": 222.0,
+      "active_batteries": 426,
+      "observed_events": 15,
+      "event_rate": 0.035211267605633804,
+      "smoothed_event_rate": 0.027975748771964522
+    },
+    {
+      "scenario_start": "2025-12-29 00:00:00",
+      "remaining_observation_days": 215.0,
+      "active_batteries": 425,
+      "observed_events": 15,
+      "event_rate": 0.03529411764705882,
+      "smoothed_event_rate": 0.027561273859868778
+    },
+    {
+      "scenario_start": "2026-01-05 00:00:00",
+      "remaining_observation_days": 208.0,
+      "active_batteries": 420,
+      "observed_events": 11,
+      "event_rate": 0.02619047619047619,
+      "smoothed_event_rate": 0.026114842925064177
+    },
+    {
+      "scenario_start": "2026-01-12 00:00:00",
+      "remaining_observation_days": 201.0,
+      "active_batteries": 417,
+      "observed_events": 8,
+      "event_rate": 0.019184652278177457,
+      "smoothed_event_rate": 0.0254313068156984
+    },
+    {
+      "scenario_start": "2026-01-19 00:00:00",
+      "remaining_observation_days": 194.0,
+      "active_batteries": 415,
+      "observed_events": 8,
+      "event_rate": 0.01927710843373494,
+      "smoothed_event_rate": 0.02448557993243923
+    },
+    {
+      "scenario_start": "2026-01-26 00:00:00",
+      "remaining_observation_days": 187.0,
+      "active_batteries": 413,
+      "observed_events": 9,
+      "event_rate": 0.021791767554479417,
+      "smoothed_event_rate": 0.02301820464020771
+    },
+    {
+      "scenario_start": "2026-02-02 00:00:00",
+      "remaining_observation_days": 180.0,
+      "active_batteries": 411,
+      "observed_events": 8,
+      "event_rate": 0.019464720194647202,
+      "smoothed_event_rate": 0.02100763792375864
+    },
+    {
+      "scenario_start": "2026-02-09 00:00:00",
+      "remaining_observation_days": 173.0,
+      "active_batteries": 410,
+      "observed_events": 9,
+      "event_rate": 0.02195121951219512,
+      "smoothed_event_rate": 0.019747750030207383
+    },
+    {
+      "scenario_start": "2026-02-16 00:00:00",
+      "remaining_observation_days": 166.0,
+      "active_batteries": 409,
+      "observed_events": 9,
+      "event_rate": 0.022004889975550123,
+      "smoothed_event_rate": 0.01927038171807462
+    },
+    {
+      "scenario_start": "2026-02-23 00:00:00",
+      "remaining_observation_days": 159.0,
+      "active_batteries": 409,
+      "observed_events": 9,
+      "event_rate": 0.022004889975550123,
+      "smoothed_event_rate": 0.018236821041452925
+    },
+    {
+      "scenario_start": "2026-03-02 00:00:00",
+      "remaining_observation_days": 152.0,
+      "active_batteries": 407,
+      "observed_events": 7,
+      "event_rate": 0.0171990171990172,
+      "smoothed_event_rate": 0.017204402424288542
+    },
+    {
+      "scenario_start": "2026-03-09 00:00:00",
+      "remaining_observation_days": 145.0,
+      "active_batteries": 404,
+      "observed_events": 6,
+      "event_rate": 0.01485148514851485,
+      "smoothed_event_rate": 0.01726387795821663
+    },
+    {
+      "scenario_start": "2026-03-16 00:00:00",
+      "remaining_observation_days": 138.0,
+      "active_batteries": 403,
+      "observed_events": 6,
+      "event_rate": 0.01488833746898263,
+      "smoothed_event_rate": 0.01760263134575051
+    },
+    {
+      "scenario_start": "2026-03-23 00:00:00",
+      "remaining_observation_days": 131.0,
+      "active_batteries": 401,
+      "observed_events": 4,
+      "event_rate": 0.00997506234413965,
+      "smoothed_event_rate": 0.017670206384759732
+    },
+    {
+      "scenario_start": "2026-03-30 00:00:00",
+      "remaining_observation_days": 124.0,
+      "active_batteries": 400,
+      "observed_events": 5,
+      "event_rate": 0.0125,
+      "smoothed_event_rate": 0.017744110297356043
+    },
+    {
+      "scenario_start": "2026-04-06 00:00:00",
+      "remaining_observation_days": 117.0,
+      "active_batteries": 400,
+      "observed_events": 8,
+      "event_rate": 0.02,
+      "smoothed_event_rate": 0.01863187692819572
+    },
+    {
+      "scenario_start": "2026-04-13 00:00:00",
+      "remaining_observation_days": 110.0,
+      "active_batteries": 400,
+      "observed_events": 10,
+      "event_rate": 0.025,
+      "smoothed_event_rate": 0.019232063529134296
+    },
+    {
+      "scenario_start": "2026-04-20 00:00:00",
+      "remaining_observation_days": 103.0,
+      "active_batteries": 398,
+      "observed_events": 9,
+      "event_rate": 0.022613065326633167,
+      "smoothed_event_rate": 0.019278484082467292
+    },
+    {
+      "scenario_start": "2026-04-27 00:00:00",
+      "remaining_observation_days": 96.0,
+      "active_batteries": 397,
+      "observed_events": 9,
+      "event_rate": 0.022670025188916875,
+      "smoothed_event_rate": 0.01959464524650875
+    },
+    {
+      "scenario_start": "2026-05-04 00:00:00",
+      "remaining_observation_days": 89.0,
+      "active_batteries": 397,
+      "observed_events": 10,
+      "event_rate": 0.02518891687657431,
+      "smoothed_event_rate": 0.02020518509226711
+    },
+    {
+      "scenario_start": "2026-05-11 00:00:00",
+      "remaining_observation_days": 82.0,
+      "active_batteries": 395,
+      "observed_events": 8,
+      "event_rate": 0.020253164556962026,
+      "smoothed_event_rate": 0.019987544771534003
+    },
+    {
+      "scenario_start": "2026-05-18 00:00:00",
+      "remaining_observation_days": 75.0,
+      "active_batteries": 392,
+      "observed_events": 6,
+      "event_rate": 0.015306122448979591,
+      "smoothed_event_rate": 0.01893241987919981
+    },
+    {
+      "scenario_start": "2026-05-25 00:00:00",
+      "remaining_observation_days": 68.0,
+      "active_batteries": 390,
+      "observed_events": 5,
+      "event_rate": 0.01282051282051282,
+      "smoothed_event_rate": 0.018716727579054238
+    },
+    {
+      "scenario_start": "2026-06-01 00:00:00",
+      "remaining_observation_days": 61.0,
+      "active_batteries": 389,
+      "observed_events": 7,
+      "event_rate": 0.017994858611825194,
+      "smoothed_event_rate": 0.018212804227608664
+    },
+    {
+      "scenario_start": "2026-06-08 00:00:00",
+      "remaining_observation_days": 54.0,
+      "active_batteries": 388,
+      "observed_events": 7,
+      "event_rate": 0.01804123711340206,
+      "smoothed_event_rate": 0.017145637417368808
+    },
+    {
+      "scenario_start": "2026-06-15 00:00:00",
+      "remaining_observation_days": 47.0,
+      "active_batteries": 387,
+      "observed_events": 6,
+      "event_rate": 0.015503875968992248,
+      "smoothed_event_rate": 0.01576788614896872
+    },
+    {
+      "scenario_start": "2026-06-22 00:00:00",
+      "remaining_observation_days": 40.0,
+      "active_batteries": 387,
+      "observed_events": 8,
+      "event_rate": 0.020671834625323,
+      "smoothed_event_rate": 0.014650466302639989
+    },
+    {
+      "scenario_start": "2026-06-29 00:00:00",
+      "remaining_observation_days": 33.0,
+      "active_batteries": 386,
+      "observed_events": 7,
+      "event_rate": 0.018134715025906734,
+      "smoothed_event_rate": 0.013809225303918673
+    },
+    {
+      "scenario_start": "2026-07-06 00:00:00",
+      "remaining_observation_days": 26.0,
+      "active_batteries": 385,
+      "observed_events": 6,
+      "event_rate": 0.015584415584415584,
+      "smoothed_event_rate": 0.013286021140430359
+    },
+    {
+      "scenario_start": "2026-07-13 00:00:00",
+      "remaining_observation_days": 19.0,
+      "active_batteries": 382,
+      "observed_events": 3,
+      "event_rate": 0.007853403141361256,
+      "smoothed_event_rate": 0.012606704572862972
+    },
+    {
+      "scenario_start": "2026-07-20 00:00:00",
+      "remaining_observation_days": 12.0,
+      "active_batteries": 381,
+      "observed_events": 2,
+      "event_rate": 0.005249343832020997,
+      "smoothed_event_rate": 0.012123842673508092
+    },
+    {
+      "scenario_start": "2026-07-27 00:00:00",
+      "remaining_observation_days": 5.0,
+      "active_batteries": 381,
+      "observed_events": 2,
+      "event_rate": 0.005249343832020997,
+      "smoothed_event_rate": 0.010414244283145113
+    }
+  ],
+  "direct_horizon_model": {
+    "horizon_days": 42,
+    "selected_regularization": 0.1,
+    "features": [
+      "latest_voltage",
+      "voltage_slope_28d",
+      "voltage_slope_90d",
+      "voltage_std_28d",
+      "frac_low_voltage_28d",
+      "crossing_days_log",
+      "age_days_log",
+      "history_days_log",
+      "remaining_observation_days_log",
+      "cold_start"
+    ],
+    "grouped_cv": {
+      "0.01": {
+        "brier": 0.01270189582884052,
+        "log_loss": 0.0599181596541809,
+        "mean_probability": 0.014055421966469658,
+        "event_rate": 0.013348973868488849
+      },
+      "0.1": {
+        "brier": 0.012593888590633465,
+        "log_loss": 0.04901170967771228,
+        "mean_probability": 0.01573079070276289,
+        "event_rate": 0.013348973868488849
+      },
+      "1.0": {
+        "brier": 0.0134829364327269,
+        "log_loss": 0.04905357078165531,
+        "mean_probability": 0.016719777372436368,
+        "event_rate": 0.013348973868488849
+      }
+    },
+    "oof_event_count": {
+      "mean_absolute_error": 4.039635339160438,
+      "mean_bias": 0.8509782212071615,
+      "correlation": 0.5276505468134894,
+      "n_cutoffs": 112
+    }
   },
   "n_examples": 48059,
-  "elapsed_seconds": 65.28872630000114
+  "elapsed_seconds": 103.99546180001926
 }

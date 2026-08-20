@@ -23,6 +23,7 @@ from src.risk.features import (
 )
 from src.risk.model import (
     CURATED_FEATURES,
+    HorizonRateCalibrator,
     PlattCalibrator,
     Task1Forecaster,
     FeatureTransform,
@@ -30,6 +31,30 @@ from src.risk.model import (
     masked_labels_at_horizon,
     select_and_fit,
 )
+
+
+class HorizonRateCalibratorTests(unittest.TestCase):
+    def setUp(self):
+        self.calibrator = HorizonRateCalibrator(
+            remaining_observation_days=(0.0, 365.0),
+            event_rates=(0.1, 0.1),
+            activation_ratio=1.9,
+        )
+
+    def test_leaves_normal_scenario_mass_unchanged(self):
+        incidence = np.array([0.15, 0.15])
+        calibrated = self.calibrator.cap_incidence(
+            incidence, np.ones(2), remaining_days=100.0
+        )
+        np.testing.assert_allclose(calibrated, incidence)
+
+    def test_caps_extreme_mass_and_preserves_ranking(self):
+        incidence = np.array([0.6, 0.4])
+        calibrated = self.calibrator.cap_incidence(
+            incidence, np.ones(2), remaining_days=100.0
+        )
+        self.assertAlmostEqual(float(calibrated.sum()), 0.2, places=8)
+        self.assertGreater(calibrated[0], calibrated[1])
 
 
 def _synthetic_readings(device_id: str, start: pd.Timestamp, n_days: int, voltage: np.ndarray, temp: float = 20.0) -> pd.DataFrame:

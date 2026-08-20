@@ -207,3 +207,58 @@ python tools/tactical_task2.py `
   --physical-risk-weight 0.6 `
   --physical-shape-min-remaining-days 210
 ```
+
+## 2026-08-20 unseen-building shift guard v4
+
+The first v3 public submission scored `4252.33`. Its dominant error was
+`early_swap=2434.99`, versus `343.23` for the public leader. Battery-change
+cost also implied about 41 total actions, compared with roughly 17 actions per
+scenario in local v3 evaluation. The local/public mismatch points to aggregate
+risk inflation on unseen buildings rather than a routing-only failure.
+
+Several conservative policies were tested and rejected as release defaults:
+
+- Always applying the temporal event-rate cap was neutral on the tuning set
+  but worsened a locked even-scenario sample by `225.58` mean cost because it
+  removed real failures.
+- A 3% hard planned-swap cap worsened tuning mean by `307.93`; a 4% cap
+  worsened it by `106.46`. Both traded too much late cost for early savings.
+- A direct 42-day evaluator-outcome classifier cut OOF event-count MAE from
+  `9.17` to `4.04`, but its standalone recall was too low. A 25% blend improved
+  planned precision from `0.380` to `0.404` on tuning while increasing mean
+  cost by `84.68`, then lost `134.78` on the locked `24..47` period. Its
+  release weight is therefore zero.
+
+The v4 release uses a one-sided shift detector around the smoothed train
+event-rate prior. It preserves every per-battery rank and leaves a scenario
+unchanged while predicted 42-day event mass is below `1.9x` its calendar-time
+prior. The largest ratio across all 48 train scenarios was `1.8721`. When the
+ratio exceeds `1.9`, one shared logit intercept is shifted until total event
+mass matches the prior. This targets the public failure mode without changing
+in-distribution behavior.
+
+Release evidence:
+
+- 35 unit/integration tests pass.
+- Eight release-smoke scenarios, including the highest train mass ratios,
+  exactly reproduce v3 plans and every cost component (`max_abs_delta=0`).
+- In a stress case with 41 expected events among 460 batteries, the shift
+  guard reduces event mass to `11.64` (`71.6%`) while preserving ranking.
+- No hard planned-swap cap is active, and the experimental direct-head weight
+  is `0.0`.
+
+This is deliberately a public-domain-shift intervention. Train scenarios
+cannot prove the expected public reduction because none cross the activation
+boundary. The next official submission is the required confirmation test;
+the key acceptance signal is a large fall in `early_swap` and operational
+cost without a late-swap increase that erases the gain.
+
+Rebuild the release artifact with:
+
+```powershell
+python tools/fit_incidence_model.py `
+  --horizon-rate-cap-multiplier 1.0 `
+  --horizon-rate-activation-ratio 1.9 `
+  --horizon-rate-smoothing-window 9 `
+  --direct-horizon-weight 0
+```
