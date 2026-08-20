@@ -1,8 +1,7 @@
 # H1 Discrete-Time Hazard Challenger
 
 Status: promoted to the submission default after local evaluation on 2026-08-20.
-The existing AFT implementation and artifact remain unchanged as an automatic
-packaging fallback.
+It is the only serialized forecaster packaged in the submission image.
 
 ## Formulation
 
@@ -102,8 +101,8 @@ docker run --rm -v "${PWD}/data/raw/train:/tmp/train:ro" -v "${PWD}/tools:/app/t
 
 ## Recommendation
 
-Use H1 as the submission default while retaining AFT as the packaged fallback.
-It passes the contract, improves grouped OOF statistics, beats the in-sample
+Use H1 as the sole packaged submission forecaster. It passes the contract,
+improves grouped OOF statistics, beats the in-sample
 AFT planner benchmark by 36.802 cost units (1.18%), and completes the 48-scenario
 run within the 30-minute limit. The margin is modest and temporal calibration
 drift remains visible, so a fold-routed OOF end-to-end planner benchmark is the

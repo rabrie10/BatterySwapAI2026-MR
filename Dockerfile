@@ -18,12 +18,11 @@ COPY requirements.submission.txt ./
 RUN /app/env/bin/pip install --no-cache-dir -r requirements.submission.txt
 
 # Copy everything script.py needs at runtime.
-# src/ must be present so the default discrete-hazard artifact (and the AFT
-# rollback artifact) can resolve their src.risk.* classes while unpickling.
+# src/ must be present so the discrete-hazard artifact can resolve its
+# src.risk.* classes while unpickling.
 COPY batteryswap_solution/ ./batteryswap_solution
 COPY src/ ./src
 COPY models/risk_forecaster_discrete_hazard.pkl ./models/risk_forecaster_discrete_hazard.pkl
-COPY models/risk_forecaster.pkl ./models/risk_forecaster.pkl
 COPY script.py ./
 
 # Default to making submissions.

@@ -78,10 +78,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    aft_path = Path("models/risk_forecaster.pkl")
-    if args.out_path.resolve() == aft_path.resolve():
-        raise ValueError("Refusing to overwrite the existing AFT artifact")
-
     started = time.perf_counter()
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset_path)
     starts = [pd.Timestamp(scenario["start_time"]) for scenario in scenarios]

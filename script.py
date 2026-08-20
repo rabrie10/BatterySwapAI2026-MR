@@ -14,7 +14,6 @@ from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 
 
 DEFAULT_HAZARD_FORECASTER_PATH = Path("models/risk_forecaster_discrete_hazard.pkl")
-FALLBACK_AFT_FORECASTER_PATH = Path("models/risk_forecaster.pkl")
 
 
 def _load_pickle(path: Path):
@@ -23,7 +22,7 @@ def _load_pickle(path: Path):
 
 
 def load_competition_planner() -> Planner:
-    """Load an optional frozen planner/forecaster, otherwise use safe defaults."""
+    """Load the configured planner or the required discrete-hazard forecaster."""
 
     planner_path_value = os.environ.get("BATTERYSWAP_PLANNER_PATH")
     if planner_path_value:
@@ -35,18 +34,15 @@ def load_competition_planner() -> Planner:
             raise TypeError("BATTERYSWAP_PLANNER_PATH did not contain a Planner")
         return planner
 
-    forecaster = None
     configured_forecaster = os.environ.get("BATTERYSWAP_FORECASTER_PATH")
-    if configured_forecaster:
-        forecaster_path = Path(configured_forecaster)
-    elif DEFAULT_HAZARD_FORECASTER_PATH.exists():
-        forecaster_path = DEFAULT_HAZARD_FORECASTER_PATH
-    else:
-        # Keep the previously shipped AFT model as a recoverable packaging
-        # fallback without overwriting either artifact.
-        forecaster_path = FALLBACK_AFT_FORECASTER_PATH
-    if forecaster_path.exists():
-        forecaster = _load_pickle(forecaster_path)
+    forecaster_path = (
+        Path(configured_forecaster)
+        if configured_forecaster
+        else DEFAULT_HAZARD_FORECASTER_PATH
+    )
+    if not forecaster_path.exists():
+        raise FileNotFoundError(f"Hazard forecaster artifact does not exist: {forecaster_path}")
+    forecaster = _load_pickle(forecaster_path)
 
     risk_multiplier = float(os.environ.get("BATTERYSWAP_LATE_RISK_MULTIPLIER", "1.0"))
     solver_seconds = float(os.environ.get("BATTERYSWAP_SOLVER_SECONDS", "2.0"))

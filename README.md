@@ -32,14 +32,13 @@ The submitted default is the H1 discrete-time hazard challenger implementing
 models/risk_forecaster_discrete_hazard.pkl
 ```
 
-`models/risk_forecaster.pkl` remains the automatic AFT rollback artifact if
-the hazard artifact is absent. `BATTERYSWAP_FORECASTER_PATH` explicitly
-overrides both defaults.
+No secondary serialized model is packaged. A missing hazard artifact is a
+release error rather than a signal to silently run a different model.
+`BATTERYSWAP_FORECASTER_PATH` may explicitly override the path for testing.
 
 The exact v1 schema is defined in `batteryswap_solution/forecast.py` and
-`docs/SOLUTION_DESIGN_SPEC.md`. If the artifact is absent or fails validation,
-the planner uses `VoltageTrendForecaster`; that fallback is for operational
-safety and parallel development, not the intended final leaderboard model.
+`docs/SOLUTION_DESIGN_SPEC.md`. The submission entry point fails immediately
+if the artifact is absent.
 
 ## Tests
 

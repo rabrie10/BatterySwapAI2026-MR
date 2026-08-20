@@ -183,7 +183,7 @@ those fields for optimization.
 The default artifact location is:
 
 ```text
-models/risk_forecaster.pkl
+models/risk_forecaster_discrete_hazard.pkl
 ```
 
 The object must be loadable with the competition Python environment and must
@@ -382,7 +382,7 @@ leaderboard selection.
 | Variable | Effect |
 | --- | --- |
 | `BATTERYSWAP_PLANNER_PATH` | Load a fully serialized `Planner`; takes precedence over all other planner construction |
-| `BATTERYSWAP_FORECASTER_PATH` | Load the Task 1 artifact; defaults to `models/risk_forecaster.pkl` |
+| `BATTERYSWAP_FORECASTER_PATH` | Override the Task 1 artifact path; defaults to `models/risk_forecaster_discrete_hazard.pkl` |
 | `BATTERYSWAP_LATE_RISK_MULTIPLIER` | Override late-risk robustness multiplier |
 | `BATTERYSWAP_SOLVER_SECONDS` | Override CP-SAT time budget |
 | `BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS` | Override normal local-search budget |
