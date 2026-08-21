@@ -24,10 +24,27 @@ with a model trained on that building.  The selected ensemble uses 25% hybrid,
 | Shipped V7 local baseline | 2,293 |
 | V8 ensemble, before phase correction | 2,240 |
 | V8 ensemble, selected phase correction | 1,999 |
+| **V8 + expected-incidence service budget** | **1,962** |
 
 This is a 12.8% reduction against the shipped local V7 baseline.  It is not a
 claim of beating the 1,160.67 public leader: only a public submission can
 establish that, and train-to-public shift may be material.
+
+### Early-swap precision repair
+
+The final planner limits proactive service to
+`ceil(2 * expected_due + 5)` batteries per scenario.  Unlike the old
+percentage cap, this is computed from the calibrated full-fleet 42-day event
+mass and is therefore stable when candidate filtering changes size.  The
+headroom protects dense scenarios; the constraint activates mainly in quiet
+closing scenarios where the uncapped planner serviced 29--43 batteries for
+only 2--6 observed failures.
+
+On all 48 building-grouped OOF scenarios this changed mean total cost
+1999.33 -> **1962.22**, early cost 778.85 -> **749.03**, and planned service
+17.81 -> **16.15** batteries per scenario.  Recall moved only 0.634 -> 0.626.
+Heavier hazard blends from 30% through 50% were rejected: 50% reduced early
+cost to 709.10 but increased late cost to 1010.62 and total cost to 2043.95.
 
 ## Reproduce
 

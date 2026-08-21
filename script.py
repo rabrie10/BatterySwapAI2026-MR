@@ -58,6 +58,7 @@ def load_forecaster() -> HazardForecaster | None:
 
 
 def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> PlannerConfig:
+    max_planned_count = _int_env("BATTERYSWAP_MAX_PLANNED_COUNT", 0)
     return PlannerConfig(
         late_risk_multiplier=_float_env("BATTERYSWAP_LATE_RISK_MULTIPLIER", 1.0),
         minimum_expected_improvement=_float_env(
@@ -66,7 +67,14 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         local_search_evaluations=local,
         uncertain_local_search_evaluations=uncertain,
         robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 4),
-        optimizer=OptimizationConfig(solver_seconds=solver_seconds),
+        optimizer=OptimizationConfig(
+            solver_seconds=solver_seconds,
+            max_planned_count=max_planned_count or None,
+            expected_due_multiplier=(
+                _float_env("BATTERYSWAP_EXPECTED_DUE_MULTIPLIER", 2.0) or None
+            ),
+            expected_due_buffer=_float_env("BATTERYSWAP_EXPECTED_DUE_BUFFER", 5.0),
+        ),
     )
 
 

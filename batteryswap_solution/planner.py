@@ -18,7 +18,7 @@ from .costs import (
     select_candidates,
 )
 from .forecast import RiskForecaster, VoltageTrendForecaster, validate_forecast
-from .optimizer import OptimizationConfig, optimize_assignments, planned_swap_limit
+from .optimizer import OptimizationConfig, optimize_assignments, scenario_planned_swap_limit
 from .replay import ReplayContext, build_replay_context, replay_operational_cost
 from .routing import order_assignments
 
@@ -157,9 +157,7 @@ class CompetitionPlanner(Planner):
         start: pd.Timestamp,
         replay_context: ReplayContext | None = None,
     ) -> float:
-        limit = planned_swap_limit(
-            len(costs.battery_ids), self.config.optimizer.max_planned_rate
-        )
+        limit = scenario_planned_swap_limit(costs, self.config.optimizer)
         if limit is not None:
             planned_count = int(
                 pd.to_datetime(plan["day"])

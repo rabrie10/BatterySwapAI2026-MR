@@ -15,7 +15,11 @@ from batteryswap_solution.forecast import (
     RiskForecast,
     validate_forecast,
 )
-from batteryswap_solution.optimizer import OptimizationConfig, planned_swap_limit
+from batteryswap_solution.optimizer import (
+    OptimizationConfig,
+    planned_swap_limit,
+    scenario_planned_swap_limit,
+)
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 from batteryswap_solution.replay import replay_operational_cost
 from batteryswap_solution.routing import route_buildings
@@ -138,8 +142,22 @@ class CostAndRoutingTests(unittest.TestCase):
     def test_planned_swap_limit_scales_with_scenario_size(self):
         self.assertIsNone(planned_swap_limit(460, None))
         self.assertEqual(planned_swap_limit(460, 0.04), 19)
+        self.assertEqual(planned_swap_limit(40, None, 15), 15)
+        self.assertEqual(planned_swap_limit(460, 0.04, 15), 15)
         with self.assertRaises(ValueError):
             planned_swap_limit(460, 0.0)
+        with self.assertRaises(ValueError):
+            planned_swap_limit(460, None, 0)
+
+    def test_scenario_limit_uses_expected_incidence(self):
+        dates = pd.date_range(START, START + pd.Timedelta(days=6), freq="D")
+        forecast = validate_forecast(
+            fixed_forecast(), list(locations()["battery"]), dates
+        )
+        costs = build_expected_cost_tables(forecast, locations(), settings(), dates)
+        config = OptimizationConfig(expected_due_multiplier=2.0, expected_due_buffer=3.0)
+        expected = int(np.ceil(2.0 * costs.horizon_event_probability.sum() + 3.0))
+        self.assertEqual(scenario_planned_swap_limit(costs, config), expected)
 
     def test_asymmetric_timing_cost_prefers_early_quantile(self):
         dates = pd.date_range(START, START + pd.Timedelta(days=6), freq="D")

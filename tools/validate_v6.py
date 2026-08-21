@@ -129,6 +129,9 @@ def main() -> None:
     parser.add_argument("--candidate-margin", type=float, default=24.0)
     parser.add_argument("--emergency-rank-scale", type=float, default=1.0)
     parser.add_argument("--max-planned-rate", type=float, default=None)
+    parser.add_argument("--max-planned-count", type=int, default=None)
+    parser.add_argument("--expected-due-multiplier", type=float, default=None)
+    parser.add_argument("--expected-due-buffer", type=float, default=0.0)
     parser.add_argument("--probability-scale", type=float, default=1.0)
     parser.add_argument(
         "--volatility-scale",
@@ -179,6 +182,9 @@ def main() -> None:
                     solver_seconds=args.solver_seconds,
                     capacity_roundtrip_fraction=args.capacity_roundtrip,
                     max_planned_rate=args.max_planned_rate,
+                    max_planned_count=args.max_planned_count,
+                    expected_due_multiplier=args.expected_due_multiplier,
+                    expected_due_buffer=args.expected_due_buffer,
                     use_cp_sat=not args.greedy,
                 ),
             ),
