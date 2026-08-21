@@ -31,6 +31,37 @@ class CostTables:
         )
 
 
+def portfolio_keep_indices(
+    forecast: RiskForecast, battery_ids: tuple[str, ...]
+) -> np.ndarray | None:
+    """Read an optional independent top-K candidate portfolio from a forecast."""
+    summaries = forecast.summaries
+    required = {"battery_id", "portfolio_rank", "scenario_candidate_pool"}
+    if not required.issubset(summaries.columns):
+        return None
+    indexed = summaries.copy()
+    indexed["battery_id"] = indexed["battery_id"].astype(str)
+    indexed = indexed.set_index("battery_id").reindex(battery_ids)
+    pool_values = indexed["scenario_candidate_pool"].dropna().astype(int).unique()
+    if len(pool_values) != 1 or int(pool_values[0]) < 1:
+        raise ValueError("Portfolio forecast must contain one positive candidate pool")
+    pool = min(int(pool_values[0]), len(battery_ids))
+    ranks = indexed["portfolio_rank"].to_numpy(dtype=float)
+    if not np.isfinite(ranks).all():
+        raise ValueError("Portfolio ranks are incomplete")
+    return np.flatnonzero(ranks <= pool)
+
+
+def portfolio_service_budget(forecast: RiskForecast) -> int | None:
+    summaries = forecast.summaries
+    if "scenario_service_budget" not in summaries:
+        return None
+    values = summaries["scenario_service_budget"].dropna().astype(int).unique()
+    if len(values) != 1 or int(values[0]) < 1:
+        raise ValueError("Portfolio forecast must contain one positive service budget")
+    return int(values[0])
+
+
 def select_candidates(
     costs: CostTables,
     *,

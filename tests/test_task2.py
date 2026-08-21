@@ -7,7 +7,7 @@ import pandas as pd
 
 from batteryswap_public.evaluate import EvaluationSettings, check_plan_valid, evaluate_plan
 
-from batteryswap_solution.costs import build_expected_cost_tables
+from batteryswap_solution.costs import build_expected_cost_tables, portfolio_keep_indices
 from batteryswap_solution.forecast import (
     CONTRACT_VERSION,
     ForecastContractError,
@@ -135,11 +135,42 @@ class ForecastContractTests(unittest.TestCase):
 
 
 class CostAndRoutingTests(unittest.TestCase):
+    def test_portfolio_budget_keeps_only_independently_ranked_candidates(self):
+        base = fixed_forecast()
+        forecast = RiskForecast(
+            base.metadata,
+            base.curves,
+            base.tail,
+            pd.DataFrame(
+                {
+                    "battery_id": ["d_urgent", "d_defer", "d_bundle"],
+                    "portfolio_rank": [1, 3, 2],
+                    "scenario_service_budget": [2, 2, 2],
+                    "scenario_candidate_pool": [2, 2, 2],
+                }
+            ),
+        )
+        keep = portfolio_keep_indices(
+            forecast, ("d_urgent", "d_defer", "d_bundle")
+        )
+        np.testing.assert_array_equal(keep, np.array([0, 2]))
+
+    def test_ordinary_forecast_has_no_portfolio_gate(self):
+        self.assertIsNone(
+            portfolio_keep_indices(
+                fixed_forecast(), ("d_urgent", "d_defer", "d_bundle")
+            )
+        )
+
     def test_planned_swap_limit_scales_with_scenario_size(self):
         self.assertIsNone(planned_swap_limit(460, None))
         self.assertEqual(planned_swap_limit(460, 0.04), 19)
+        self.assertEqual(planned_swap_limit(460, None, 15), 15)
+        self.assertEqual(planned_swap_limit(460, 0.04, 12), 12)
         with self.assertRaises(ValueError):
             planned_swap_limit(460, 0.0)
+        with self.assertRaises(ValueError):
+            planned_swap_limit(460, None, 0)
 
     def test_asymmetric_timing_cost_prefers_early_quantile(self):
         dates = pd.date_range(START, START + pd.Timedelta(days=6), freq="D")

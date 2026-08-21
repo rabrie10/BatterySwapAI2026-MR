@@ -1,0 +1,619 @@
+{
+  "n_scenarios": 48,
+  "actual_due_mean": 9.4583,
+  "blocked_groups": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    3,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5
+  ],
+  "selected_model": "poisson_10",
+  "models": [
+    {
+      "name": "poisson_10",
+      "mae": 2.3647,
+      "rmse": 2.9168,
+      "bias": -0.1653,
+      "predicted_mean": 9.2931
+    },
+    {
+      "name": "ridge_10",
+      "mae": 2.489,
+      "rmse": 3.052,
+      "bias": -0.2187,
+      "predicted_mean": 9.2396
+    },
+    {
+      "name": "ridge_100",
+      "mae": 2.5182,
+      "rmse": 3.0968,
+      "bias": -0.2276,
+      "predicted_mean": 9.2307
+    },
+    {
+      "name": "poisson_1",
+      "mae": 2.8382,
+      "rmse": 3.4107,
+      "bias": 0.0553,
+      "predicted_mean": 9.5137
+    },
+    {
+      "name": "raw_v7_expected_due",
+      "mae": 2.8482,
+      "rmse": 3.6292,
+      "bias": -0.0543,
+      "predicted_mean": 9.404
+    },
+    {
+      "name": "ridge_1",
+      "mae": 3.0047,
+      "rmse": 3.7272,
+      "bias": -0.1753,
+      "predicted_mean": 9.283
+    },
+    {
+      "name": "ridge_1000",
+      "mae": 3.0055,
+      "rmse": 3.9079,
+      "bias": -0.0846,
+      "predicted_mean": 9.3738
+    },
+    {
+      "name": "ridge_0.1",
+      "mae": 3.7142,
+      "rmse": 5.0875,
+      "bias": 0.3513,
+      "predicted_mean": 9.8097
+    },
+    {
+      "name": "poisson_0.1",
+      "mae": 5.4125,
+      "rmse": 8.9447,
+      "bias": 2.1219,
+      "predicted_mean": 11.5803
+    }
+  ],
+  "selected_policy": {
+    "multiplier": 1.5,
+    "buffer": 6.0,
+    "mean_budget": 19.854,
+    "recall": 0.6696,
+    "precision": 0.319,
+    "early_proxy": 710.469,
+    "late_proxy": 708.333,
+    "timing_proxy": 1418.802
+  },
+  "deployment_policy": {
+    "multiplier": 1.25,
+    "buffer": 6.0,
+    "selection_basis": "representative end-to-end planner screen"
+  },
+  "policies": [
+    {
+      "multiplier": 1.5,
+      "buffer": 6.0,
+      "mean_budget": 19.854,
+      "recall": 0.6696,
+      "precision": 0.319,
+      "early_proxy": 710.469,
+      "late_proxy": 708.333,
+      "timing_proxy": 1418.802
+    },
+    {
+      "multiplier": 1.75,
+      "buffer": 6.0,
+      "mean_budget": 21.333,
+      "recall": 0.696,
+      "precision": 0.3086,
+      "early_proxy": 770.333,
+      "late_proxy": 650.0,
+      "timing_proxy": 1420.333
+    },
+    {
+      "multiplier": 2.0,
+      "buffer": 4.0,
+      "mean_budget": 21.188,
+      "recall": 0.6916,
+      "precision": 0.3088,
+      "early_proxy": 767.479,
+      "late_proxy": 664.167,
+      "timing_proxy": 1431.646
+    },
+    {
+      "multiplier": 1.75,
+      "buffer": 4.0,
+      "mean_budget": 19.938,
+      "recall": 0.6696,
+      "precision": 0.3177,
+      "early_proxy": 723.688,
+      "late_proxy": 708.333,
+      "timing_proxy": 1432.021
+    },
+    {
+      "multiplier": 2.0,
+      "buffer": 2.0,
+      "mean_budget": 19.854,
+      "recall": 0.6674,
+      "precision": 0.3179,
+      "early_proxy": 725.844,
+      "late_proxy": 710.833,
+      "timing_proxy": 1436.677
+    },
+    {
+      "multiplier": 2.0,
+      "buffer": 6.0,
+      "mean_budget": 22.271,
+      "recall": 0.7004,
+      "precision": 0.2975,
+      "early_proxy": 801.135,
+      "late_proxy": 636.25,
+      "timing_proxy": 1437.385
+    },
+    {
+      "multiplier": 1.25,
+      "buffer": 6.0,
+      "mean_budget": 18.021,
+      "recall": 0.6344,
+      "precision": 0.3329,
+      "early_proxy": 642.51,
+      "late_proxy": 800.833,
+      "timing_proxy": 1443.344
+    },
+    {
+      "multiplier": 1.0,
+      "buffer": 6.0,
+      "mean_budget": 15.812,
+      "recall": 0.5925,
+      "precision": 0.3544,
+      "early_proxy": 555.896,
+      "late_proxy": 901.042,
+      "timing_proxy": 1456.938
+    },
+    {
+      "multiplier": 1.25,
+      "buffer": 4.0,
+      "mean_budget": 16.104,
+      "recall": 0.5947,
+      "precision": 0.3493,
+      "early_proxy": 567.646,
+      "late_proxy": 895.417,
+      "timing_proxy": 1463.062
+    },
+    {
+      "multiplier": 1.5,
+      "buffer": 4.0,
+      "mean_budget": 18.208,
+      "recall": 0.6344,
+      "precision": 0.3295,
+      "early_proxy": 658.5,
+      "late_proxy": 813.75,
+      "timing_proxy": 1472.25
+    },
+    {
+      "multiplier": 1.5,
+      "buffer": 2.0,
+      "mean_budget": 16.354,
+      "recall": 0.5969,
+      "precision": 0.3452,
+      "early_proxy": 587.385,
+      "late_proxy": 885.0,
+      "timing_proxy": 1472.385
+    },
+    {
+      "multiplier": 2.0,
+      "buffer": 0.0,
+      "mean_budget": 18.396,
+      "recall": 0.6366,
+      "precision": 0.3273,
+      "early_proxy": 673.771,
+      "late_proxy": 804.792,
+      "timing_proxy": 1478.562
+    },
+    {
+      "multiplier": 1.75,
+      "buffer": 2.0,
+      "mean_budget": 18.396,
+      "recall": 0.6344,
+      "precision": 0.3262,
+      "early_proxy": 669.198,
+      "late_proxy": 816.458,
+      "timing_proxy": 1485.656
+    },
+    {
+      "multiplier": 1.75,
+      "buffer": 0.0,
+      "mean_budget": 16.688,
+      "recall": 0.6013,
+      "precision": 0.3408,
+      "early_proxy": 609.719,
+      "late_proxy": 885.0,
+      "timing_proxy": 1494.719
+    },
+    {
+      "multiplier": 1.25,
+      "buffer": 2.0,
+      "mean_budget": 14.104,
+      "recall": 0.5286,
+      "precision": 0.3545,
+      "early_proxy": 506.375,
+      "late_proxy": 1035.833,
+      "timing_proxy": 1542.208
+    },
+    {
+      "multiplier": 1.5,
+      "buffer": 0.0,
+      "mean_budget": 14.417,
+      "recall": 0.5441,
+      "precision": 0.3569,
+      "early_proxy": 519.219,
+      "late_proxy": 1027.917,
+      "timing_proxy": 1547.135
+    },
+    {
+      "multiplier": 0.75,
+      "buffer": 6.0,
+      "mean_budget": 13.5,
+      "recall": 0.5132,
+      "precision": 0.3596,
+      "early_proxy": 473.479,
+      "late_proxy": 1075.208,
+      "timing_proxy": 1548.688
+    },
+    {
+      "multiplier": 1.0,
+      "buffer": 4.0,
+      "mean_budget": 13.812,
+      "recall": 0.522,
+      "precision": 0.3575,
+      "early_proxy": 494.75,
+      "late_proxy": 1063.75,
+      "timing_proxy": 1558.5
+    },
+    {
+      "multiplier": 1.25,
+      "buffer": 0.0,
+      "mean_budget": 12.104,
+      "recall": 0.4692,
+      "precision": 0.3666,
+      "early_proxy": 445.281,
+      "late_proxy": 1206.25,
+      "timing_proxy": 1651.531
+    },
+    {
+      "multiplier": 1.0,
+      "buffer": 2.0,
+      "mean_budget": 11.812,
+      "recall": 0.4581,
+      "precision": 0.3668,
+      "early_proxy": 430.49,
+      "late_proxy": 1230.625,
+      "timing_proxy": 1661.115
+    },
+    {
+      "multiplier": 0.75,
+      "buffer": 4.0,
+      "mean_budget": 11.5,
+      "recall": 0.4449,
+      "precision": 0.3659,
+      "early_proxy": 413.938,
+      "late_proxy": 1258.75,
+      "timing_proxy": 1672.688
+    },
+    {
+      "multiplier": 1.0,
+      "buffer": 0.0,
+      "mean_budget": 9.812,
+      "recall": 0.3943,
+      "precision": 0.38,
+      "early_proxy": 366.823,
+      "late_proxy": 1386.875,
+      "timing_proxy": 1753.698
+    },
+    {
+      "multiplier": 0.75,
+      "buffer": 2.0,
+      "mean_budget": 9.5,
+      "recall": 0.3744,
+      "precision": 0.3728,
+      "early_proxy": 358.094,
+      "late_proxy": 1421.875,
+      "timing_proxy": 1779.969
+    },
+    {
+      "multiplier": 0.75,
+      "buffer": 0.0,
+      "mean_budget": 7.5,
+      "recall": 0.3018,
+      "precision": 0.3806,
+      "early_proxy": 290.208,
+      "late_proxy": 1618.333,
+      "timing_proxy": 1908.542
+    }
+  ],
+  "scenario_predictions": [
+    {
+      "scenario": "s_0",
+      "actual_due": 9,
+      "predicted_due": 11.0318
+    },
+    {
+      "scenario": "s_1",
+      "actual_due": 13,
+      "predicted_due": 12.6421
+    },
+    {
+      "scenario": "s_2",
+      "actual_due": 17,
+      "predicted_due": 14.4415
+    },
+    {
+      "scenario": "s_3",
+      "actual_due": 19,
+      "predicted_due": 12.5914
+    },
+    {
+      "scenario": "s_4",
+      "actual_due": 14,
+      "predicted_due": 11.616
+    },
+    {
+      "scenario": "s_5",
+      "actual_due": 14,
+      "predicted_due": 12.32
+    },
+    {
+      "scenario": "s_6",
+      "actual_due": 18,
+      "predicted_due": 13.0133
+    },
+    {
+      "scenario": "s_7",
+      "actual_due": 14,
+      "predicted_due": 12.8481
+    },
+    {
+      "scenario": "s_8",
+      "actual_due": 14,
+      "predicted_due": 15.475
+    },
+    {
+      "scenario": "s_9",
+      "actual_due": 10,
+      "predicted_due": 15.0418
+    },
+    {
+      "scenario": "s_10",
+      "actual_due": 10,
+      "predicted_due": 13.7563
+    },
+    {
+      "scenario": "s_11",
+      "actual_due": 10,
+      "predicted_due": 13.2892
+    },
+    {
+      "scenario": "s_12",
+      "actual_due": 11,
+      "predicted_due": 10.0225
+    },
+    {
+      "scenario": "s_13",
+      "actual_due": 14,
+      "predicted_due": 11.8081
+    },
+    {
+      "scenario": "s_14",
+      "actual_due": 12,
+      "predicted_due": 11.0465
+    },
+    {
+      "scenario": "s_15",
+      "actual_due": 13,
+      "predicted_due": 10.2382
+    },
+    {
+      "scenario": "s_16",
+      "actual_due": 15,
+      "predicted_due": 10.3109
+    },
+    {
+      "scenario": "s_17",
+      "actual_due": 15,
+      "predicted_due": 9.9231
+    },
+    {
+      "scenario": "s_18",
+      "actual_due": 11,
+      "predicted_due": 9.918
+    },
+    {
+      "scenario": "s_19",
+      "actual_due": 8,
+      "predicted_due": 9.9681
+    },
+    {
+      "scenario": "s_20",
+      "actual_due": 8,
+      "predicted_due": 10.0425
+    },
+    {
+      "scenario": "s_21",
+      "actual_due": 9,
+      "predicted_due": 9.5451
+    },
+    {
+      "scenario": "s_22",
+      "actual_due": 8,
+      "predicted_due": 8.7257
+    },
+    {
+      "scenario": "s_23",
+      "actual_due": 9,
+      "predicted_due": 8.8984
+    },
+    {
+      "scenario": "s_24",
+      "actual_due": 9,
+      "predicted_due": 8.5881
+    },
+    {
+      "scenario": "s_25",
+      "actual_due": 9,
+      "predicted_due": 8.5905
+    },
+    {
+      "scenario": "s_26",
+      "actual_due": 7,
+      "predicted_due": 8.1888
+    },
+    {
+      "scenario": "s_27",
+      "actual_due": 6,
+      "predicted_due": 8.016
+    },
+    {
+      "scenario": "s_28",
+      "actual_due": 6,
+      "predicted_due": 8.6622
+    },
+    {
+      "scenario": "s_29",
+      "actual_due": 4,
+      "predicted_due": 8.6049
+    },
+    {
+      "scenario": "s_30",
+      "actual_due": 5,
+      "predicted_due": 8.1789
+    },
+    {
+      "scenario": "s_31",
+      "actual_due": 8,
+      "predicted_due": 7.7992
+    },
+    {
+      "scenario": "s_32",
+      "actual_due": 10,
+      "predicted_due": 6.8612
+    },
+    {
+      "scenario": "s_33",
+      "actual_due": 9,
+      "predicted_due": 6.4668
+    },
+    {
+      "scenario": "s_34",
+      "actual_due": 9,
+      "predicted_due": 5.5479
+    },
+    {
+      "scenario": "s_35",
+      "actual_due": 10,
+      "predicted_due": 6.0005
+    },
+    {
+      "scenario": "s_36",
+      "actual_due": 8,
+      "predicted_due": 5.1581
+    },
+    {
+      "scenario": "s_37",
+      "actual_due": 6,
+      "predicted_due": 5.6201
+    },
+    {
+      "scenario": "s_38",
+      "actual_due": 5,
+      "predicted_due": 5.2477
+    },
+    {
+      "scenario": "s_39",
+      "actual_due": 7,
+      "predicted_due": 5.4648
+    },
+    {
+      "scenario": "s_40",
+      "actual_due": 7,
+      "predicted_due": 5.2939
+    },
+    {
+      "scenario": "s_41",
+      "actual_due": 6,
+      "predicted_due": 5.6776
+    },
+    {
+      "scenario": "s_42",
+      "actual_due": 8,
+      "predicted_due": 5.6316
+    },
+    {
+      "scenario": "s_43",
+      "actual_due": 7,
+      "predicted_due": 6.9415
+    },
+    {
+      "scenario": "s_44",
+      "actual_due": 6,
+      "predicted_due": 8.1442
+    },
+    {
+      "scenario": "s_45",
+      "actual_due": 3,
+      "predicted_due": 7.8407
+    },
+    {
+      "scenario": "s_46",
+      "actual_due": 2,
+      "predicted_due": 6.9592
+    },
+    {
+      "scenario": "s_47",
+      "actual_due": 2,
+      "predicted_due": 8.0696
+    }
+  ]
+}

@@ -43,6 +43,7 @@ from batteryswap_solution.optimizer import OptimizationConfig
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 
 from bsai.forecaster import HazardForecaster
+from bsai.portfolio import PortfolioForecaster
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
 
@@ -90,8 +91,15 @@ def main() -> None:
     parser.add_argument("--dataset", type=Path, default=Path("dataset/train"))
     parser.add_argument("--model", type=Path, default=Path("models/v6_hazard.joblib"))
     parser.add_argument("--folds", type=Path, default=Path("outputs/v6_folds.joblib"))
+    parser.add_argument(
+        "--incidence-model",
+        type=Path,
+        default=None,
+        help="optional V9 scenario-incidence model providing a top-K portfolio",
+    )
     parser.add_argument("--report", type=Path, default=Path("outputs/v6_validation.json"))
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--start-index", type=int, default=0)
     parser.add_argument("--solver-seconds", type=float, default=1.0)
     parser.add_argument("--local-search", type=int, default=80)
     parser.add_argument("--uncertain-search", type=int, default=35)
@@ -131,6 +139,10 @@ def main() -> None:
     building_of = dict(zip(devices["device_id"], devices["building_id"]))
 
     forecaster = build_forecaster(args, building_of)
+    if args.incidence_model is not None:
+        forecaster = PortfolioForecaster(
+            forecaster, joblib.load(args.incidence_model)
+        )
     if args.per_battery:
         planner = PerBatteryPlanner(
             forecaster=forecaster,
@@ -168,11 +180,15 @@ def main() -> None:
     audit: list[dict] = []
     started = time.time()
 
+    processed = 0
     for index, (scenario, locs, cut, not_dead) in enumerate(
         iterate_scenarios(locations, timeseries, eol_times, scenarios)
     ):
-        if args.limit is not None and index >= args.limit:
+        if index < args.start_index:
+            continue
+        if args.limit is not None and processed >= args.limit:
             break
+        processed += 1
         start = pd.Timestamp(scenario["start_time"])
         settings = scenario["settings"]
         horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
@@ -216,6 +232,7 @@ def main() -> None:
             missed=len(due - served),
             cold_start=int(forecaster.last_cold_start),
             expected_due=round(float(forecaster.last_expected_due), 2),
+            service_budget=int(getattr(forecaster, "last_service_budget", 0)),
             seconds=round(elapsed, 2),
         )
         rows.append(entry)
@@ -223,6 +240,7 @@ def main() -> None:
             f"  {scenario['name']:>5}  total={entry['total_cost']:9.1f}  "
             f"served={entry['served']:3d}  due={entry['due']:3d}  "
             f"missed={entry['missed']:3d}  cold={entry['cold_start']:3d}  "
+            f"budget={entry['service_budget']:2d}  "
             f"{elapsed:5.1f}s",
             flush=True,
         )
@@ -277,6 +295,7 @@ def _summarise(frame: pd.DataFrame, blocks: int) -> dict:
             "missed_per_scenario": round(float(frame["missed"].mean()), 2),
             "cold_start_per_scenario": round(float(frame["cold_start"].mean()), 1),
             "expected_due_per_scenario": round(float(frame["expected_due"].mean()), 2),
+            "service_budget_per_scenario": round(float(frame["service_budget"].mean()), 2),
             "recall": round(float(frame["hit"].sum() / max(frame["due"].sum(), 1)), 3),
             "precision": round(float(frame["hit"].sum() / max(frame["served"].sum(), 1)), 3),
         },

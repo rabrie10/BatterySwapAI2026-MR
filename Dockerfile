@@ -1,7 +1,7 @@
 # Submission will be executed with this image.
 # Adapted from the official BatterySwapAI2026-Example Dockerfile for this
 # repo's layout: Task 1 lives in bsai/, Task 2 in batteryswap_solution/, and
-# the fitted forecaster artifact in models/.
+# the fitted V7 and V9 artifacts in models/.
 FROM huggingface/competitions:latest
 
 WORKDIR /app
@@ -13,11 +13,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy everything script.py needs at runtime.
-# bsai/ must be present before models/v7_wiener.joblib can be loaded: joblib
-# resolves the artifact's class as bsai.wiener.WienerModel, which in turn imports
-# bsai.features, bsai.hazard, bsai.margin and bsai.smoothing, so the whole package
-# has to come along. src/ is kept for the frozen v4 control artifact, which
-# unpickles as src.risk.model.Task1Forecaster.
+# bsai/ must be present before either model artifact can be loaded because
+# joblib resolves their classes from that package. src/ is kept for the frozen
+# v4 control artifact, which unpickles as src.risk.model.Task1Forecaster.
 COPY batteryswap_solution/ ./batteryswap_solution
 COPY bsai/ ./bsai
 COPY src/ ./src
@@ -31,5 +29,6 @@ COPY script.py ./
 # silently produced a train-only submission. Pass -e BATTERYSWAP_SPLITS=train
 # explicitly when testing locally against the train-only dataset checkout.
 
-# Default to making submissions.
-CMD ["python3", "script.py"]
+# Dependencies are installed into the competition image's isolated /app/env.
+# Calling the base image's global python skips that environment.
+CMD ["/app/env/bin/python", "script.py"]

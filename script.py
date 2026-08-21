@@ -1,9 +1,9 @@
 """Official BatterySwapAI submission entry point.
 
-Task 1 is the V7 Wiener first-passage model in ``bsai``; Task 2 is the existing
-``batteryswap_solution`` planner, which reaches 77.83 on train scenarios 0-11
-when the risk it is given is correct. The two meet at the v1 forecast contract,
-so the model can be replaced without touching any scheduling code.
+Task 1 combines the V7 Wiener first-passage model with V9's independent
+scenario-incidence estimate. Task 2 ranks a broad V7 candidate pool, then caps
+the number serviced with V9's fleet-level estimate. The two meet at the v1
+forecast contract.
 
 The planner instance is deliberately shared across every scenario:
 ``make_submissions`` calls the loader once per scenario, and the smoothing cache
@@ -25,6 +25,7 @@ from batteryswap_public.utils import make_submissions
 from batteryswap_solution.optimizer import OptimizationConfig
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 from bsai.forecaster import HazardForecaster
+from bsai.portfolio import PortfolioForecaster
 from bsai.runtime import (
     HARD_DEADLINE_SECONDS,
     SOFT_DEADLINE_SECONDS,
@@ -34,6 +35,7 @@ from bsai.runtime import (
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
+DEFAULT_INCIDENCE_MODEL_PATH = Path("models/v9_incidence.joblib")
 
 
 def _float_env(name: str, default: float) -> float:
@@ -44,14 +46,26 @@ def _int_env(name: str, default: int) -> int:
     return int(os.environ.get(name, default))
 
 
-def load_forecaster() -> HazardForecaster | None:
-    """Load the V6 model, or None so the planner uses its own safe fallback."""
+def load_forecaster():
+    """Load V7 plus V9's independent fleet-incidence portfolio model."""
     path = Path(os.environ.get("BATTERYSWAP_MODEL_PATH", DEFAULT_MODEL_PATH))
     if not path.exists():
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)
         return None
     try:
-        return HazardForecaster(joblib.load(path))
+        base = HazardForecaster(joblib.load(path))
+        incidence_path = Path(
+            os.environ.get(
+                "BATTERYSWAP_INCIDENCE_MODEL_PATH", DEFAULT_INCIDENCE_MODEL_PATH
+            )
+        )
+        if not incidence_path.exists():
+            LOGGER.warning(
+                "Incidence model missing at %s; using ordinary V7 decisions",
+                incidence_path,
+            )
+            return base
+        return PortfolioForecaster(base, joblib.load(incidence_path))
     except Exception:
         LOGGER.exception("Could not load %s; falling back to voltage trend", path)
         return None

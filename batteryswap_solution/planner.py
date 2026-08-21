@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import logging
 
 import numpy as np
@@ -15,6 +15,8 @@ from .costs import (
     CostTables,
     build_expected_cost_tables,
     isolated_emergency_costs,
+    portfolio_keep_indices,
+    portfolio_service_budget,
     select_candidates,
 )
 from .forecast import RiskForecaster, VoltageTrendForecaster, validate_forecast
@@ -65,6 +67,7 @@ class CompetitionPlanner(Planner):
         self.fallback_forecaster = VoltageTrendForecaster()
         self.config = config or PlannerConfig()
         self.last_expected_improvement = float("nan")
+        self._active_max_planned_count: int | None = None
 
     @staticmethod
     def _planning_clock(
@@ -158,7 +161,9 @@ class CompetitionPlanner(Planner):
         replay_context: ReplayContext | None = None,
     ) -> float:
         limit = planned_swap_limit(
-            len(costs.battery_ids), self.config.optimizer.max_planned_rate
+            len(costs.battery_ids),
+            self.config.optimizer.max_planned_rate,
+            self._active_max_planned_count,
         )
         if limit is not None:
             planned_count = int(
@@ -648,6 +653,10 @@ class CompetitionPlanner(Planner):
         try:
             dates, defer_day = self._planning_clock(start, settings)
             forecast = self._forecast(battery_data, locations, start, dates)
+            self._active_max_planned_count = (
+                portfolio_service_budget(forecast)
+                or self.config.optimizer.max_planned_count
+            )
             full_costs = build_expected_cost_tables(
                 forecast,
                 locations,
@@ -660,11 +669,13 @@ class CompetitionPlanner(Planner):
             # search evaluation is linear in the battery count, and roughly
             # nine of some four hundred are ever due, so this is the difference
             # between fitting the evaluation budget and not.
-            keep = select_candidates(
-                full_costs,
-                margin_hours=self.config.candidate_margin_hours,
-                max_candidates=self.config.max_candidates,
-            )
+            keep = portfolio_keep_indices(forecast, full_costs.battery_ids)
+            if keep is None:
+                keep = select_candidates(
+                    full_costs,
+                    margin_hours=self.config.candidate_margin_hours,
+                    max_candidates=self.config.max_candidates,
+                )
             costs = full_costs.take(keep)
             candidate_ids = set(costs.battery_ids)
             excluded = [
@@ -687,7 +698,10 @@ class CompetitionPlanner(Planner):
                     candidate_locations,
                     travel_costs,
                     settings,
-                    config=self.config.optimizer,
+                    config=replace(
+                        self.config.optimizer,
+                        max_planned_count=self._active_max_planned_count,
+                    ),
                 )
             ]
             plan = self._local_search(
