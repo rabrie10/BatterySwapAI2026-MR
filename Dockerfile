@@ -32,5 +32,7 @@ COPY script.py ./
 # silently produced a train-only submission. Pass -e BATTERYSWAP_SPLITS=train
 # explicitly when testing locally against the train-only dataset checkout.
 
-# Default to making submissions.
-CMD ["python3", "script.py"]
+# The competition base image installs allowed requirements into /app/env.
+# Its runtime entrypoint resets PATH to the separate miniconda interpreter, so
+# an unqualified python/python3 cannot import joblib or batteryswap_public.
+CMD ["/app/env/bin/python", "script.py"]
