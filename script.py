@@ -1,6 +1,6 @@
 """Official BatterySwapAI submission entry point.
 
-Task 1 is the V6 first-passage model in ``bsai``; Task 2 is the existing
+Task 1 is the V7 Wiener first-passage model in ``bsai``; Task 2 is the existing
 ``batteryswap_solution`` planner, which reaches 77.83 on train scenarios 0-11
 when the risk it is given is correct. The two meet at the v1 forecast contract,
 so the model can be replaced without touching any scheduling code.
@@ -33,7 +33,7 @@ from bsai.runtime import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/v6_hazard.joblib")
+DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
 
 
 def _float_env(name: str, default: float) -> float:

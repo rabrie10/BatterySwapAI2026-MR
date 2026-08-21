@@ -21,7 +21,7 @@ from batteryswap_public.utils import iterate_scenarios, load_dataset
 from batteryswap_solution.forecast import validate_forecast
 
 DATASET = Path("dataset/train")
-MODEL = Path("models/v6_hazard.joblib")
+MODEL = Path("models/v7_wiener.joblib")
 
 EARLY_SCENARIO = 0
 LATE_SCENARIO = 46

@@ -33,6 +33,7 @@ from batteryswap_solution.forecast import (
 
 from .features import DeviceView, FeatureContext, feature_row, fleet_climatology
 from .hazard import HazardModel
+from .shape import ShapeCache, align_to
 from .smoothing import SmoothingCache
 
 _EPOCH = pd.Timestamp("1970-01-01")
@@ -79,6 +80,7 @@ class HazardForecaster:
         self.probability_scale = float(probability_scale)
         self.model_version = model.model_version
         self.cache = SmoothingCache()
+        self.shape_cache = ShapeCache()
         self.use_split_climatology = use_split_climatology
         self._context: FeatureContext | None = None
         self.last_cold_start = 0
@@ -105,6 +107,7 @@ class HazardForecaster:
         evaluation_observation_end: pd.Timestamp,
     ) -> RiskForecast:
         self.cache.update(battery_data)
+        self.shape_cache.update(battery_data)
         self._context = self._refresh_context()
 
         origin = _normal_date(prediction_origin)
@@ -134,7 +137,12 @@ class HazardForecaster:
                 continue
             index = min(index, len(series) - 1)
             view = DeviceView(series.smooth_voltage, series.smooth_temperature)
-            row = feature_row(view, index, series.origin + index, self._context)
+            shape_view = align_to(
+                self.shape_cache.devices.get(device_id), series.origin, len(series)
+            )
+            row = feature_row(
+                view, index, series.origin + index, self._context, shape_view
+            )
             if row is None:
                 continue
             rows.append(row)

@@ -45,6 +45,12 @@ LEVEL_THRESHOLDS = (2.90, 2.80, 2.70, 2.65, 2.60, 2.55, 2.50, 2.45, 2.42)
 CROSSING_WINDOWS = (14, 30, 60)
 OUTLOOK_DAYS = (21, 42)
 
+# Trailing windows for the within-day statistics. Short enough to catch a knee
+# turning on, long enough that a device reporting intermittently still has days
+# to average over.
+SHAPE_WINDOWS = (7, 30)
+SHAPE_BASELINE_WINDOW = 180
+
 MIN_OBSERVATIONS = 20
 FAR_CROSSING_DAYS = 900.0
 RECENT_WINDOW = 90
@@ -78,6 +84,20 @@ def _build_names() -> list[str]:
         "knee_worst_14d_drop",
         "knee_recent_vs_baseline",
     ]
+    # Within-day shape. Everything above is some function of one number per day;
+    # these are the only features that see inside the day, where the internal
+    # resistance signal lives. Measured on the population the smoothed series
+    # cannot rank at all, the within-day dV/dT separates due from not-due with
+    # AUC 0.871 and a 3.8x median ratio.
+    names += [f"beta_{w}" for w in SHAPE_WINDOWS]
+    names += [f"v_std_{w}" for w in SHAPE_WINDOWS]
+    names += [f"v_range_{w}" for w in SHAPE_WINDOWS]
+    names += ["t_range_30"]
+    # Ratios against the device's own long baseline. Absolute sensitivity varies
+    # a lot between devices and buildings, so a rise relative to the unit's own
+    # history transfers where a raw level does not -- which is exactly where V6's
+    # calibration failed across buildings.
+    names += ["beta_rise", "v_std_rise", "v_range_rise"]
     return names
 
 
@@ -227,6 +247,7 @@ def feature_row(
     index: int,
     day_ordinal: int,
     context: FeatureContext,
+    shape=None,
 ) -> list[float] | None:
     """Features at one cutoff, or None when there is nothing usable yet."""
     if index < 0 or index >= view.size:
@@ -317,7 +338,29 @@ def feature_row(
     row.append(float(index - view.first_index) if view.first_index >= 0 else np.nan)
 
     row += _knee_features(view, index, slope(30), current)
+    row += _shape_features(shape, index)
     return row
+
+
+def _shape_features(shape, index: int) -> list[float]:
+    """Within-day statistics, and their rise against the device's own baseline."""
+    if shape is None:
+        return [np.nan] * (3 * len(SHAPE_WINDOWS) + 4)
+
+    levels: list[float] = []
+    for name in ("beta", "v_std", "v_range"):
+        levels += [shape.trailing_mean(name, index, w) for w in SHAPE_WINDOWS]
+    out = list(levels)
+    out.append(shape.trailing_mean("t_range", index, 30))
+
+    for name in ("beta", "v_std", "v_range"):
+        recent = shape.trailing_mean(name, index, 30)
+        baseline = shape.trailing_mean(name, index, SHAPE_BASELINE_WINDOW)
+        if np.isfinite(recent) and np.isfinite(baseline) and abs(baseline) > 1e-9:
+            out.append(recent / baseline)
+        else:
+            out.append(np.nan)
+    return out
 
 
 def _knee_features(

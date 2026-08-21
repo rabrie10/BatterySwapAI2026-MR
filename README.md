@@ -7,18 +7,18 @@ license: mit
 Competition solution for RUL forecasting and cost-aware battery-swap planning.
 The submitted entry point is `script.py`.
 
-- **Task 1** is `bsai/`: a multi-horizon first-passage model for the 2.4 V
-  crossing.
+- **Task 1** is `bsai/`: a Wiener first-passage model for the 2.4 V crossing,
+  driven by within-day features the official smoothing discards.
 - **Task 2** is `batteryswap_solution/`: the scheduling and routing optimizer.
 
 They meet at the versioned forecast contract in
 `batteryswap_solution/forecast.py`, so the model can be replaced without
 touching any scheduling code.
 
-The reasoning behind this design is in
-[`docs/PLAN_V6_MAXIMUM.md`](docs/PLAN_V6_MAXIMUM.md); what it actually measures,
-including the approaches that failed, is in
-[`docs/V6_IMPLEMENTATION.md`](docs/V6_IMPLEMENTATION.md).
+The current design and its measurements, including the approaches that failed,
+are in [`docs/V7_IMPLEMENTATION.md`](docs/V7_IMPLEMENTATION.md) and
+[`docs/PLAN_V7_MARGIN.md`](docs/PLAN_V7_MARGIN.md). The previous generation is
+recorded in [`docs/V6_IMPLEMENTATION.md`](docs/V6_IMPLEMENTATION.md).
 
 ## Where it stands
 
@@ -28,12 +28,23 @@ Out-of-fold by building, official `evaluate_plan()` over all 48 train scenarios:
 |---|---:|
 | all-defer (service nothing) | 3324.7 |
 | shipped v3 | 2644.9 |
-| **this branch** | **2526.0** |
+| V6 hazard classifier | 2526.0 |
+| **this branch (V7 Wiener)** | **2293.2** |
 | perfect knowledge, this planner (scenarios 0-11) | 77.8 |
 
-Runtime is 5.65 s per scenario, projecting to 11.3 minutes for the 96 public and
-private scenarios including harness overhead — against a 30-minute limit and the
-previous solution's 25.8-27.6 minute projection.
+The submission run plans all 48 train scenarios in 476 s with nothing degraded
+or deferred, projecting about 18 minutes for the 96 public and private
+scenarios against a 30-minute limit.
+
+The change that mattered was not the model class. A two-line control -- rank by
+`margin / -slope`, no model at all -- matched V6 exactly (precision 0.309
+against 0.300 at twelve swaps), so fifty-one features of gradient boosting were
+worth nothing over a straight line. `smooth_series` collapses 8.5 million hourly
+readings into 360,847 daily numbers, and every V6 feature was a function of that
+one collapsed series. The within-day voltage response to the daily temperature
+cycle -- a proxy for internal resistance, the documented knee precursor --
+separates due from not-due with AUC 0.871 on exactly the population the smoothed
+series cannot rank at all.
 
 The local mean is a weak predictor of the leaderboard: v3 scored 2644.9 locally
 and 4252.3 on public. What that public score actually reflected was
@@ -60,8 +71,11 @@ whole competition is the question of *which* batteries to touch.
 | module | role |
 |---|---|
 | `smoothing.py` | Incremental, exact reimplementation of `smooth_series`. Pinned to the official function to 1e-12, including the partial-day boundary. |
-| `features.py` | 51 causal features from one device's smoothed grid up to one cutoff. |
-| `hazard.py` | Multi-horizon classifier: P(EOL recorded within h days), monotone in h. |
+| `features.py` | 64 causal features: the smoothed grid, plus the within-day statistics that grid discards. |
+| `shape.py` | Incremental within-day statistics from the raw hourly readings: voltage spread and the dV/dT response to the daily temperature cycle. |
+| `wiener.py` | Wiener first passage: learned drift and volatility, closed-form crossing probability. |
+| `hazard.py` | Cutoff sampling and the previous multi-horizon classifier, kept for comparison. |
+| `margin.py` | Quantile regression on the running minimum; measured, not shipped. |
 | `forecaster.py` | Adapter to the Task 2 forecast contract, including the censoring branch. |
 | `validation.py` | Out-of-fold dispatch, so no device is ever scored by a model that saw its building. |
 | `runtime.py` | Wall-clock governor for the 30-minute evaluation budget. |
@@ -106,16 +120,15 @@ expected seasonal temperature change across the planning window.
 Both commands are deterministic given the seeds in the source.
 
 ```bash
-python tools/train_v6.py
+python tools/train_wiener.py --stride 4
 ```
 
-Writes `models/v6_hazard.joblib` (the shipped artifact, fitted on every
-building, carrying isotonic calibrators fitted on out-of-fold predictions only),
-`outputs/v6_folds.joblib` (the five fold models, used for validation and not
-needed at submission time), and `docs/v6_training_report.json`.
+Writes `models/v7_wiener.joblib` (the shipped artifact, fitted on every
+building), `outputs/v7_folds.joblib` (the five fold models, used for validation
+and not needed at submission time), and `docs/v7_training_report.json`.
 
 ```bash
-python tools/validate_v6.py
+python tools/validate_v6.py --folds outputs/v7_folds.joblib     --model models/v7_wiener.joblib --volatility-scale 1.0
 ```
 
 Scores the production planner over all 48 train scenarios using predictions from
@@ -158,7 +171,7 @@ equality between the fast operational replay and
 
 ## Environment overrides
 
-- `BATTERYSWAP_MODEL_PATH` -- Task 1 artifact, default `models/v6_hazard.joblib`
+- `BATTERYSWAP_MODEL_PATH` -- Task 1 artifact, default `models/v7_wiener.joblib`
 - `BATTERYSWAP_PLANNER_PATH` -- load a pickled planner instead
 - `BATTERYSWAP_SOLVER_SECONDS`, `BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS`,
   `BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS`, `BATTERYSWAP_ROBUST_SAMPLES`

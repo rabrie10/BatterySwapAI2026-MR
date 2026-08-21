@@ -74,6 +74,9 @@ def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
         model = joblib.load(args.model)
         return HazardForecaster(model, probability_scale=args.probability_scale)
     bundle = joblib.load(args.folds)
+    if args.volatility_scale is not None:
+        for fold_model in bundle["by_building"].values():
+            fold_model.volatility_scale = args.volatility_scale
     model = OofHazardModel(
         by_building=bundle["by_building"],
         building_of=building_of,
@@ -102,6 +105,13 @@ def main() -> None:
     parser.add_argument("--emergency-rank-scale", type=float, default=1.0)
     parser.add_argument("--max-planned-rate", type=float, default=None)
     parser.add_argument("--probability-scale", type=float, default=1.0)
+    parser.add_argument(
+        "--volatility-scale",
+        type=float,
+        default=None,
+        help="override the Wiener volatility scale; the level must be calibrated "
+        "on the scenario population, not the training cutoffs",
+    )
     parser.add_argument("--per-battery", action="store_true",
                         help="decide each battery on its own cost; no joint search")
     parser.add_argument("--work-cost", type=float, default=0.25)

@@ -31,6 +31,7 @@ from .features import (
     feature_row,
     fleet_climatology,
 )
+from .shape import ShapeCache, align_to
 from .smoothing import SmoothingCache
 
 # Dense through the 42-day planning window, then coarse out to the longest
@@ -72,6 +73,7 @@ def build_training_frame(
     building_of: dict[str, str],
     observation_end_index: dict[str, int],
     *,
+    shape_cache: ShapeCache | None = None,
     stride: int = 3,
     warmup_days: int = 45,
     cutoff_days: np.ndarray | None = None,
@@ -108,8 +110,17 @@ def build_training_frame(
             continue
         first, last = int(valid[0]), int(valid[-1])
         cross = eol_index.get(device_id)
-        stop = last if cross is None else min(last, int(cross))
+        # Strictly before the crossing. A cutoff *on* the crossing day describes
+        # a battery whose smoothed voltage is already under 2.4 -- it is not a
+        # decision point, because the evaluator has removed it from locations by
+        # then, and such a row only teaches the model that a dead battery dies.
+        stop = last if cross is None else min(last, int(cross) - 1)
         view = DeviceView(series.smooth_voltage, series.smooth_temperature)
+        shape_view = align_to(
+            None if shape_cache is None else shape_cache.devices.get(device_id),
+            series.origin,
+            len(series),
+        )
         if cutoff_days is None:
             indices = range(first + warmup_days, stop + 1, stride)
         else:
@@ -117,7 +128,9 @@ def build_training_frame(
             indices = local[(local >= first + warmup_days) & (local <= stop)]
         for index in indices:
             index = int(index)
-            row = feature_row(view, index, series.origin + index, context)
+            row = feature_row(
+                view, index, series.origin + index, context, shape_view
+            )
             if row is None:
                 continue
             rows.append(row)

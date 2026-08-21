@@ -1,0 +1,48 @@
+{
+  "model_version": "bsai-wiener/v1",
+  "within_day_features": true,
+  "n_features": 64,
+  "stride_days": 4,
+  "fit_horizons": [
+    7,
+    14,
+    21,
+    28,
+    42,
+    63,
+    91,
+    126
+  ],
+  "volatility_scale": 1.4,
+  "n_cutoffs": 88013,
+  "n_windows": 546042,
+  "metrics": {
+    "scale_1.0": {
+      "n": 88013,
+      "positives": 862,
+      "base_rate": 0.00979,
+      "auc": 0.9823,
+      "pr_auc": 0.4303,
+      "predicted_over_actual": 0.637,
+      "precision_at_50": 0.72,
+      "precision_at_100": 0.66,
+      "precision_at_200": 0.635,
+      "precision_at_500": 0.534,
+      "precision_at_1000": 0.451
+    },
+    "scale_1.4": {
+      "n": 88013,
+      "positives": 862,
+      "base_rate": 0.00979,
+      "auc": 0.9821,
+      "pr_auc": 0.4262,
+      "predicted_over_actual": 1.025,
+      "precision_at_50": 0.74,
+      "precision_at_100": 0.63,
+      "precision_at_200": 0.62,
+      "precision_at_500": 0.516,
+      "precision_at_1000": 0.45
+    }
+  },
+  "seconds": 385.1
+}

@@ -13,3 +13,6 @@ __pycache__/
 outputs/v6_folds.joblib
 outputs/v6_*.json
 outputs/v5match.json
+outputs/daily_shape.parquet
+outputs/v7_*.json
+outputs/v7_folds.joblib
