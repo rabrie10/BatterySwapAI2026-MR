@@ -31,53 +31,14 @@ class OptimizationConfig:
     capacity_roundtrip_fraction: float = 1.0
     use_cp_sat: bool = True
     max_planned_rate: float | None = None
-    max_planned_count: int | None = None
-    expected_due_multiplier: float | None = None
-    expected_due_buffer: float = 0.0
 
 
-def planned_swap_limit(
-    battery_count: int,
-    rate: float | None,
-    count: int | None = None,
-) -> int | None:
-    limits: list[int] = []
-    if rate is not None:
-        if not 0.0 < float(rate) <= 1.0:
-            raise ValueError("max_planned_rate must be in (0, 1]")
-        limits.append(max(1, int(np.ceil(float(rate) * int(battery_count)))))
-    if count is not None:
-        if int(count) < 1:
-            raise ValueError("max_planned_count must be positive")
-        limits.append(int(count))
-    return None if not limits else min(limits)
-
-
-def scenario_planned_swap_limit(
-    costs: CostTables,
-    config: OptimizationConfig,
-) -> int | None:
-    """Stable service budget based on calibrated scenario incidence.
-
-    Candidate filtering makes a percentage cap unstable: the same rate allowed
-    six swaps in one scenario and fifteen in another.  Expected incidence is
-    measured before selection and transfers across fleet sizes, while the
-    multiplier and buffer retain headroom for ranking uncertainty.
-    """
-    limit = planned_swap_limit(
-        len(costs.battery_ids), config.max_planned_rate, config.max_planned_count
-    )
-    if config.expected_due_multiplier is None:
-        return limit
-    multiplier = float(config.expected_due_multiplier)
-    buffer = float(config.expected_due_buffer)
-    if multiplier <= 0.0 or buffer < 0.0:
-        raise ValueError("expected-due budget parameters must be non-negative")
-    incidence_limit = max(
-        1,
-        int(np.ceil(multiplier * float(costs.horizon_event_probability.sum()) + buffer)),
-    )
-    return incidence_limit if limit is None else min(limit, incidence_limit)
+def planned_swap_limit(battery_count: int, rate: float | None) -> int | None:
+    if rate is None:
+        return None
+    if not 0.0 < float(rate) <= 1.0:
+        raise ValueError("max_planned_rate must be in (0, 1]")
+    return max(1, int(np.ceil(float(rate) * int(battery_count))))
 
 
 def _columns(locations: pd.DataFrame) -> tuple[str, str, str]:
@@ -127,7 +88,7 @@ def _greedy_assign(
                     costs.candidate_dates[best_day],
                 )
             )
-    limit = scenario_planned_swap_limit(costs, config)
+    limit = planned_swap_limit(len(costs.battery_ids), config.max_planned_rate)
     selected = sorted(beneficial, key=lambda item: (-item[0], item[1]))
     if limit is not None:
         selected = selected[:limit]
@@ -174,7 +135,7 @@ def optimize_assignments(
     for battery in range(battery_count):
         model.add(sum(service[battery]) + deferred[battery] == 1)
         model.add_hint(deferred[battery], 1)
-    limit = scenario_planned_swap_limit(costs, config)
+    limit = planned_swap_limit(battery_count, config.max_planned_rate)
     if limit is not None:
         model.add(
             sum(

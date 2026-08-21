@@ -31,6 +31,7 @@ from batteryswap_solution.forecast import (
     RiskForecast,
 )
 
+from .calibrate import RemainingCalibration
 from .features import DeviceView, FeatureContext, feature_row, fleet_climatology
 from .hazard import HazardModel
 from .shape import ShapeCache, align_to
@@ -60,24 +61,28 @@ class HazardForecaster:
         *,
         use_split_climatology: bool = True,
         probability_scale: float = 1.0,
+        calibration: RemainingCalibration | None = None,
     ) -> None:
-        """``probability_scale`` shrinks the whole CDF.
+        """Two corrections sit between the model and the planner.
 
-        The model ranks well but its probability *level* does not survive a
-        change of buildings: measured out-of-fold at scenario cutoffs it
-        predicts 12.86 due per scenario against a realised 9.46, and the top
-        bucket predicts 0.87 against 0.39. Refitting the calibrator on the
-        scenario population does not help, because the shift is between
-        buildings and a calibrator fitted on the other four folds cannot see it
-        -- which is exactly the situation on the public and private splits.
-
-        So the correction is a deliberate, tunable under-confidence rather than
-        a calibrator. It is one number, selected out-of-fold, and it errs in the
-        cheaper direction: under-confidence costs late swaps on a handful of
-        batteries, over-confidence costs early swaps on dozens.
+        ``probability_scale`` shrinks the whole CDF uniformly. ``calibration``
+        corrects along the remaining-observation axis, and that one is not
+        optional in practice: pooled, the model looks well calibrated at 0.93
+        predicted-to-actual, but that average is 0.54 in the opening scenarios
+        and 1.64 in the closing ones. It predicts the most failures where there
+        are the fewest. A uniform scale cannot fix a bias that changes sign,
+        which is why every global knob tried in V6 traded one end against the
+        other and landed inside the noise floor.
         """
         self.model = model
         self.probability_scale = float(probability_scale)
+        # Correction along the remaining-observation axis. The pooled calibration
+        # ratio of 0.93 hides an under-prediction of 0.54 in the opening
+        # scenarios and an over-prediction of 1.64 in the closing ones, and no
+        # single scalar can fix a bias that changes sign.
+        if calibration is not None:
+            model.calibration = calibration
+        self.calibration = getattr(model, "calibration", None)
         self.model_version = model.model_version
         self.cache = SmoothingCache()
         self.shape_cache = ShapeCache()
@@ -152,23 +157,16 @@ class HazardForecaster:
         count = len(battery_ids)
         self.last_cold_start = count - len(positions)
         grid = np.zeros((count, len(self.model.horizons)))
-        scenario_scale_method = getattr(
-            self.model, "probability_scale_for_origin", None
-        )
-        scenario_scale = (
-            1.0
-            if scenario_scale_method is None
-            else float(scenario_scale_method(origin))
-        )
         if rows:
             predicted = self.model.predict_grid(
                 np.asarray(rows, dtype=np.float32),
                 remaining[np.asarray(positions, dtype=int)],
                 np.asarray(row_devices),
             )
-            grid[np.asarray(positions, dtype=int)] = np.clip(
-                predicted * self.probability_scale * scenario_scale, 0.0, 1.0
-            )
+            index = np.asarray(positions, dtype=int)
+            # The remaining-observation calibration is applied inside the model,
+            # where the out-of-fold dispatcher has already chosen the right fold.
+            grid[index] = np.clip(predicted * self.probability_scale, 0.0, 1.0)
 
         daily = self.model.cdf_at(grid, day_offsets)
 

@@ -1,6 +1,6 @@
 """Official BatterySwapAI submission entry point.
 
-Task 1 is the V8 GBDT-hazard/AFT/Wiener ensemble in ``bsai``; Task 2 is the existing
+Task 1 is the V7 Wiener first-passage model in ``bsai``; Task 2 is the existing
 ``batteryswap_solution`` planner, which reaches 77.83 on train scenarios 0-11
 when the risk it is given is correct. The two meet at the v1 forecast contract,
 so the model can be replaced without touching any scheduling code.
@@ -33,7 +33,7 @@ from bsai.runtime import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/v8_ensemble.joblib")
+DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
 
 
 def _float_env(name: str, default: float) -> float:
@@ -45,7 +45,7 @@ def _int_env(name: str, default: int) -> int:
 
 
 def load_forecaster() -> HazardForecaster | None:
-    """Load the submission model, or None so the planner uses its safe fallback."""
+    """Load the V6 model, or None so the planner uses its own safe fallback."""
     path = Path(os.environ.get("BATTERYSWAP_MODEL_PATH", DEFAULT_MODEL_PATH))
     if not path.exists():
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)
@@ -58,7 +58,6 @@ def load_forecaster() -> HazardForecaster | None:
 
 
 def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> PlannerConfig:
-    max_planned_count = _int_env("BATTERYSWAP_MAX_PLANNED_COUNT", 0)
     return PlannerConfig(
         late_risk_multiplier=_float_env("BATTERYSWAP_LATE_RISK_MULTIPLIER", 1.0),
         minimum_expected_improvement=_float_env(
@@ -67,14 +66,7 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         local_search_evaluations=local,
         uncertain_local_search_evaluations=uncertain,
         robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 4),
-        optimizer=OptimizationConfig(
-            solver_seconds=solver_seconds,
-            max_planned_count=max_planned_count or None,
-            expected_due_multiplier=(
-                _float_env("BATTERYSWAP_EXPECTED_DUE_MULTIPLIER", 2.0) or None
-            ),
-            expected_due_buffer=_float_env("BATTERYSWAP_EXPECTED_DUE_BUFFER", 5.0),
-        ),
+        optimizer=OptimizationConfig(solver_seconds=solver_seconds),
     )
 
 
