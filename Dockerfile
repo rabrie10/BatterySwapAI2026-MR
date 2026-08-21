@@ -13,8 +13,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy everything script.py needs at runtime.
-# bsai/ must be present before models/v7_wiener.joblib can be loaded: joblib
-# resolves the artifact's class as bsai.wiener.WienerModel, which in turn imports
+# bsai/ must be present before models/v8_ensemble.joblib can be loaded: joblib
+# resolves the artifact's classes from bsai.ensemble, bsai.hybrid and bsai.wiener.
+# Those classes in turn import
 # bsai.features, bsai.hazard, bsai.margin and bsai.smoothing, so the whole package
 # has to come along. src/ is kept for the frozen v4 control artifact, which
 # unpickles as src.risk.model.Task1Forecaster.

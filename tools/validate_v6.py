@@ -43,6 +43,7 @@ from batteryswap_solution.optimizer import OptimizationConfig
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 
 from bsai.forecaster import HazardForecaster
+from bsai.ensemble import ProbabilityBlendModel
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
 
@@ -74,6 +75,24 @@ def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
         model = joblib.load(args.model)
         return HazardForecaster(model, probability_scale=args.probability_scale)
     bundle = joblib.load(args.folds)
+    if args.blend_folds is not None:
+        other = joblib.load(args.blend_folds)
+        if args.blend_volatility_scale is not None:
+            for fold_model in other["by_building"].values():
+                if hasattr(fold_model, "volatility_scale"):
+                    fold_model.volatility_scale = args.blend_volatility_scale
+        shared = sorted(set(bundle["by_building"]) & set(other["by_building"]))
+        bundle = {
+            "by_building": {
+                building: ProbabilityBlendModel(
+                    bundle["by_building"][building],
+                    other["by_building"][building],
+                    left_weight=args.blend_weight,
+                )
+                for building in shared
+            },
+            "climatology": bundle["climatology"],
+        }
     if args.volatility_scale is not None:
         for fold_model in bundle["by_building"].values():
             fold_model.volatility_scale = args.volatility_scale
@@ -90,8 +109,14 @@ def main() -> None:
     parser.add_argument("--dataset", type=Path, default=Path("dataset/train"))
     parser.add_argument("--model", type=Path, default=Path("models/v6_hazard.joblib"))
     parser.add_argument("--folds", type=Path, default=Path("outputs/v6_folds.joblib"))
+    parser.add_argument("--blend-folds", type=Path, default=None)
+    parser.add_argument("--blend-weight", type=float, default=0.5,
+                        help="weight of --folds in an odds blend")
+    parser.add_argument("--blend-volatility-scale", type=float, default=1.0,
+                        help="Wiener volatility scale for --blend-folds")
     parser.add_argument("--report", type=Path, default=Path("outputs/v6_validation.json"))
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--start-index", type=int, default=0)
     parser.add_argument("--solver-seconds", type=float, default=1.0)
     parser.add_argument("--local-search", type=int, default=80)
     parser.add_argument("--uncertain-search", type=int, default=35)
@@ -168,11 +193,15 @@ def main() -> None:
     audit: list[dict] = []
     started = time.time()
 
+    processed = 0
     for index, (scenario, locs, cut, not_dead) in enumerate(
         iterate_scenarios(locations, timeseries, eol_times, scenarios)
     ):
-        if args.limit is not None and index >= args.limit:
+        if index < args.start_index:
+            continue
+        if args.limit is not None and processed >= args.limit:
             break
+        processed += 1
         start = pd.Timestamp(scenario["start_time"])
         settings = scenario["settings"]
         horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))

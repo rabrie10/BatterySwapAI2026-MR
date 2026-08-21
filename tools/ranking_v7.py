@@ -33,6 +33,7 @@ if str(REPO_ROOT) not in sys.path:
 from batteryswap_public.utils import iterate_scenarios, load_dataset, load_devices
 
 from bsai.forecaster import HazardForecaster
+from bsai.ensemble import ProbabilityBlendModel
 from bsai.validation import OofHazardModel
 
 SWAP_COUNTS = (8, 10, 12, 15, 18, 21, 25, 30)
@@ -52,11 +53,34 @@ def main() -> None:
     parser.add_argument("--folds", type=Path, default=Path("outputs/v7_folds.joblib"))
     parser.add_argument("--label", default="model")
     parser.add_argument("--report", type=Path, default=None)
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--blend-folds", type=Path, default=None)
+    parser.add_argument("--blend-weight", type=float, default=0.5,
+                        help="weight of --folds in an odds blend")
+    parser.add_argument("--blend-volatility-scale", type=float, default=1.0)
     args = parser.parse_args()
 
     devices = load_devices(args.dataset / "devices.csv")
     building_of = dict(zip(devices["device_id"], devices["building_id"]))
     bundle = joblib.load(args.folds)
+    if args.blend_folds is not None:
+        other = joblib.load(args.blend_folds)
+        if args.blend_volatility_scale is not None:
+            for fold_model in other["by_building"].values():
+                if hasattr(fold_model, "volatility_scale"):
+                    fold_model.volatility_scale = args.blend_volatility_scale
+        shared = sorted(set(bundle["by_building"]) & set(other["by_building"]))
+        bundle = {
+            "by_building": {
+                building: ProbabilityBlendModel(
+                    bundle["by_building"][building],
+                    other["by_building"][building],
+                    left_weight=args.blend_weight,
+                )
+                for building in shared
+            },
+            "climatology": bundle["climatology"],
+        }
     forecaster = HazardForecaster(
         OofHazardModel(
             by_building=bundle["by_building"],
@@ -67,9 +91,11 @@ def main() -> None:
 
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset)
     rows: list[dict] = []
-    for scenario, locs, cut, not_dead in iterate_scenarios(
+    for scenario_index, (scenario, locs, cut, not_dead) in enumerate(iterate_scenarios(
         locations, timeseries, eol_times, scenarios
-    ):
+    )):
+        if args.limit is not None and scenario_index >= args.limit:
+            break
         start = pd.Timestamp(scenario["start_time"])
         settings = scenario["settings"]
         horizon = int(settings.planning_window_days)

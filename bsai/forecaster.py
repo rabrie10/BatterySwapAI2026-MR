@@ -152,6 +152,14 @@ class HazardForecaster:
         count = len(battery_ids)
         self.last_cold_start = count - len(positions)
         grid = np.zeros((count, len(self.model.horizons)))
+        scenario_scale_method = getattr(
+            self.model, "probability_scale_for_origin", None
+        )
+        scenario_scale = (
+            1.0
+            if scenario_scale_method is None
+            else float(scenario_scale_method(origin))
+        )
         if rows:
             predicted = self.model.predict_grid(
                 np.asarray(rows, dtype=np.float32),
@@ -159,7 +167,7 @@ class HazardForecaster:
                 np.asarray(row_devices),
             )
             grid[np.asarray(positions, dtype=int)] = np.clip(
-                predicted * self.probability_scale, 0.0, 1.0
+                predicted * self.probability_scale * scenario_scale, 0.0, 1.0
             )
 
         daily = self.model.cdf_at(grid, day_offsets)

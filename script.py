@@ -1,6 +1,6 @@
 """Official BatterySwapAI submission entry point.
 
-Task 1 is the V7 Wiener first-passage model in ``bsai``; Task 2 is the existing
+Task 1 is the V8 GBDT-hazard/AFT/Wiener ensemble in ``bsai``; Task 2 is the existing
 ``batteryswap_solution`` planner, which reaches 77.83 on train scenarios 0-11
 when the risk it is given is correct. The two meet at the v1 forecast contract,
 so the model can be replaced without touching any scheduling code.
@@ -33,7 +33,7 @@ from bsai.runtime import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
+DEFAULT_MODEL_PATH = Path("models/v8_ensemble.joblib")
 
 
 def _float_env(name: str, default: float) -> float:
@@ -45,7 +45,7 @@ def _int_env(name: str, default: int) -> int:
 
 
 def load_forecaster() -> HazardForecaster | None:
-    """Load the V6 model, or None so the planner uses its own safe fallback."""
+    """Load the submission model, or None so the planner uses its safe fallback."""
     path = Path(os.environ.get("BATTERYSWAP_MODEL_PATH", DEFAULT_MODEL_PATH))
     if not path.exists():
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)

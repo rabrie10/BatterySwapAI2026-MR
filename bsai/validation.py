@@ -33,6 +33,11 @@ class OofHazardModel:
     def context(self) -> FeatureContext:
         return FeatureContext(climatology=self.climatology)
 
+    def probability_scale_for_origin(self, origin) -> float:
+        model = next(iter(self.by_building.values()))
+        method = getattr(model, "probability_scale_for_origin", None)
+        return 1.0 if method is None else float(method(origin))
+
     def predict_grid(
         self,
         features: np.ndarray,
