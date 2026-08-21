@@ -1,0 +1,73 @@
+{
+  "model_version": "bsai-hazard/v1",
+  "horizons": [
+    3,
+    7,
+    10,
+    14,
+    17,
+    21,
+    25,
+    28,
+    32,
+    35,
+    39,
+    42,
+    49,
+    56,
+    70,
+    84,
+    105,
+    126,
+    150,
+    180,
+    220,
+    270,
+    330,
+    400
+  ],
+  "n_cutoffs": 117312,
+  "n_stacked_rows": 2815488,
+  "positive_rate": 0.022576192830514638,
+  "stride_days": 3,
+  "folds": 5,
+  "n_features": 55,
+  "calibrated_bands": [
+    21,
+    42,
+    120,
+    1000000
+  ],
+  "calibration_rows": 1202472,
+  "calibration_positive_rate": 0.022724853468521513,
+  "metrics": {
+    "stacked": {
+      "auc": 0.9678,
+      "pr_auc": 0.4896,
+      "brier": 0.01722
+    },
+    "horizon_14": {
+      "n": 117312,
+      "positives": 410,
+      "base_rate": 0.0035,
+      "auc": 0.9896,
+      "pr_auc": 0.3256,
+      "precision_at_10": 0.7,
+      "precision_at_20": 0.55,
+      "precision_at_50": 0.66,
+      "precision_at_100": 0.56
+    },
+    "horizon_42": {
+      "n": 117312,
+      "positives": 1165,
+      "base_rate": 0.0099,
+      "auc": 0.9797,
+      "pr_auc": 0.4052,
+      "precision_at_10": 0.9,
+      "precision_at_20": 0.6,
+      "precision_at_50": 0.76,
+      "precision_at_100": 0.84
+    }
+  },
+  "seconds": 1076.7
+}

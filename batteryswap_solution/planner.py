@@ -11,7 +11,12 @@ import pandas as pd
 from batteryswap_public.evaluate import check_plan_valid, evaluate_plan
 from batteryswap_public.interfaces import Planner
 
-from .costs import CostTables, build_expected_cost_tables, isolated_emergency_costs
+from .costs import (
+    CostTables,
+    build_expected_cost_tables,
+    isolated_emergency_costs,
+    select_candidates,
+)
 from .forecast import RiskForecaster, VoltageTrendForecaster, validate_forecast
 from .optimizer import OptimizationConfig, optimize_assignments, planned_swap_limit
 from .replay import ReplayContext, build_replay_context, replay_operational_cost
@@ -29,6 +34,9 @@ class PlannerConfig:
     uncertain_local_search_evaluations: int = 70
     robust_emergency_samples: int = 4
     random_seed: int = 20260818
+    emergency_rank_scale: float = 1.0
+    candidate_margin_hours: float = 24.0
+    max_candidates: int = 150
     optimizer: OptimizationConfig = field(default_factory=OptimizationConfig)
 
 
@@ -80,6 +88,26 @@ class CompetitionPlanner(Planner):
                 "battery": sorted(locations[id_column].astype(str)),
             }
         ).reset_index(drop=True)
+
+    @staticmethod
+    def _restore_excluded(
+        plan: pd.DataFrame, excluded: list[str], defer_day: pd.Timestamp
+    ) -> pd.DataFrame:
+        """Put the batteries the search never considered back, all deferred.
+
+        A plan must name every battery exactly once, and anything outside the
+        candidate set was excluded precisely because deferring dominates.
+        """
+        if not excluded:
+            return plan
+        tail = pd.DataFrame(
+            {
+                "day": pd.DatetimeIndex([pd.Timestamp(defer_day).normalize()] * len(excluded)),
+                "battery": sorted(str(value) for value in excluded),
+            }
+        )
+        combined = pd.concat([plan, tail], ignore_index=True)
+        return combined.sort_values("day", kind="stable").reset_index(drop=True)
 
     @staticmethod
     def _operational_score(
@@ -190,7 +218,7 @@ class CompetitionPlanner(Planner):
 
     def _local_search(
         self,
-        assignments: dict[str, pd.Timestamp | None],
+        seeds: list[dict[str, pd.Timestamp | None]],
         costs: CostTables,
         locations: pd.DataFrame,
         travel_costs: pd.DataFrame,
@@ -237,17 +265,27 @@ class CompetitionPlanner(Planner):
                 priority=priority,
             )
 
-        incumbent = build(assignments)
-        incumbent_score = self._expected_score(
-            incumbent,
-            costs,
-            due_samples,
-            locations,
-            travel_costs,
-            settings,
-            start,
-            replay_context,
-        )
+        # Start from whichever construction scores best. Measured on all 48
+        # train scenarios a CP-SAT seed and a per-battery-optimum seed converge
+        # to the same plan in every cost component, so this is insurance for an
+        # unfamiliar split rather than a source of gain today.
+        assignments = None
+        incumbent = None
+        incumbent_score = float("inf")
+        for seed in seeds:
+            candidate = build(seed)
+            score = self._expected_score(
+                candidate,
+                costs,
+                due_samples,
+                locations,
+                travel_costs,
+                settings,
+                start,
+                replay_context,
+            )
+            if score < incumbent_score:
+                assignments, incumbent, incumbent_score = dict(seed), candidate, score
         all_defer_assignments = {battery_id: None for battery_id in costs.battery_ids}
         all_defer = build(all_defer_assignments)
         all_defer_score = self._expected_score(
@@ -610,29 +648,58 @@ class CompetitionPlanner(Planner):
         try:
             dates, defer_day = self._planning_clock(start, settings)
             forecast = self._forecast(battery_data, locations, start, dates)
-            costs = build_expected_cost_tables(
+            full_costs = build_expected_cost_tables(
                 forecast,
                 locations,
                 settings,
                 dates,
                 late_risk_multiplier=self.config.late_risk_multiplier,
+                emergency_rank_scale=self.config.emergency_rank_scale,
             )
-            assignments = optimize_assignments(
-                costs,
-                locations,
-                travel_costs,
-                settings,
-                config=self.config.optimizer,
+            # Search only over batteries servicing could plausibly help. Every
+            # search evaluation is linear in the battery count, and roughly
+            # nine of some four hundred are ever due, so this is the difference
+            # between fitting the evaluation budget and not.
+            keep = select_candidates(
+                full_costs,
+                margin_hours=self.config.candidate_margin_hours,
+                max_candidates=self.config.max_candidates,
             )
+            costs = full_costs.take(keep)
+            candidate_ids = set(costs.battery_ids)
+            excluded = [
+                battery_id
+                for battery_id in full_costs.battery_ids
+                if battery_id not in candidate_ids
+            ]
+            id_column = "battery_id" if "battery_id" in locations else "battery"
+            candidate_locations = locations[
+                locations[id_column].astype(str).isin(candidate_ids)
+            ]
+
+            # Measured on all 48 train scenarios, seeding the search from the
+            # per-battery optimum instead of the CP-SAT assignment produces an
+            # identical plan in every component -- the local search dominates
+            # the construction. One seed it is.
+            seeds = [
+                optimize_assignments(
+                    costs,
+                    candidate_locations,
+                    travel_costs,
+                    settings,
+                    config=self.config.optimizer,
+                )
+            ]
             plan = self._local_search(
-                assignments,
+                seeds,
                 costs,
-                locations,
+                candidate_locations,
                 travel_costs,
                 settings,
                 start,
                 defer_day,
             )
+            plan = self._restore_excluded(plan, excluded, defer_day)
             check_plan_valid(plan, locations, start_time=start)
             fast_score = self._operational_score(
                 plan, locations, travel_costs, settings, start

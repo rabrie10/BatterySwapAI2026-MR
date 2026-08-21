@@ -19,6 +19,44 @@ class CostTables:
     event_pmf: np.ndarray
     horizon_event_probability: np.ndarray
 
+    def take(self, indices: np.ndarray) -> "CostTables":
+        indices = np.asarray(indices, dtype=int)
+        return CostTables(
+            battery_ids=tuple(self.battery_ids[index] for index in indices),
+            candidate_dates=self.candidate_dates,
+            service_cost=self.service_cost[indices],
+            defer_cost=self.defer_cost[indices],
+            event_pmf=self.event_pmf[indices],
+            horizon_event_probability=self.horizon_event_probability[indices],
+        )
+
+
+def select_candidates(
+    costs: CostTables,
+    *,
+    margin_hours: float = 24.0,
+    max_candidates: int = 150,
+) -> np.ndarray:
+    """Batteries the optimizer could plausibly want to service.
+
+    About 9.5 batteries per scenario actually reach EOL inside the window, out
+    of roughly 420 alive, yet every search evaluation used to walk the whole
+    fleet. Servicing helps only when the expected timing cost of a swap is not
+    far above the expected cost of deferring, so everything well below that line
+    can be deferred up front without changing the answer.
+
+    ``margin_hours`` is deliberately generous -- 24 hours of expected timing cost
+    is about 48 days of earliness -- so the reduction is a speedup rather than a
+    decision. Ties are broken by the size of the gain, and the cap bounds the
+    worst case on an unfamiliar split.
+    """
+    gain = costs.defer_cost - costs.service_cost.min(axis=1)
+    keep = np.flatnonzero(gain > -abs(float(margin_hours)))
+    if keep.size > max_candidates:
+        order = np.argsort(-gain[keep])[:max_candidates]
+        keep = np.sort(keep[order])
+    return keep
+
 
 def _setting(settings, name: str) -> float:
     return float(getattr(settings, name))
@@ -31,6 +69,7 @@ def build_expected_cost_tables(
     candidate_dates: pd.DatetimeIndex,
     *,
     late_risk_multiplier: float = 1.0,
+    emergency_rank_scale: float = 1.0,
 ) -> CostTables:
     """Compute expected score contributions for every battery/service date.
 
@@ -94,13 +133,20 @@ def build_expected_cost_tables(
     # Emergency visits occur in sorted battery-ID order, one per day. Under an
     # independent marginal approximation, expected rank is the sum of earlier
     # batteries' probabilities of being due within the horizon.
+    #
+    # That sum runs over every battery, but the queue only ever contains the
+    # ones the plan misses. Summed over the fleet it comes to about 6.4 on train
+    # against a realised 3.6 misses per scenario, so the raw rank inflates the
+    # cost of deferring -- by 10 hours per day of rank -- and quietly biases
+    # every decision towards servicing. The scale makes that assumption
+    # explicit and tunable.
     sorted_positions = np.argsort(np.asarray(battery_ids, dtype=str), kind="stable")
     expected_rank = np.zeros(len(battery_ids), dtype=float)
     cumulative = 0.0
     for position in sorted_positions:
         expected_rank[position] = cumulative
         cumulative += horizon_probability[position]
-    emergency_offsets = emergency_start_offset + expected_rank
+    emergency_offsets = emergency_start_offset + emergency_rank_scale * expected_rank
     late_days = np.maximum(emergency_offsets[:, None] - np.arange(len(dates))[None, :], 0.0)
     expected_emergency_lateness = np.sum(pmf * late_days, axis=1) * late
 

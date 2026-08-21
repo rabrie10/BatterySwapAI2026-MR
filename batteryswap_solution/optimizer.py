@@ -23,6 +23,13 @@ class OptimizationConfig:
     time_scale: int = 1000
     capacity_margin_hours: float = 0.05
     objective_roundtrip_fraction: float = 0.55
+    # A day's route is one tour from base and back, not one round trip per
+    # building, so charging every building a full round trip overstates how full
+    # a day is and pushes the model towards one building per day -- which costs
+    # more active days, more returns to base, and more of the evaluator's
+    # double-counted return travel.
+    capacity_roundtrip_fraction: float = 1.0
+    use_cp_sat: bool = True
     max_planned_rate: float | None = None
 
 
@@ -104,7 +111,7 @@ def optimize_assignments(
         locations, travel_costs, settings, costs.battery_ids
     )
     defer_cost = costs.defer_cost + costs.horizon_event_probability * emergency_operations
-    if cp_model is None:
+    if cp_model is None or not config.use_cp_sat:
         return _greedy_assign(
             costs, defer_cost, locations, travel_costs, settings, config
         )
@@ -189,6 +196,8 @@ def optimize_assignments(
     diagonal_units = round(float(travel.loc[(base, base)]) * time_scale)
     daily_work = []
     overtime = []
+    daily_breach: list = []
+    weekly_breach: list = []
     for day in range(day_count):
         work_terms = [
             battery_units * service[battery][day]
@@ -201,26 +210,40 @@ def optimize_assignments(
             if building == base:
                 continue
             roundtrip = float(travel.loc[(base, building)]) + float(travel.loc[(building, base)])
-            conservative_units = building_units + round(roundtrip * time_scale)
-            work_terms.append(conservative_units * building_active[(day, building)])
+            capacity_units = building_units + round(
+                config.capacity_roundtrip_fraction * roundtrip * time_scale
+            )
+            work_terms.append(capacity_units * building_active[(day, building)])
         work_terms.append(diagonal_units * day_active[day])
         work = model.new_int_var(0, 10**8, f"work_{day}")
         model.add(work == sum(work_terms))
         daily_work.append(work)
 
-        daily_limit = round(
-            (float(settings.worker_limit_daily_hours) - config.capacity_margin_hours) * time_scale
-        )
-        model.add(work <= daily_limit)
-        overtime_var = model.new_int_var(0, daily_limit, f"overtime_{day}")
+        # The evaluator does not forbid a long day or a long week -- it charges a
+        # flat penalty for one. Modelling either as a hard constraint makes the
+        # optimizer defer a due battery, and a deferred due battery costs
+        # 10 per day of lateness from day 48 onwards plus a dedicated emergency
+        # trip: 200 to 400, against a penalty of 100. Both limits are therefore
+        # priced in the objective, with a loose hard bound kept only to stop the
+        # solver exploring physically absurd days.
+        daily_limit = round(float(settings.worker_limit_daily_hours) * time_scale)
+        model.add(work <= 2 * daily_limit)
+        over_daily = model.new_bool_var(f"over_daily_{day}")
+        model.add(work >= daily_limit + 1).only_enforce_if(over_daily)
+        model.add(work <= daily_limit).only_enforce_if(over_daily.negated())
+        daily_breach.append(over_daily)
+        overtime_var = model.new_int_var(0, 2 * daily_limit, f"overtime_{day}")
         model.add(overtime_var >= work - round(float(settings.overtime_start) * time_scale))
         overtime.append(overtime_var)
 
-    weekly_limit = round(
-        (float(settings.worker_limit_weekly_hours) - config.capacity_margin_hours) * time_scale
-    )
+    # The weekly penalty fires at >= the limit, not above it.
+    weekly_limit = round(float(settings.worker_limit_weekly_hours) * time_scale)
     for first_day in range(0, day_count, 7):
-        model.add(sum(daily_work[first_day : first_day + 7]) <= weekly_limit)
+        week_total = sum(daily_work[first_day : first_day + 7])
+        over_weekly = model.new_bool_var(f"over_weekly_{first_day}")
+        model.add(week_total >= weekly_limit).only_enforce_if(over_weekly)
+        model.add(week_total <= weekly_limit - 1).only_enforce_if(over_weekly.negated())
+        weekly_breach.append(over_weekly)
 
     objective: list = []
     cost_scale = int(config.cost_scale)
@@ -249,6 +272,11 @@ def optimize_assignments(
             round(float(settings.overtime_penalty_factor) * cost_scale / time_scale)
             * overtime[day]
         )
+
+    daily_penalty = round(float(settings.worker_limit_daily_penalty) * cost_scale)
+    weekly_penalty = round(float(settings.worker_limit_weekly_penalty) * cost_scale)
+    objective.extend(daily_penalty * breach for breach in daily_breach)
+    objective.extend(weekly_penalty * breach for breach in weekly_breach)
     model.minimize(sum(objective))
 
     solver = cp_model.CpSolver()

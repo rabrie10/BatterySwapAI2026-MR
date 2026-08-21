@@ -17,10 +17,12 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy everything script.py needs at runtime.
-# src/ must be present so unpickling models/risk_forecaster.pkl succeeds:
-# pickle resolves the artifact's class as src.risk.model.Task1Forecaster,
-# which requires src/ to be importable, not just batteryswap_solution/.
+# bsai/ must be present before models/v6_hazard.joblib can be loaded: joblib
+# resolves the artifact's class as bsai.hazard.HazardModel, and the feature
+# module it references has to import cleanly too. src/ is kept for the frozen
+# v4 control artifact, which unpickles as src.risk.model.Task1Forecaster.
 COPY batteryswap_solution/ ./batteryswap_solution
+COPY bsai/ ./bsai
 COPY src/ ./src
 COPY models/ ./models
 COPY script.py ./

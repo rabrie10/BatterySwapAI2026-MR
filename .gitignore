@@ -10,3 +10,6 @@ venv/
 __pycache__/
 .claude/
 .claude//de/
+outputs/v6_folds.joblib
+outputs/v6_*.json
+outputs/v5match.json
