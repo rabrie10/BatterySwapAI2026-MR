@@ -1,12 +1,8 @@
 # Submission will be executed with this image.
 # Adapted from the official BatterySwapAI2026-Example Dockerfile for this
-# repo's layout: Task 2 lives in batteryswap_solution/, Task 1 in src/risk/,
-# and the fitted forecaster artifact in models/.
+# repo's layout: Task 1 lives in bsai/, Task 2 in batteryswap_solution/, and
+# the fitted forecaster artifact in models/.
 FROM huggingface/competitions:latest
-
-# Default to running on train split only for local testing; the real
-# evaluation run overrides this (BATTERYSWAP_SPLITS=public,private).
-ENV BATTERYSWAP_SPLITS=train
 
 WORKDIR /app
 
@@ -26,6 +22,13 @@ COPY bsai/ ./bsai
 COPY src/ ./src
 COPY models/ ./models
 COPY script.py ./
+
+# No BATTERYSWAP_SPLITS default is baked in here. script.py's own fallback is
+# public,private, matching the official run -- and matching the official
+# checklist's own docker run command, which passes no override at all. Baking
+# train in as an image-level default meant that exact command would have
+# silently produced a train-only submission. Pass -e BATTERYSWAP_SPLITS=train
+# explicitly when testing locally against the train-only dataset checkout.
 
 # Default to making submissions.
 CMD ["python3", "script.py"]
