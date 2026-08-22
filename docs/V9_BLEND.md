@@ -216,6 +216,13 @@ improve** -- the first configuration in this project to do that -- and because t
 mechanism is not a knob: more labelled thresholds on 82 events is more
 information, not a tuned parameter.
 
+**Ten is the plateau, not a slope.** Sweeping the density further, two seeds each
+and averaging, at fifteen swaps: ten horizons 1418, sixteen 1428, the model's own
+twenty-four 1435. At eighteen swaps sixteen is best at 1435 against 1494. Every
+difference is inside the 30-45 spread between seeds of the *same* grid. The
+7 -> 10 step was worth about 90 on the same measure, so it was real; 10 -> 16 -> 24
+is not. **This lever is spent.**
+
 Cost-sensitive training was tried alongside it and is not worth shipping.
 Weighting each row by what getting it wrong actually costs -- an emergency visit
 for a false negative, the earliness of a swap that runs to the substitute end of

@@ -132,6 +132,7 @@ Do not repeat these. Every one was validated out-of-fold and rejected.
 | **Shrinking the local search** to buy deadline headroom | At `uncertain_local_search_evaluations = 20`, `repair_reserve` is floored at 20 so `general_budget` becomes **zero**: no general move runs, the plan stays at the raw CP-SAT seed and the repair loop grinds. 1827.85 at 16.56 s per scenario against 1806.71 at 12.78. Worse *and* slower. |
 | **A dedicated prune pass**, a separate budget for dropping the weakest swaps | −7.07, sem 11.3, 5/48 wins, and it removes almost nothing. **With move order (−15) and the x11 budget (−72, far too slow), that is three independent attacks on the planner. It is not where the remaining points are.** |
 | **Cost-sensitive head training**, weighting rows by what the error really costs | Mixed sign, inside noise. |
+| **Horizon-grid density past ten thresholds** | Swept at 10 / 16 / 24, two seeds each. At fifteen swaps: 1418 / 1428 / 1435; at eighteen: 1494 / 1435 / 1477. Every difference is inside the 30-45 spread between seeds of the same grid. The 7 -> 10 step was worth about 90 and was real; **this lever is now spent.** |
 | **A head on the strided grid** (88,013 cutoffs against 19,890) | Worse at every swap count. Same 82 dying devices; the population mismatch costs more than the volume buys. |
 
 The peer-contrast failure is worth understanding, because the prior evidence was
@@ -241,14 +242,11 @@ problem nothing else moves the score.
    19,890 rows, the strided grid has 88,013 cutoffs of the same devices.
 2. **Peer contrast, done properly.** See section 4. Still the only measured
    source of *between-device* information in the project.
-3. **Horizon-grid density, further.** Going from seven thresholds to ten was worth
-   −53. Whether fifteen or twenty keeps paying is untested, and it is free at
-   inference. This is the cheapest untried lever in the project.
-4. **A tail-weighted survival loss.** The censored labels carry 15,581 events
+3. **A tail-weighted survival loss.** The censored labels carry 15,581 events
    against the binary label's 862, and `E[log T]` is measurably the wrong thing
    to do with them -- see section 4. Whether a loss aimed at the 42-day region
    can extract them instead is untested.
-5. **Season as the calibration axis** instead of remaining observation.
+4. **Season as the calibration axis** instead of remaining observation.
 
 The emergency-queue rank defect recorded in `V8_HYPOTHESIS_TESTS.md` section 1b is
 now **closed without being built.** Re-running the belief decomposition on V9
