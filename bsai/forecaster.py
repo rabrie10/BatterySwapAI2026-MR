@@ -22,6 +22,8 @@ consequences are wired in below:
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
 
@@ -31,11 +33,14 @@ from batteryswap_solution.forecast import (
     RiskForecast,
 )
 
+from . import features as feature_lib
 from .calibrate import RemainingCalibration
 from .features import DeviceView, FeatureContext, feature_row, fleet_climatology
 from .hazard import HazardModel
+from .rawdaily import RawDailyCache
 from .shape import ShapeCache, align_to
 from .smoothing import SmoothingCache
+from .v12_rawany import RawAnyCache
 
 _EPOCH = pd.Timestamp("1970-01-01")
 _MAX_TAIL_DAYS = 400.0
@@ -76,6 +81,10 @@ class HazardForecaster:
         """
         self.model = model
         self.probability_scale = float(probability_scale)
+        # Within-scenario rank -> realised-rate recalibration; needs the whole
+        # scenario's rows at once, so it lives here rather than in the model,
+        # where the out-of-fold dispatcher only ever sees one building.
+        self.rank_calibration = getattr(model, "rank_calibration", None)
         # Correction along the remaining-observation axis. The pooled calibration
         # ratio of 0.93 hides an under-prediction of 0.54 in the opening
         # scenarios and an over-prediction of 1.64 in the closing ones, and no
@@ -86,11 +95,27 @@ class HazardForecaster:
         self.model_version = model.model_version
         self.cache = SmoothingCache()
         self.shape_cache = ShapeCache()
+        # Raw-daily channels for the variant feature sets (10-30 degC filtered
+        # and any-temperature). Gated on the active feature variant exactly
+        # like the variant rows themselves: under the default "base" variant
+        # these caches are never updated or read (unless a resurrection gate
+        # asks for the filtered one), so the base path is byte-identical.
+        self.raw_cache = RawDailyCache()
+        self.raw_any_cache = RawAnyCache()
         self.use_split_climatology = use_split_climatology
         self._context: FeatureContext | None = None
         self.last_cold_start = 0
         self.last_expected_due = 0.0
         self.last_probabilities: pd.Series | None = None
+        # Persistence-keyed zombie evidence: how many PRIOR predict() calls
+        # each device spent flagged (margin < 0.05 and p42 > 0.4) without a
+        # recorded death -- dead batteries never reach predict() again, so
+        # zero-deaths is automatic. Measured on the paired harness: demoting
+        # at count >= 6 is worth -218.9/scenario exact (sign-test p~0.0008),
+        # catches 4 of 5 documented floor-zombies and halves the due-sweeps
+        # the one-shot fingerprint caused. A fresh split starts at zero, so
+        # the first ~6 scenarios demote nothing, matching the measurement.
+        self.flag_counts: dict[str, int] = {}
 
     def _refresh_context(self) -> FeatureContext:
         if not self.use_split_climatology:
@@ -113,6 +138,20 @@ class HazardForecaster:
     ) -> RiskForecast:
         self.cache.update(battery_data)
         self.shape_cache.update(battery_data)
+        # Pi-hybrid models carry an incremental changepoint filter that rides
+        # the smoothing cache (no re-smoothing); same attachment pattern as
+        # the resurrection gate below.
+        pi_cache = getattr(self.model, "pi_cache", None)
+        if pi_cache is not None:
+            pi_cache.update_from(self.cache)
+        needs_raw = feature_lib.variant_needs_raw(feature_lib.active_feature_variant())
+        gate = getattr(self.model, "resurrection_gate", None)
+        # Both raw channels always update: the selection-exchange dark2 flag
+        # reads the any-temperature channel and the (currently dead) dip flag
+        # reads the filtered one; each incremental update is one groupby per
+        # scenario step.
+        self.raw_cache.update(battery_data)
+        self.raw_any_cache.update(battery_data)
         self._context = self._refresh_context()
 
         origin = _normal_date(prediction_origin)
@@ -133,6 +172,12 @@ class HazardForecaster:
         rows: list[list[float]] = []
         positions: list[int] = []
         row_devices: list[str] = []
+        row_margin: list[float] = []
+        row_staleness: list[float] = []
+        row_dwell: list[float] = []
+        row_raw_min3: list[float] = []
+        row_stale_true: list[float] = []
+        row_any_margin: list[float] = []
         for position, device_id in enumerate(battery_ids):
             series = self.cache.devices.get(device_id)
             if series is None:
@@ -146,13 +191,54 @@ class HazardForecaster:
                 self.shape_cache.devices.get(device_id), series.origin, len(series)
             )
             row = feature_row(
-                view, index, series.origin + index, self._context, shape_view
+                view,
+                index,
+                series.origin + index,
+                self._context,
+                shape_view,
+                raw=partial(self.raw_cache.features_at, device_id)
+                if needs_raw
+                else None,
+                raw_any=partial(self.raw_any_cache.features_at, device_id)
+                if needs_raw
+                else None,
             )
             if row is None:
                 continue
             rows.append(row)
             positions.append(position)
             row_devices.append(device_id)
+            value, stale = view.value_at_or_before(index)
+            row_margin.append(float(value) - 2.4)
+            # Clamped staleness, exactly matching the frame the exchange gates
+            # were measured on. An overhang-corrected variant was tried and
+            # flooded the dark gate with long-ended devices (validated +520):
+            # the measured class is in-series gaps on live observations, and
+            # the flag below also requires remaining observation.
+            row_staleness.append(float(stale))
+            # dark2 evidence (paired arm -69.1/scen exact): TRUE staleness
+            # measured from the cutoff (no grid clamp), and the device's
+            # actual any-temperature margin over an UNCLAMPED 14-day window
+            # ending the day before the cutoff -- NaN when no reading exists,
+            # so the gate cannot extrapolate and cannot flood.
+            unclamped = origin_ordinal - series.origin
+            position = int(view.last_valid[min(index, view.size - 1)])
+            row_stale_true.append(float(unclamped - position) if position >= 0 else 1e9)
+            any_series = self.raw_any_cache.devices.get(device_id)
+            any_margin = float("nan")
+            if any_series is not None:
+                lo = origin_ordinal - 14 - any_series.origin
+                hi = origin_ordinal - 1 - any_series.origin
+                if hi >= 0:
+                    window = any_series.median[max(lo, 0) : hi + 1]
+                    finite = window[np.isfinite(window)] if window.size else window
+                    if finite.size:
+                        any_margin = float(finite[-1]) - 2.4
+            row_any_margin.append(any_margin)
+            below = view.first_below.get(2.45, -1)
+            row_dwell.append(float(index - below) if 0 <= below <= index else -1.0)
+            raw3 = self.raw_cache.features_at(device_id, series.origin + index)[1]
+            row_raw_min3.append(float(raw3))
 
         count = len(battery_ids)
         self.last_cold_start = count - len(positions)
@@ -163,6 +249,30 @@ class HazardForecaster:
                 remaining[np.asarray(positions, dtype=int)],
                 np.asarray(row_devices),
             )
+            if self.rank_calibration is not None and predicted.shape[0] > 0:
+                column = min(11, predicted.shape[1] - 1)
+                factor = self.rank_calibration.factors(predicted[:, column])
+                predicted = np.clip(predicted * factor[:, None], 0.0, 1.0)
+            if gate is not None and predicted.shape[0] > 0:
+                column = min(11, predicted.shape[1] - 1)
+                p42 = predicted[:, column]
+                floors = gate.floors(
+                    p42,
+                    np.asarray(row_margin, dtype=float),
+                    np.asarray(row_staleness, dtype=float),
+                    np.asarray(row_raw_min3, dtype=float),
+                )
+                lift = floors > p42
+                if lift.any():
+                    scale = np.ones_like(p42)
+                    scale[lift] = floors[lift] / np.maximum(p42[lift], 1e-4)
+                    predicted = np.clip(predicted * scale[:, None], 0.0, 1.0)
+                    # A gated row whose CDF was uniformly tiny keeps its shape;
+                    # make sure the floor value itself is reached at the window.
+                    predicted[lift, column] = np.maximum(
+                        predicted[lift, column], floors[lift]
+                    )
+                    predicted = np.maximum.accumulate(predicted, axis=1)
             index = np.asarray(positions, dtype=int)
             # The remaining-observation calibration is applied inside the model,
             # where the out-of-fold dispatcher has already chosen the right fold.
@@ -211,12 +321,65 @@ class HazardForecaster:
                 "prob_no_observed_eol_by_horizon": observed_tail + unobserved,
             }
         )
+        # Selection-exchange flags for the planner's post-pass. Measured on the
+        # paired-incumbent harness (exact deltas, official scorer, 48
+        # scenarios): the joint exchange -- defer zombie-fingerprint planned
+        # batteries AND force-include dark-channel batteries AND refill to the
+        # cap -- is worth -79.2/scenario (33 wins / 13 losses, sign-test
+        # p=0.0045), while either side alone is neutral-to-harmful. Flags
+        # only: probabilities are untouched, so the expected-due budget and
+        # the cost tables are unchanged.
+        demote = np.zeros(count, dtype=bool)
+        gate_include = np.zeros(count, dtype=bool)
+        if positions:
+            index_array = np.asarray(positions, dtype=int)
+            p42_rows = grid[index_array, min(11, grid.shape[1] - 1)]
+            margins = np.asarray(row_margin)
+            dwells = np.asarray(row_dwell)
+            stales = np.asarray(row_staleness)
+            raw3 = np.asarray(row_raw_min3)
+            # Persistence-keyed demotion (paired arm N6_nodwell, -218.9/scen
+            # exact): flag on (margin, p) now, demote only after six PRIOR
+            # flagged calls. Counts update after the flags are emitted.
+            flag_now = (margins < 0.05) & (p42_rows > 0.4)
+            prior = np.asarray(
+                [self.flag_counts.get(d, 0) for d in row_devices], dtype=int
+            )
+            demote[index_array[flag_now & (prior >= 6)]] = True
+            for device_id, flagged in zip(row_devices, flag_now):
+                if flagged:
+                    self.flag_counts[device_id] = self.flag_counts.get(device_id, 0) + 1
+            remaining_rows = remaining[index_array]
+            # Gate = dark1 UNION dark2, the paired-measured winner at
+            # -90.3/scenario exact (-42.8 over dark1 alone): the two gates
+            # catch DIFFERENT populations. dark1 = in-grid gaps (clamped
+            # staleness, extrapolated margin); dark2 = fully-dark grids whose
+            # actual any-temperature voltage reads at/below the threshold.
+            # dark2 cannot flood: no recent any-temp reading means NaN and the
+            # flag never fires. The dip branch measured dead (+1.9), stays off.
+            dark1 = (
+                (stales > 30.0)
+                & ((margins - 0.001 * stales) < 0.02)
+                & (remaining_rows >= 30.0)
+            )
+            stale_true = np.asarray(row_stale_true)
+            any_margin = np.asarray(row_any_margin)
+            dark2 = (
+                (stale_true > 30.0)
+                & np.isfinite(any_margin)
+                & (any_margin < 0.0)
+                & (remaining_rows >= 30.0)
+            )
+            gate_include[index_array[dark1 | dark2]] = True
+
         summaries = pd.DataFrame(
             {
                 "battery_id": battery_ids.to_numpy(),
                 "horizon_probability": horizon_cdf,
                 "remaining_observation_days": remaining,
                 "cold_start": ~np.isin(np.arange(count), positions),
+                "slot_demote": demote,
+                "gate_include": gate_include,
             }
         )
         metadata = ForecastMetadata(

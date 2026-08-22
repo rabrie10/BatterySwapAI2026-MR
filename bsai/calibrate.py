@@ -113,13 +113,22 @@ class RemainingCalibration:
         remaining = np.asarray(remaining, dtype=float)
         predicted = np.asarray(predicted, dtype=float)
         actual = np.asarray(actual, dtype=float)
+        pooled = float(actual.sum()) / max(float(predicted.sum()), 1e-9)
         factors: list[float] = []
         for low, high in zip(edges[:-1], edges[1:]):
             inside = (remaining >= low) & (remaining < high)
             mass = float(predicted[inside].sum())
             events = float(actual[inside].sum())
-            if inside.sum() == 0 or mass <= 1e-9 or events < min_events:
+            if inside.sum() == 0 or mass <= 1e-9:
                 factors.append(1.0)
+                continue
+            if events < min_events:
+                # A thin bucket used to fall back to 1.0, which left the
+                # shortest-remaining bucket uncorrected in 3 of 5 folds and the
+                # closing-block expected-due count running 2.09x hot. Shrink
+                # toward the pooled ratio instead of toward no-correction.
+                shrunk = (events + 10.0 * pooled) / (mass + 10.0)
+                factors.append(float(np.clip(shrunk, MIN_FACTOR, MAX_FACTOR)))
                 continue
             factors.append(float(np.clip(events / mass, MIN_FACTOR, MAX_FACTOR)))
         return cls(edges=tuple(edges), factors=tuple(factors))
@@ -132,6 +141,204 @@ class RemainingCalibration:
             span = f"{low:>6.0f}-{high:>6.0f}" if high < 1e8 else f"{low:>6.0f}+     "
             lines.append(f"  remaining {span} d   x{factor:.3f}")
         return "\n".join(lines)
+
+
+@dataclass
+class ResurrectionGate:
+    """Rescue batteries the smoothed channel has gone dark on.
+
+    The official smoothing only accepts readings between 10 and 30 degC, so a
+    cold room silences a device for weeks: its features freeze, its predicted
+    probability collapses toward zero, and it fails unseen -- 28% of the
+    mid-year missed dues sit on exactly this dead channel. Measured on the
+    out-of-fold frame, two plan-time-computable gates identify them:
+
+    * dark-decay: staleness > 30 d and (margin - 0.001 x staleness) < 0.02
+      -- 60 rows realising 0.567;
+    * raw-dip: raw 3-day minimum below 2.40 V while the smoothed margin still
+      reads above 0.03 and p < 0.1 -- 27 rows realising 0.519.
+
+    Union: 82 rows realising 0.524, carrying 0.90 currently-missed dues per
+    scenario at median p 0.005. The override floors the gated rows' whole CDF
+    at the class rate (fitted out-of-fold, shrunk), which clears every
+    break-even decisively -- unlike the knee floor's marginal 0.1-0.27 rates,
+    which only churned selection.
+    """
+
+    stale_min: float = 30.0
+    mext_max: float = 0.02
+    raw_dip: float = 2.40
+    dip_margin_min: float = 0.03
+    dip_p_max: float = 0.10
+    rate_dark: float = 0.45
+    rate_dip: float = 0.40
+    max_per_scenario: int = 3
+
+    def floors(
+        self,
+        probability: np.ndarray,
+        margin: np.ndarray,
+        staleness: np.ndarray,
+        raw_min3: np.ndarray,
+    ) -> np.ndarray:
+        probability = np.asarray(probability, dtype=float)
+        margin = np.asarray(margin, dtype=float)
+        staleness = np.asarray(staleness, dtype=float)
+        raw_min3 = np.asarray(raw_min3, dtype=float)
+
+        dark = (staleness > self.stale_min) & (
+            (margin - 0.001 * staleness) < self.mext_max
+        )
+        dip = (
+            np.isfinite(raw_min3)
+            & (raw_min3 < self.raw_dip)
+            & (margin > self.dip_margin_min)
+            & (probability < self.dip_p_max)
+        )
+        floor = np.where(dark, self.rate_dark, 0.0)
+        floor = np.maximum(floor, np.where(dip, self.rate_dip, 0.0))
+        gated = floor > probability
+        if gated.sum() > self.max_per_scenario:
+            # Keep the strongest evidence: deepest staleness-adjusted deficit.
+            deficit = np.where(gated, floor - probability, -np.inf)
+            keep = np.argsort(-deficit)[: self.max_per_scenario]
+            mask = np.zeros_like(gated)
+            mask[keep] = True
+            floor = np.where(mask, floor, 0.0)
+        return floor
+
+    @classmethod
+    def fit(
+        cls,
+        scenario: np.ndarray,
+        probability: np.ndarray,
+        margin: np.ndarray,
+        staleness: np.ndarray,
+        raw_min3: np.ndarray,
+        due: np.ndarray,
+        *,
+        shrink: float = 15.0,
+        prior: float = 0.25,
+        min_events: int = 8,
+    ) -> "ResurrectionGate":
+        """Class rates from realised frequencies, shrunk toward a low prior."""
+        template = cls()
+        probability = np.asarray(probability, dtype=float)
+        margin = np.asarray(margin, dtype=float)
+        staleness = np.asarray(staleness, dtype=float)
+        raw_min3 = np.asarray(raw_min3, dtype=float)
+        due = np.asarray(due, dtype=float)
+
+        dark = (staleness > template.stale_min) & (
+            (margin - 0.001 * staleness) < template.mext_max
+        )
+        dip = (
+            np.isfinite(raw_min3)
+            & (raw_min3 < template.raw_dip)
+            & (margin > template.dip_margin_min)
+            & (probability < template.dip_p_max)
+        )
+
+        def shrunk_rate(mask: np.ndarray) -> float:
+            n = float(mask.sum())
+            events = float(due[mask].sum())
+            if events < min_events:
+                return 0.0  # not enough evidence: gate disabled
+            return float((events + shrink * prior) / (n + shrink))
+
+        return cls(rate_dark=shrunk_rate(dark), rate_dip=shrunk_rate(dip))
+
+    def describe(self) -> str:
+        return (
+            f"dark(stale>{self.stale_min:.0f}, mext<{self.mext_max}) -> {self.rate_dark:.3f}; "
+            f"dip(raw3<{self.raw_dip}, margin>{self.dip_margin_min}, p<{self.dip_p_max}) "
+            f"-> {self.rate_dip:.3f}; max {self.max_per_scenario}/scenario"
+        )
+
+
+@dataclass
+class RankCalibration:
+    """Map within-scenario probability rank to the realised due rate.
+
+    Measured on the public split, the model's absolute probability level
+    inflates on unseen buildings (production expected-due 8.45/scenario on its
+    own buildings, at least 11.4 deduced on public against a realised ~9.5),
+    which silently defeated a level-based swap budget. The within-scenario
+    RANKING is far more stable across buildings than the level, so the level
+    is re-derived from the rank: battery at rank r gets the out-of-fold
+    realised due rate at rank r, applied as a per-row rescale of its whole
+    horizon grid. Rates are monotone in rank by isotonic fit, so ordering is
+    preserved; the factor is clipped so extreme rows keep some of their own
+    level information.
+    """
+
+    # rates[r-1] = realised P(due in window) at within-scenario rank r.
+    rates: tuple[float, ...] = ()
+    tail_rate: float = 0.004
+    min_factor: float = 0.1
+    max_factor: float = 5.0
+
+    def rate_for_rank(self, ranks: np.ndarray) -> np.ndarray:
+        ranks = np.asarray(ranks, dtype=int)
+        table = np.asarray(self.rates, dtype=float)
+        out = np.full(ranks.shape, self.tail_rate, dtype=float)
+        inside = (ranks >= 1) & (ranks <= table.size)
+        out[inside] = table[ranks[inside] - 1]
+        return out
+
+    def factors(self, probability: np.ndarray) -> np.ndarray:
+        """Per-row factor for one scenario's batteries, ranked by probability."""
+        probability = np.asarray(probability, dtype=float)
+        order = np.argsort(-probability, kind="stable")
+        ranks = np.empty(probability.size, dtype=int)
+        ranks[order] = np.arange(1, probability.size + 1)
+        target = self.rate_for_rank(ranks)
+        factor = target / np.maximum(probability, 1e-4)
+        return np.clip(factor, self.min_factor, self.max_factor)
+
+    @classmethod
+    def fit(
+        cls,
+        scenario: np.ndarray,
+        predicted: np.ndarray,
+        actual: np.ndarray,
+        *,
+        max_rank: int = 60,
+        tail_rate: float | None = None,
+    ) -> "RankCalibration":
+        from sklearn.isotonic import IsotonicRegression
+
+        scenario = np.asarray(scenario)
+        predicted = np.asarray(predicted, dtype=float)
+        actual = np.asarray(actual, dtype=float)
+        ranks: list[int] = []
+        outcomes: list[float] = []
+        tail_mass = 0.0
+        tail_n = 0
+        for value in np.unique(scenario):
+            inside = scenario == value
+            p = predicted[inside]
+            y = actual[inside]
+            order = np.argsort(-p, kind="stable")
+            for position, row in enumerate(order, start=1):
+                if position <= max_rank:
+                    ranks.append(position)
+                    outcomes.append(float(y[row]))
+                else:
+                    tail_mass += float(y[row])
+                    tail_n += 1
+        iso = IsotonicRegression(y_min=0.0, y_max=1.0, increasing=False, out_of_bounds="clip")
+        iso.fit(np.asarray(ranks, dtype=float), np.asarray(outcomes, dtype=float))
+        rates = tuple(float(v) for v in iso.predict(np.arange(1, max_rank + 1, dtype=float)))
+        fitted_tail = tail_mass / tail_n if tail_n else 0.004
+        return cls(rates=rates, tail_rate=float(tail_rate if tail_rate is not None else fitted_tail))
+
+    def describe(self) -> str:
+        probes = (1, 3, 5, 8, 12, 16, 20, 30, 45, 60)
+        pairs = "  ".join(
+            f"r{p}:{self.rates[p-1]:.3f}" for p in probes if p <= len(self.rates)
+        )
+        return f"rank->rate {pairs}  tail:{self.tail_rate:.4f}"
 
 
 @dataclass
@@ -157,6 +364,13 @@ class DwellAdjust:
     factors: tuple[float, ...] = (1.0, 1.0, 1.0, 1.0)
     min_factor: float = 0.1
     max_factor: float = 2.5
+    # Apply only where the remaining observation window is at least this long.
+    # Ungated, the knockdown measured worse through the planner: in mid and
+    # closing scenarios the demoted cells' budget slots refill with worse
+    # candidates. Gated long-remaining, it acts where the measured effect
+    # lives (opening-block top-5 realised rate 0.51 -> 0.69 under dwell
+    # reordering) and where a wasted swap costs ~170 against ~25 elsewhere.
+    min_remaining: float | None = None
 
     def factor_for(self, margin: np.ndarray, dwell: np.ndarray) -> np.ndarray:
         margin = np.asarray(margin, dtype=float)
@@ -170,11 +384,20 @@ class DwellAdjust:
         factors = np.asarray(self.factors, dtype=float)[band]
         return np.where(inside, factors, 1.0)
 
-    def apply(self, grid: np.ndarray, margin: np.ndarray, dwell: np.ndarray) -> np.ndarray:
+    def apply(
+        self,
+        grid: np.ndarray,
+        margin: np.ndarray,
+        dwell: np.ndarray,
+        remaining: np.ndarray | None = None,
+    ) -> np.ndarray:
         if grid.shape[0] == 0:
             return grid
-        factor = self.factor_for(margin, dwell)[:, None]
-        return np.clip(grid * factor, 0.0, 1.0)
+        factor = self.factor_for(margin, dwell)
+        gate = getattr(self, "min_remaining", None)
+        if gate is not None and remaining is not None:
+            factor = np.where(np.asarray(remaining, dtype=float) >= float(gate), factor, 1.0)
+        return np.clip(grid * factor[:, None], 0.0, 1.0)
 
     @classmethod
     def fit(

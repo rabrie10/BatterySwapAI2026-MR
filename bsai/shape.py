@@ -216,6 +216,26 @@ class ShapeView:
             return float("nan")
         return float(self._sums[name][high] - self._sums[name][low]) / count
 
+    def prefix_median_iqr(
+        self, name: str, index: int, min_count: int = 30
+    ) -> tuple[float, float]:
+        """Median and IQR of the daily values from the start through ``index``.
+
+        A causal prefix statistic: at cutoff ``index`` it sees only days at or
+        before the cutoff, so the same call means the same thing in training
+        and at deployment. Used by the invariant feature variant to express a
+        device's within-day sensitivity in units of its *own* history instead
+        of the building-bound absolute scale.
+        """
+        if index < 0:
+            return float("nan"), float("nan")
+        values = getattr(self, name)[: min(index, self.size - 1) + 1]
+        finite = values[np.isfinite(values)]
+        if finite.size < min_count:
+            return float("nan"), float("nan")
+        q25, q50, q75 = np.percentile(finite, [25.0, 50.0, 75.0])
+        return float(q50), float(q75 - q25)
+
 
 def align_to(shape: DeviceShape | None, grid_origin: int, size: int) -> ShapeView:
     """Build a view whose index 0 is ``grid_origin``, matching DeviceSeries."""
