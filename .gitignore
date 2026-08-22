@@ -23,3 +23,13 @@ outputs/v9_*.npz
 outputs/v9_*.csv
 outputs/v9_*.json
 outputs/v8_*.json
+
+# Reproducible experiment artifacts for the final-J2W branch. The JSON
+# summaries the docs cite are kept; the fold bundles, caches, raw logs and
+# per-swap dumps are all regenerable and none is needed at submission time.
+outputs/*.joblib
+outputs/*.npz
+outputs/*.log
+outputs/fj_*_served.json
+outputs/fj_lab_c*.json
+outputs/fj_candA_smoke.json
