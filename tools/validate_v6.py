@@ -124,6 +124,9 @@ def main() -> None:
     parser.add_argument("--no-emergency-ops", action="store_true",
                         help="price deferral on lateness alone, as the V5 prototype did")
     parser.add_argument("--capacity-roundtrip", type=float, default=1.0)
+    parser.add_argument("--max-daily-factor", type=float, default=2.0,
+                        help="hard bound on one day's work, as a multiple of the "
+                             "24-hour daily limit; 1.0 forbids two far round trips")
     parser.add_argument("--greedy", action="store_true", help="skip CP-SAT")
     parser.add_argument(
         "--audit",
@@ -160,6 +163,7 @@ def main() -> None:
                 optimizer=OptimizationConfig(
                     solver_seconds=args.solver_seconds,
                     capacity_roundtrip_fraction=args.capacity_roundtrip,
+                    max_daily_hours_factor=args.max_daily_factor,
                     max_planned_rate=args.max_planned_rate,
                     use_cp_sat=not args.greedy,
                 ),

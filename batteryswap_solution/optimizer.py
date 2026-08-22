@@ -29,6 +29,13 @@ class OptimizationConfig:
     # more active days, more returns to base, and more of the evaluator's
     # double-counted return travel.
     capacity_roundtrip_fraction: float = 1.0
+    # Multiple of the daily limit allowed as a hard bound on one day's work.
+    # At 2.0 the solver may put two 20.5-hour round trips on one day -- 41 hours,
+    # a guaranteed 100 and about 66 of overtime -- where splitting them costs two
+    # days at 22.5 hours and no daily penalty at all. Three of the 48 train
+    # scenarios put the base in a building that is 10.25 hours from everything,
+    # and they cost 3722.7 against a 2040.0 average, with 5.7 breaching days each.
+    max_daily_hours_factor: float = 2.0
     use_cp_sat: bool = True
     max_planned_rate: float | None = None
 
@@ -227,7 +234,9 @@ def optimize_assignments(
         # priced in the objective, with a loose hard bound kept only to stop the
         # solver exploring physically absurd days.
         daily_limit = round(float(settings.worker_limit_daily_hours) * time_scale)
-        model.add(work <= 2 * daily_limit)
+        model.add(
+            work <= round(float(config.max_daily_hours_factor) * daily_limit)
+        )
         over_daily = model.new_bool_var(f"over_daily_{day}")
         model.add(work >= daily_limit + 1).only_enforce_if(over_daily)
         model.add(work <= daily_limit).only_enforce_if(over_daily.negated())

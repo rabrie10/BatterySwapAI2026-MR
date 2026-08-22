@@ -2,32 +2,44 @@
 
 Out of fold by building over all 48 train scenarios:
 
-| configuration | local | delta |
-|---|---:|---:|
-| V8 phase 1 (`de261f5`) | 2145.16 | — |
-| **V9 blend, shipped config** | **1923.96** | **−221.20** |
+| configuration | local | delta | t | wins |
+|---|---:|---:|---:|---:|
+| V8 phase 1 (`de261f5`) | 2145.16 | — | | |
+| V9 blend, single-horizon head | 1923.96 | −221.20 | 3.82 | 36/48 |
+| **V9 blend, multi-horizon bagged head** | **1855.28** | **−289.88** | **4.27** | **34/48** |
 
-Paired over the same 48 scenarios: **t = 3.82**, **36/48 wins**, and the block-mean
-delta over six non-overlapping blocks is **−221.2 ± 88.2**, so this clears the
-noise floor on the conservative measure as well as the optimistic one. Five of
-the six blocks improve.
+The block-mean delta over six non-overlapping blocks is **−289.9 ± 114.5**, so
+this clears the noise floor on the conservative measure as well as the optimistic
+one. Five of the six blocks improve. The multi-horizon head is worth −68.7
+against the single-horizon one on its own (t = 1.60, 28/48), which is not
+significant in isolation; it is kept because it also raises precision, costs
+nothing at inference and is faster end to end.
 
 | | V8 | V9 |
 |---|---:|---:|
-| early_swap | 763.39 | **591.05** |
-| late_swap | 1026.46 | 1040.21 |
-| weekly_limit | 114.58 | 85.42 |
-| daily_limit | 87.50 | 72.92 |
-| overtime | 79.52 | 67.63 |
-| travel | 45.69 | 40.75 |
-| swaps served | 17.65 | **14.79** |
-| missed | 3.94 | 3.90 |
-| **precision** | **0.313** | **0.376** |
-| recall | 0.584 | 0.588 |
+| early_swap | 763.39 | **494.75** |
+| late_swap | 1026.46 | 1100.42 |
+| weekly_limit | 114.58 | 70.83 |
+| daily_limit | 87.50 | 62.50 |
+| overtime | 79.52 | 63.38 |
+| travel | 45.69 | 38.47 |
+| swaps served | 17.65 | **13.46** |
+| missed | 3.94 | 4.00 |
+| **precision** | **0.313** | **0.406** |
+| recall | 0.584 | 0.577 |
+| seconds per scenario | 9.85 | 10.30 |
 
-**Three fewer swaps, the same misses, and 172 points less earliness.** That is the
-shape of the public gap: of the 942 points between us and first place,
-`early_swap` was +634 and the capacity penalties +248.
+**Four fewer swaps, the same misses, 269 points less earliness and 85 points less
+capacity penalty.** That is the shape of the public gap: of the 942 points between
+us and first place, `early_swap` was +634 and the capacity penalties +248.
+
+One block regresses. Scenarios 32-39 go from 1970.4 to 2210.9, and the reason is
+visible: the plan serves 9.50 there against 8.00 due and misses 5.25 against 3.88.
+The model now **under**-swaps in that block -- earliness falls 211 and lateness
+rises 458. Predicted mass is 8.45 per scenario against a realised 9.46, so the
+level is about 11% low. That is the next thing to measure, and it is the place
+where local and the leaderboard disagree: locally the optimum wants more swaps,
+the leaderboard says fewer.
 
 ---
 
@@ -90,18 +102,33 @@ the remaining observation window, on the **scenario-cutoff population** -- one r
 per (scenario, device) the forecaster is actually asked about -- and combined with
 the passage probability as a geometric mean at the 42-day decision.
 
-The passage model keeps its job of supplying the *shape* across horizons, because
-the planner needs a full CDF to choose a service day; the blended level is
-imposed on that shape. Where the passage probability is too small for its own
-shape to mean anything, a fleet median shape recorded at fit time is used.
+The head is fitted at seven horizons rather than only at the decision, so both
+halves of the blend carry a shape and the geometric mean is taken column by
+column across the whole horizon grid.
 
 Out of fold by building, on the same folds, same features:
 
-| | AUC | PR-AUC | AUC below 0.12 V |
-|---|---:|---:|---:|
-| Wiener passage | 0.9503 | 0.3083 | 0.7589 |
-| head alone | 0.9550 | 0.3627 | — |
-| **geometric mean** | **0.9581** | **0.3825** | **0.7957** |
+| | AUC | PR-AUC |
+|---|---:|---:|
+| Wiener passage | 0.9503 | 0.3083 |
+| head alone, single horizon | 0.9550 | 0.3627 |
+| head alone, multi-horizon bagged | 0.9609 | 0.3677 |
+| geometric mean, single horizon | 0.9581 | 0.3825 |
+| **geometric mean, multi-horizon bagged** | **0.9590** | **0.3953** |
+
+**The head is fitted at seven horizons, not just the 42-day decision.** Stacking
+the same rows at 14 to 126 days takes the positives from 454 to 1114 and gives
+the head a horizon axis under a monotone constraint. That buys two things: a
+better ranking at the decision, and a shape -- so the blend applies at every
+horizon rather than being imposed on the passage model's shape at one point. The
+geometric mean of two functions monotone in the horizon is monotone, so the CDF
+contract the planner reads survives.
+
+Heads are bagged over five seeds because a single head moves the timing screen by
+±34 between seeds, larger than most of the effects worth chasing here. The five
+heads are evaluated as one tall design rather than one call per horizon, which
+turns 1.6 seconds per scenario into 1.0; `tests/test_blend.py` pins the two paths
+to identical answers.
 
 The blend beats *both* ends of the weight sweep -- pure passage scores 1709 on the
 timing screen and pure head 1725, while the blend scores 1598 -- which is the
@@ -114,9 +141,8 @@ at a time. The two are equivalent in quality (PR-AUC 0.3889 against 0.3876).
 It also removes the calibration inversion that trap 3 was written about. Block
 ratios of predicted to actual, before correction, were 0.54 / 1.01 / 1.64 for the
 passage model -- a bias that changes sign, which no scalar can fix. For the blend
-they are 0.55 / 0.67 / 0.93, a uniform under-prediction, and after the
-out-of-fold correction 0.84 / 0.92 / 1.02 against the passage model's
-0.78 / 1.08 / 1.31.
+they are a uniform under-prediction, and after the out-of-fold correction they
+are **0.83 / 0.94 / 0.96** against the passage model's 0.78 / 1.08 / 1.31.
 
 ## 4. The planner's local search was a one-way ratchet
 
@@ -151,16 +177,14 @@ this is the first knob to turn.**
 
 The shipped configuration trades a little search for headroom:
 `solver_seconds 0.5` and `candidate_margin_hours 12` against the previous 1.0 and
-24. Measured effect on the score: **+4.5** against the expensive configuration
-(1923.96 against 1919.48), which is noise. Measured effect on time: **11.29 s per
-scenario against 13.2**, projecting to **20.3 minutes for 96** against the
-30-minute cap.
+24. Measured effect on the score: **+4.5**, which is noise.
 
-For comparison the previous submission projected 18.0 minutes and scored, so this
-is a 13% increase on a run that already fit. The soft deadline in
-`bsai/runtime.py` is deliberately left at 17 minutes -- it was not changed for
-this, because the machinery that stops a run scoring zero should not be loosened
-for a marginal quality gain.
+The end result is **10.30 seconds per scenario, projecting to 18.8 minutes for
+96** -- essentially unchanged from the previous submission's 18.0, despite five
+extra models in the forecast. Swapping four fewer batteries makes the search and
+every replay cheaper, and that pays for the head. The soft deadline in
+`bsai/runtime.py` is deliberately left at 17 minutes: the machinery that stops a
+run scoring zero should not be loosened for a marginal quality gain.
 
 ## 6. What this does not fix
 

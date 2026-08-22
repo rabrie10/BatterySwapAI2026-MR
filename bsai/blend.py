@@ -1,43 +1,46 @@
-"""Wiener first passage with a discriminative head, blended in probability space.
+"""Wiener first passage blended with a discriminative head, horizon by horizon.
 
 Two measurements motivate this, both on the scenario-cutoff population rather
 than the strided training grid.
 
-**The first-passage law is right about shape and wrong about level.** Realised
-against predicted deaths, bucketed by margin:
+**The passage law is right about shape and wrong about level.** Realised against
+predicted deaths, bucketed by margin (``smooth_v - 2.4``):
 
-    margin 0.05-0.10   146 deaths, 94 predicted   ratio 1.6
-    margin 0.10-0.15    65 deaths, 31 predicted   ratio 2.1
-    margin 0.15-0.20    41 deaths,  7 predicted   ratio 6.0
-    margin 0.20-0.30    25 deaths,  1 predicted   ratio 19.1
-    margin 0.30-0.50     6 deaths,  0.06 predicted ratio 99.2
+    margin 0.05-0.10   141 deaths,  118 predicted   ratio 1.2
+    margin 0.10-0.15    74 deaths,   36 predicted   ratio 2.1
+    margin 0.15-0.20    42 deaths,    7 predicted   ratio 6.0
+    margin 0.20-0.30    25 deaths,    1 predicted   ratio 19.1
+    margin 0.30-0.50     8 deaths, 0.06 predicted   ratio 99.2
 
-A Gaussian increment gives a tail that is a hundred times too thin once the
-margin is more than a couple of tenths of a volt, so 30% of all deaths land in a
-region the model reports as impossible. That cannot be repaired by a
-multiplicative calibration -- a factor of a hundred on 1e-14 is still zero.
+A Gaussian increment gives a tail a hundred times too thin once the margin is
+more than a couple of tenths of a volt, so the due batteries the plan misses
+carry a *median predicted probability of 0.008* -- declared safe, not merely
+ranked low. Only 3.2% of misses were ranked above the lowest-ranked battery the
+planner did swap, so the decision layer is not at fault. Inside that "safe"
+population plain ``voltage`` separates the deaths at AUC 0.913.
 
-**A boosted classifier on the same features fixes the level but is worse on its
-own.** Fitted out of fold by building on the 48 scenario cutoffs it scores
-PR-AUC 0.3605 against the passage model's 0.3083, but it loses at every swap
-count the leaderboard charges, because it has 454 positives from 82 distinct
-devices and no horizon structure at all.
+**A boosted classifier fixes the level and is worse on its own.** Out of fold by
+building it beats the passage model on PR-AUC and loses at every swap count the
+leaderboard charges, because it has 454 positives from 82 distinct devices.
 
-The geometric mean of the two beats both, and by more than either margin:
+The geometric mean beats both ends of the weight sweep, which is the signature of
+two decorrelated views rather than one dominating.
 
-    PR-AUC              0.3083  ->  0.3889
-    AUC below 0.12 V    0.7589  ->  0.7957
-    timing at 12 swaps  1802    ->  1704
+**The head is fitted at several horizons, not just the 42-day decision.** Stacking
+the same rows at 14 to 126 days takes the positives from 454 to 1114 and gives
+the head a horizon axis of its own, under a monotone constraint. That earns two
+things: a better ranking at the decision (timing 1598 -> 1506 at fifteen swaps,
+bagged over five seeds), and a *shape* -- so the blend applies at every horizon
+instead of being imposed on the passage model's shape at one point. The planner
+reads a full CDF to choose a service day, and the geometric mean of two functions
+monotone in the horizon is itself monotone, so the contract survives.
+
+Heads are bagged over five seeds. A single head moves the timing screen by ±34
+between seeds, which is larger than most of the effects worth chasing here.
 
 Blending in probability space rather than by rank is what makes it shippable:
 rank depends on the whole scored set, and ``predict_grid`` is called one building
-at a time.
-
-The head only ever predicts the 42-day decision, so the passage model keeps its
-job of supplying the *shape* across horizons -- the planner needs a full CDF to
-choose a service day. The blended level is imposed on that shape. Where the
-passage probability is too small for its own shape to be meaningful, a fleet
-median shape recorded at fit time is used instead.
+at a time. The two are equivalent in quality (PR-AUC 0.3889 against 0.3876).
 """
 
 from __future__ import annotations
@@ -52,9 +55,13 @@ from .hazard import HORIZON_GRID
 from .wiener import WienerModel
 
 DECISION_HORIZON = 42
-# Below this the passage model's own shape is noise, so the fleet median is used.
-MIN_SHAPE_ANCHOR = 1e-3
 MIN_PROBABILITY = 1e-12
+
+# Horizons the head is stacked over. Short enough to keep the 42-day decision
+# sharp, long enough that the tail of the grid is anchored by data rather than by
+# extrapolation.
+HEAD_HORIZONS = (14, 21, 28, 42, 63, 91, 126)
+HEAD_SEEDS = (20260822, 1, 2, 3, 7)
 
 HEAD_PARAMS = dict(
     max_iter=300,
@@ -62,7 +69,6 @@ HEAD_PARAMS = dict(
     max_leaf_nodes=15,
     min_samples_leaf=40,
     l2_regularization=1.0,
-    random_state=20260822,
 )
 
 
@@ -71,17 +77,16 @@ class BlendedModel:
     """Presents the ``WienerModel`` interface; the planner is unchanged."""
 
     wiener: WienerModel
-    head: HistGradientBoostingClassifier
-    default_shape: np.ndarray
+    heads: list
     weight: float = 0.5
     calibration: object | None = None
     horizons: tuple[int, ...] = HORIZON_GRID
     feature_names: tuple[str, ...] = field(default_factory=lambda: tuple(FEATURE_NAMES))
-    model_version: str = "bsai-blend/v1"
+    model_version: str = "bsai-blend/v2"
 
     def __post_init__(self) -> None:
-        # The passage model's own calibration is held here instead, so the two
-        # corrections are not applied twice.
+        # The passage model's own calibration is held here instead, so the
+        # remaining-observation correction is not applied twice.
         self.wiener.calibration = None
 
     @property
@@ -99,10 +104,46 @@ class BlendedModel:
         return self.wiener.cdf_at(grid_values, days)
 
     @staticmethod
-    def head_design(features: np.ndarray, remaining: np.ndarray) -> np.ndarray:
+    def head_design(
+        features: np.ndarray, remaining: np.ndarray, horizon: float
+    ) -> np.ndarray:
+        rows = features.shape[0]
         return np.hstack(
-            [features, np.asarray(remaining, dtype=np.float32)[:, None]]
+            [
+                features,
+                np.asarray(remaining, dtype=np.float32).reshape(rows, 1),
+                np.full((rows, 1), float(horizon), dtype=np.float32),
+            ]
         )
+
+    def head_grid(self, features: np.ndarray, remaining: np.ndarray) -> np.ndarray:
+        """The bagged head's CDF on the model's own horizon grid.
+
+        One tall design per head rather than one call per horizon: five heads
+        over a twenty-four point grid is a hundred and twenty calls into the tree
+        ensemble, and the per-call overhead dominates. Batching turns 1.6 seconds
+        per scenario into a tenth of that, which is the difference between fitting
+        the thirty-minute evaluation budget and not.
+        """
+        rows = features.shape[0]
+        count = len(self.horizons)
+        tall = np.hstack(
+            [
+                np.tile(features, (count, 1)),
+                np.tile(
+                    np.asarray(remaining, dtype=np.float32).reshape(rows, 1), (count, 1)
+                ),
+                np.repeat(
+                    np.asarray(self.horizons, dtype=np.float32), rows
+                ).reshape(-1, 1),
+            ]
+        )
+        total = np.zeros(tall.shape[0])
+        for head in self.heads:
+            total += np.log(
+                np.clip(head.predict_proba(tall)[:, 1], MIN_PROBABILITY, 1.0)
+            )
+        return np.exp(total / len(self.heads)).reshape(count, rows).T
 
     def predict_grid(
         self,
@@ -114,51 +155,66 @@ class BlendedModel:
         if rows == 0:
             return np.zeros((0, len(self.horizons)))
         remaining = np.asarray(remaining, dtype=float)
-        grid = self.wiener.predict_grid(features, remaining)
-        column = list(self.horizons).index(DECISION_HORIZON)
-        anchor = grid[:, column]
+        passage = self.wiener.predict_grid(features, remaining)
+        head = self.head_grid(features, remaining)
 
-        head = self.head.predict_proba(
-            self.head_design(features, remaining)
-        )[:, 1]
-        blended = np.clip(anchor, MIN_PROBABILITY, 1.0) ** (1.0 - self.weight)
-        blended *= np.clip(head, MIN_PROBABILITY, 1.0) ** self.weight
-
-        usable = anchor > MIN_SHAPE_ANCHOR
-        shape = np.where(
-            usable[:, None],
-            grid / np.maximum(anchor, MIN_SHAPE_ANCHOR)[:, None],
-            self.default_shape[None, :],
-        )
-        out = np.clip(shape * blended[:, None], 0.0, 1.0)
-        # A device with no observation left cannot file a record, whatever the
-        # head thinks; the passage model already zeroes those columns.
-        out = np.where(grid <= 0.0, np.minimum(out, grid), out)
+        out = np.clip(passage, MIN_PROBABILITY, 1.0) ** (1.0 - self.weight)
+        out *= np.clip(head, MIN_PROBABILITY, 1.0) ** self.weight
+        # No record can be filed once observation has ended, whatever the head
+        # believes; the passage model already zeroes those columns.
+        out = np.where(passage <= 0.0, 0.0, out)
         if self.calibration is not None:
             out = self.calibration.apply(out, remaining)
         return np.maximum.accumulate(np.clip(out, 0.0, 1.0), axis=1)
 
+    @staticmethod
+    def record_label(
+        days_to_eol: np.ndarray, remaining: np.ndarray, horizon: float
+    ) -> np.ndarray:
+        """Did an EOL *record* land within ``horizon`` days?
+
+        A device whose observation ends before the horizon is a genuine negative,
+        not a censored unknown -- dropping those rows is what removed the
+        population that dominates the closing scenarios (HANDOVER.md section 3).
+        """
+        return (
+            (np.asarray(days_to_eol) <= horizon)
+            & (np.asarray(days_to_eol) <= np.asarray(remaining))
+        ).astype(int)
+
     @classmethod
-    def fit_head(
+    def fit_heads(
         cls,
         features: np.ndarray,
         remaining: np.ndarray,
-        due: np.ndarray,
+        days_to_eol: np.ndarray,
         *,
+        horizons: tuple[int, ...] = HEAD_HORIZONS,
+        seeds: tuple[int, ...] = HEAD_SEEDS,
         params: dict | None = None,
-    ) -> HistGradientBoostingClassifier:
+    ) -> list:
+        """Stack the rows over horizons and fit one head per seed.
+
+        The label is "an EOL *record* exists within h days", so a device whose
+        observation ends before h is a genuine negative rather than a censored
+        unknown -- the same construction the shipped labels use.
+        """
+        designs, labels = [], []
+        for horizon in horizons:
+            designs.append(cls.head_design(features, remaining, horizon))
+            labels.append(cls.record_label(days_to_eol, remaining, horizon))
+        design = np.vstack(designs)
+        label = np.concatenate(labels)
+        constraint = np.zeros(design.shape[1], dtype=int)
+        constraint[-1] = 1  # the CDF cannot fall as the horizon grows
+
         settings = dict(HEAD_PARAMS)
         settings.update(params or {})
-        head = HistGradientBoostingClassifier(**settings)
-        head.fit(cls.head_design(features, remaining), np.asarray(due, dtype=int))
-        return head
-
-    @staticmethod
-    def median_shape(grid: np.ndarray, anchor: np.ndarray) -> np.ndarray:
-        """Fleet median CDF normalised to one at the decision horizon."""
-        usable = anchor > 1e-2
-        if not usable.any():
-            out = np.linspace(0.0, 1.0, grid.shape[1])
-            return np.maximum.accumulate(out)
-        normalised = grid[usable] / anchor[usable][:, None]
-        return np.maximum.accumulate(np.median(normalised, axis=0))
+        heads = []
+        for seed in seeds:
+            head = HistGradientBoostingClassifier(
+                monotonic_cst=constraint, random_state=seed, **settings
+            )
+            head.fit(design, label)
+            heads.append(head)
+        return heads

@@ -12,8 +12,6 @@ from __future__ import annotations
 import unittest
 
 import numpy as np
-from sklearn.ensemble import HistGradientBoostingClassifier
-
 from bsai.blend import DECISION_HORIZON, BlendedModel
 from bsai.calibrate import RemainingCalibration
 from bsai.features import N_FEATURES
@@ -43,27 +41,26 @@ class _Wiener:
         return grid_values[:, : len(days)]
 
 
-def _blend(level, head_probability):
-    rows = len(level)
-    head = HistGradientBoostingClassifier(max_iter=2, max_leaf_nodes=2)
-    design = np.zeros((20, N_FEATURES + 1), dtype=np.float32)
-    design[:10, 0] = 1.0
-    head.fit(design, np.array([1] * 10 + [0] * 10))
+def _blend(level, head_probability, heads=2):
     model = BlendedModel(
         wiener=_Wiener(level),
-        head=head,
-        default_shape=np.linspace(0.2, 1.0, len(HORIZON_GRID)),
+        heads=[_ConstantHead(head_probability) for _ in range(heads)],
     )
-    model.head = _ConstantHead(head_probability)
-    return model, np.zeros((rows, N_FEATURES), dtype=np.float32)
+    return model, np.zeros((len(level), N_FEATURES), dtype=np.float32)
 
 
 class _ConstantHead:
+    """A head whose probability rises with the horizon, as a real one must."""
+
     def __init__(self, value) -> None:
         self.value = np.asarray(value, dtype=float)
 
     def predict_proba(self, design):
-        column = np.broadcast_to(self.value, (design.shape[0],))
+        rows = design.shape[0]
+        horizon = design[:, -1]
+        ramp = np.clip(horizon / float(max(HORIZON_GRID)), 0.05, 1.0)
+        # The tall design stacks the same rows once per horizon.
+        column = np.tile(self.value, rows // self.value.size) * ramp
         return np.column_stack([1.0 - column, column])
 
 
@@ -76,15 +73,29 @@ class BlendContractTests(unittest.TestCase):
         self.assertTrue((np.diff(grid, axis=1) >= -1e-12).all())
 
     def test_decision_probability_is_the_geometric_mean(self) -> None:
-        level = np.array([0.4])
-        head = np.array([0.1])
-        model, features = _blend(level, head)
+        model, features = _blend(np.array([0.4]), np.array([0.6]))
         column = list(HORIZON_GRID).index(DECISION_HORIZON)
-        anchor = model.wiener.predict_grid(features, np.array([300.0]))[0, column]
-        grid = model.predict_grid(features, np.array([300.0]))
+        remaining = np.array([300.0])
+        passage = model.wiener.predict_grid(features, remaining)[0, column]
+        head = model.head_grid(features, remaining)[0, column]
+        grid = model.predict_grid(features, remaining)
         self.assertAlmostEqual(
-            float(grid[0, column]), float(np.sqrt(anchor * head[0])), places=6
+            float(grid[0, column]), float(np.sqrt(passage * head)), places=6
         )
+
+    def test_batched_head_grid_matches_one_call_per_horizon(self) -> None:
+        """The tall design is an optimisation; it must not change the answer."""
+        model, features = _blend(np.array([0.4, 0.2]), np.array([0.5, 0.3]))
+        remaining = np.array([300.0, 120.0])
+        batched = model.head_grid(features, remaining)
+        for column, horizon in enumerate(HORIZON_GRID):
+            design = model.head_design(features, remaining, horizon)
+            total = np.zeros(2)
+            for head in model.heads:
+                total += np.log(np.clip(head.predict_proba(design)[:, 1], 1e-12, 1.0))
+            np.testing.assert_allclose(
+                batched[:, column], np.exp(total / len(model.heads)), atol=1e-12
+            )
 
     def test_the_passage_model_keeps_no_calibration_of_its_own(self) -> None:
         """Otherwise the remaining-observation correction is applied twice."""
@@ -106,10 +117,12 @@ class BlendContractTests(unittest.TestCase):
         grid = model.predict_grid(features, np.array([0.0]))
         self.assertTrue((grid <= 1e-12).all())
 
-    def test_median_shape_is_monotone_and_anchored(self) -> None:
-        grid = np.array([[0.1, 0.3, 0.6], [0.2, 0.4, 0.5]])
-        shape = BlendedModel.median_shape(grid, np.array([0.6, 0.5]))
-        self.assertTrue((np.diff(shape) >= -1e-12).all())
+    def test_a_record_needs_observation_left_to_be_filed(self) -> None:
+        """Same EOL, different observation window: only one can be recorded."""
+        label = BlendedModel.record_label(
+            np.array([30.0, 30.0, 60.0]), np.array([300.0, 10.0, 300.0]), 42
+        )
+        np.testing.assert_array_equal(label, np.array([1, 0, 0]))
 
 
 if __name__ == "__main__":

@@ -57,6 +57,7 @@ def main() -> None:
     features = z["features"]
     remaining = z["remaining"]
     due = z["due"].astype(int)
+    days_to_eol = z["days_to_eol"]
     building = np.asarray([str(b) for b in z["building"]])
     wiener_probability = z["probability"]
 
@@ -68,22 +69,29 @@ def main() -> None:
         seen.setdefault(key, len(seen))
         fold_of[str(name)] = seen[key]
     fold = np.asarray([fold_of[b] for b in building])
-    print(f"{len(features)} rows, {int(due.sum())} due, {len(seen)} folds")
+    print(f"{len(features)} rows, {int(due.sum())} due at 42d, {len(seen)} folds")
+    for horizon in (14, 42, 91, 126):
+        label = (days_to_eol <= horizon) & (days_to_eol <= remaining)
+        print(f"  positives at h={horizon:3d}: {int(label.sum())}")
 
-    # Out-of-fold heads, then the blended probability they imply, so the
-    # measurement below is the one validate_v6 will reproduce.
+    # Out-of-fold heads, so the number below is the one validate_v6 reproduces.
     oof_head = np.zeros(len(features))
-    heads: dict[int, object] = {}
+    heads_by_fold: dict[int, list] = {}
     for index in sorted(seen.values()):
         held = fold == index
-        head = BlendedModel.fit_head(
-            features[~held], remaining[~held], due[~held]
+        heads = BlendedModel.fit_heads(
+            features[~held], remaining[~held], days_to_eol[~held]
         )
-        heads[index] = head
-        oof_head[held] = head.predict_proba(
-            BlendedModel.head_design(features[held], remaining[held])
-        )[:, 1]
-        print(f"  fold {index} head fitted, {time.time() - started:.0f}s", flush=True)
+        heads_by_fold[index] = heads
+        design = BlendedModel.head_design(
+            features[held], remaining[held], DECISION_HORIZON
+        )
+        total = np.zeros(int(held.sum()))
+        for head in heads:
+            total += np.log(np.clip(head.predict_proba(design)[:, 1], 1e-12, 1.0))
+        oof_head[held] = np.exp(total / len(heads))
+        print(f"  fold {index}: {len(heads)} heads fitted, "
+              f"{time.time() - started:.0f}s", flush=True)
 
     blended = (
         np.clip(wiener_probability, 1e-12, 1.0) ** (1.0 - args.weight)
@@ -100,20 +108,12 @@ def main() -> None:
     }
     print(json.dumps(metrics, indent=2))
 
-    # Assemble one blended model per building, sharing its fold's parts.
     by_building: dict[str, BlendedModel] = {}
-    shapes: dict[int, np.ndarray] = {}
     for index in sorted(seen.values()):
         names = [b for b, f in fold_of.items() if f == index]
-        wiener = bundle["by_building"][names[0]]
-        held = fold == index
-        grid = wiener.predict_grid(features[held], remaining[held])
-        anchor = grid[:, list(wiener.horizons).index(DECISION_HORIZON)]
-        shapes[index] = BlendedModel.median_shape(grid, anchor)
         model = BlendedModel(
-            wiener=copy.deepcopy(wiener),
-            head=heads[index],
-            default_shape=shapes[index],
+            wiener=copy.deepcopy(bundle["by_building"][names[0]]),
+            heads=heads_by_fold[index],
             weight=args.weight,
         )
         for name in names:
@@ -124,15 +124,9 @@ def main() -> None:
         args.folds_out,
     )
 
-    # Production: the shipped passage model plus a head fitted on everything.
-    production_head = BlendedModel.fit_head(features, remaining, due)
-    production_wiener = joblib.load(args.wiener_model)
-    grid = production_wiener.predict_grid(features, remaining)
-    anchor = grid[:, list(production_wiener.horizons).index(DECISION_HORIZON)]
     production = BlendedModel(
-        wiener=production_wiener,
-        head=production_head,
-        default_shape=BlendedModel.median_shape(grid, anchor),
+        wiener=joblib.load(args.wiener_model),
+        heads=BlendedModel.fit_heads(features, remaining, days_to_eol),
         weight=args.weight,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
