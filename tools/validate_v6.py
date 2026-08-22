@@ -103,6 +103,12 @@ def main() -> None:
     parser.add_argument("--late-multiplier", type=float, default=1.0)
     parser.add_argument("--candidate-margin", type=float, default=24.0)
     parser.add_argument("--emergency-rank-scale", type=float, default=1.0)
+    parser.add_argument(
+        "--move-order",
+        choices=("legacy", "interleaved"),
+        default="interleaved",
+        help="how the local search spends its evaluation budget; see PlannerConfig",
+    )
     parser.add_argument("--max-planned-rate", type=float, default=None)
     parser.add_argument("--probability-scale", type=float, default=1.0)
     parser.add_argument(
@@ -150,6 +156,7 @@ def main() -> None:
                 uncertain_local_search_evaluations=args.uncertain_search,
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
+                move_order=args.move_order,
                 optimizer=OptimizationConfig(
                     solver_seconds=args.solver_seconds,
                     capacity_roundtrip_fraction=args.capacity_roundtrip,

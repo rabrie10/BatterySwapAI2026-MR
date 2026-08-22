@@ -35,6 +35,13 @@ class PlannerConfig:
     robust_emergency_samples: int = 4
     random_seed: int = 20260818
     emergency_rank_scale: float = 1.0
+    # How the local search spends a small evaluation budget. "legacy"
+    # concatenates the move classes, which means a budget of 15 -- what the
+    # shipped settings actually produce -- is consumed entirely by the first
+    # class, reinserting deferred batteries, and never reaches the moves that
+    # can *remove* a swap. "interleaved" round-robins the classes and puts
+    # removals first, so the search can go in both directions.
+    move_order: str = "interleaved"
     candidate_margin_hours: float = 24.0
     max_candidates: int = 150
     optimizer: OptimizationConfig = field(default_factory=OptimizationConfig)
@@ -315,6 +322,22 @@ class CompetitionPlanner(Planner):
             battery_id: index for index, battery_id in enumerate(costs.battery_ids)
         }
         moves: list[tuple[list[str], pd.Timestamp | None]] = []
+        reinsert_moves: list[tuple[list[str], pd.Timestamp | None]] = []
+        removal_moves: list[tuple[list[str], pd.Timestamp | None]] = []
+
+        # Removing one battery from a shared day. The optimizer's expected cost
+        # includes trip batching, so a battery that fails its own standalone
+        # test can still be picked up for being co-located with a visit that is
+        # happening anyway -- and a battery nobody ranks highly is precisely the
+        # one whose end of life is distant, so it pays close to the full wasted
+        # swap. Lowest predicted probability first, because that is where the
+        # gain is largest.
+        serviced = sorted(
+            (battery_id for battery_id, day in assignments.items() if day is not None),
+            key=lambda battery_id: (priority[battery_id], battery_id),
+        )
+        for battery_id in serviced:
+            removal_moves.append(([battery_id], None))
 
         # CP-SAT can defer a very expensive battery when conservative capacity
         # bounds make all dates look infeasible. Exact reinsertion gets first
@@ -346,7 +369,7 @@ class CompetitionPlanner(Planner):
                 key=lambda day: (abs((day - best_day).days), day),
             )
             for target_day in list(dict.fromkeys([best_day] + same_building_days[:3])):
-                moves.append(([battery_id], target_day))
+                reinsert_moves.append(([battery_id], target_day))
 
         group_items = sorted(groups.items())
         selected_by_building: dict[str, list[str]] = {}
@@ -436,6 +459,20 @@ class CompetitionPlanner(Planner):
             )
             moves.extend((batteries, target_day) for target_day in existing_days)
             moves.append((batteries, None))
+
+        if self.config.move_order == "interleaved":
+            # Round-robin so a budget of fifteen samples every kind of move
+            # rather than fifteen variants of one kind, and let removals go
+            # first: the seed over-services, and nothing else can undo that.
+            classes = [removal_moves, reinsert_moves, moves]
+            ordered: list[tuple[list[str], pd.Timestamp | None]] = []
+            for position in range(max(len(c) for c in classes) if classes else 0):
+                for candidate in classes:
+                    if position < len(candidate):
+                        ordered.append(candidate[position])
+            moves = ordered
+        else:
+            moves = reinsert_moves + moves + removal_moves
 
         evaluations = 0
         for batteries, target_day in moves:

@@ -33,7 +33,7 @@ from bsai.runtime import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
+DEFAULT_MODEL_PATH = Path("models/v9_blend.joblib")
 
 
 def _float_env(name: str, default: float) -> float:
@@ -45,7 +45,14 @@ def _int_env(name: str, default: int) -> int:
 
 
 def load_forecaster() -> HazardForecaster | None:
-    """Load the V6 model, or None so the planner uses its own safe fallback."""
+    """Load the shipped model, or None so the planner uses its own fallback.
+
+    ``models/v9_blend.joblib`` unpickles as ``bsai.blend.BlendedModel``, which
+    holds a ``bsai.wiener.WienerModel``, a scikit-learn head and a
+    ``bsai.calibrate.RemainingCalibration``. ``COPY bsai/ ./bsai`` covers all of
+    them -- see HANDOVER.md trap 9, where a missing module silently downgraded
+    the submission to the voltage-trend forecaster.
+    """
     path = Path(os.environ.get("BATTERYSWAP_MODEL_PATH", DEFAULT_MODEL_PATH))
     if not path.exists():
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)
@@ -66,6 +73,7 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         local_search_evaluations=local,
         uncertain_local_search_evaluations=uncertain,
         robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 4),
+        candidate_margin_hours=_float_env("BATTERYSWAP_CANDIDATE_MARGIN", 12.0),
         optimizer=OptimizationConfig(solver_seconds=solver_seconds),
     )
 
@@ -83,7 +91,7 @@ def load_competition_planner() -> Planner:
         return planner
 
     config = build_planner_config(
-        _float_env("BATTERYSWAP_SOLVER_SECONDS", 1.0),
+        _float_env("BATTERYSWAP_SOLVER_SECONDS", 0.5),
         _int_env("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", 80),
         _int_env("BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS", 35),
     )

@@ -1,0 +1,17 @@
+{
+  "weight": 0.5,
+  "metrics": {
+    "wiener": {
+      "auc": 0.9503,
+      "pr_auc": 0.3083
+    },
+    "head": {
+      "auc": 0.955,
+      "pr_auc": 0.3627
+    },
+    "blend": {
+      "auc": 0.9581,
+      "pr_auc": 0.3825
+    }
+  }
+}
