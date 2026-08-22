@@ -15,7 +15,8 @@ them are recorded because each one cost real time, and most were not obvious.
 | v3, discrete-time hazard classifier | 4252.33 | 17 of 19 |
 | V6, censoring-aware label | 2915.68 | 17 of 19 |
 | V7, Wiener first passage + within-day features | **2167.11** | **12 of 12** |
-| J2W, first place | 1160.67 | 1 |
+| V8 phase 1 (remaining-observation calibration) | 2078.28 | 13 of 16 |
+| J2W, first place | 1135.82 | 1 |
 
 Local out-of-fold mean over all 48 train scenarios, which is the only number
 allowed to justify a submission:
@@ -26,11 +27,24 @@ allowed to justify a submission:
 | v3 | 2644.9 |
 | V6 | 2526.0 |
 | V7 | 2293.2 |
-| **V8 phase 1, on branch `claude/v8-precision`** | **2145.1** |
+| V8 phase 1, on branch `claude/v8-precision` | 2145.1 |
+| **V9 blend, on branch `claude/v9-timing-and-packing`** | **1753.5** |
 | perfect knowledge, same planner (scenarios 0-11) | 77.8 |
 
 V8 phase 1 is committed at `db85121`, a clean fast-forward from `main`, 62 tests
 passing, submission path verified. **It has not been submitted yet.**
+
+**V9 is the current best: 1753.46, a paired −391.71 against V8 with t = 6.44 and
+41/48 wins, and all six non-overlapping blocks improve.** Precision 0.313 -> 0.404
+*and* recall 0.584 -> 0.626, which no
+earlier generation managed -- every previous gain in one came out of the other.
+The write-up is `docs/V9_BLEND.md`; the two-line version is that the Wiener
+first-passage law is right about the *shape* of the CDF and wrong about its
+*level*, so a gradient-boosted head fitted on the scenario-cutoff population is
+blended into it as a geometric mean, horizon by horizon.
+
+**Read `docs/V9_BLEND.md` before `docs/PLAN_V8_PRECISION.md`.** Several premises
+in the older plan are refuted there by measurement.
 
 ## 2. The gap to first place, decomposed
 
@@ -109,6 +123,18 @@ Do not repeat these. Every one was validated out-of-fold and rejected.
 | **Stacking** a logistic layer on `logit(p)` plus the most separable features | PR-AUC 0.2913 against the raw 0.3083. A control given only the probability scored 0.2591, so the wrapper itself destroys information. The passage model already extracts the signal. |
 | **Per-device adaptive drift** (random effects) | Disqualified by the stacking result before building: the features it would add are already used. See trap 6. |
 | **Peer contrast** (margin and slope against room/building medians) | 2319.3 against 2145.1, recall −0.036, precision −0.023. See below. |
+| **The planner's own objective**, the 400-500 points that were item 1 below | Not a bug. The believed-against-realised gap of 1210.4 splits 30 % early / 59 % late / 11 % operational, and every per-branch formula is right where the model is right -- believed early on genuinely-due swaps 32.5 against a realised 36.1. See `docs/V8_HYPOTHESIS_TESTS.md` section 1. |
+| **Censored days-to-EOL regression** (log-normal AFT, EM on the Tobit likelihood, `bsai/aft.py`) | 18x more labelled events (15,581 against 862) and strictly worse: precision at 12/15/18/21 swaps per scenario 0.304/0.271/0.251/0.231 against the Wiener model's 0.370/0.349/0.325/0.302, and worse recall at every point too. Section 2. |
+| **`beta` as a monotone state variable**, and with it the gamma and inverse-Gaussian processes | No barrier. `beta`'s spread at crossing (p90/p10 2.22) is the same as its spread at 0.40 V of margin (2.43), it saturates 0.1 V before end of life, and it tracks the margin at Spearman −0.79. Section 3. |
+| **Expected-cost ranking** off a predicted EOL *date* rather than a probability | Worse at every operating point. The AFT over-predicts time to EOL by a consistent 2-3x, so subtracting it adds noise. `V9_BLEND.md` section 7. |
+| **`end_time` as a leak** -- does a device's data stop when it dies? | No. 445 of 461 devices share one export date, and dying devices keep reporting for a median 204 days after their EOL. |
+| **An oracle-free swap-day policy** | The planner puts the median swap on day 1 of a 42-day window and the naive headroom looks like 333 per scenario; fitted on three blocks and scored on the other three it is 56. Day 1 is close to correct -- with a 0.5/10 asymmetric loss the optimum is the 4.8th percentile of the predicted failure time. |
+| **Shrinking the local search** to buy deadline headroom | At `uncertain_local_search_evaluations = 20`, `repair_reserve` is floored at 20 so `general_budget` becomes **zero**: no general move runs, the plan stays at the raw CP-SAT seed and the repair loop grinds. 1827.85 at 16.56 s per scenario against 1806.71 at 12.78. Worse *and* slower. |
+| **A dedicated prune pass**, a separate budget for dropping the weakest swaps | −7.07, sem 11.3, 5/48 wins, and it removes almost nothing. **With move order (−15) and the x11 budget (−72, far too slow), that is three independent attacks on the planner. It is not where the remaining points are.** |
+| **Cost-sensitive head training**, weighting rows by what the error really costs | Mixed sign, inside noise. |
+| **The full-strength retrain** (stride 2 / 400 iterations), open since V6 | **+57.36, 16/48 wins.** Twice the training data gives an *equivalent* ranker -- PR-AUC 0.3842 against 0.3879 on the deployment population, trading places across operating points -- and the planner then lands at 15.19 swaps instead of 14.65 and loses precision. Costs ~1 s per scenario more and twice the training time. **The passage model is not data-starved.** |
+| **Horizon-grid density past ten thresholds** | Swept at 10 / 16 / 24, two seeds each. At fifteen swaps: 1418 / 1428 / 1435; at eighteen: 1494 / 1435 / 1477. Every difference is inside the 30-45 spread between seeds of the same grid. The 7 -> 10 step was worth about 90 and was real; **this lever is now spent.** |
+| **A head on the strided grid** (88,013 cutoffs against 19,890) | Worse at every swap count. Same 82 dying devices; the population mismatch costs more than the volume buys. |
 
 The peer-contrast failure is worth understanding, because the prior evidence was
 the strongest in the whole phase. Measured *inside the swapped group* -- so
@@ -200,15 +226,34 @@ baked-in `train` would have produced a train-only submission.
 
 ## 6. What is still unexplored, ranked
 
-1. **The planner's own objective, roughly 400-500 points.** `_expected_score`
-   believes **1176.8** where the evaluator charges **2328.2**, correlation 0.613
-   (`tools/belief_v6.py`). The analytic ranking says the best achievable timing
-   at 16 swaps is about 1450; the planner delivers 1961. Nobody has attacked
-   this. It is the largest measured, unexploited gap in the whole project.
-2. **Full-strength retrain.** Everything ships at stride 4 and 250 iterations,
-   chosen for fast iteration. Stride 2 with 400 iterations has never been run.
-3. **Peer contrast, done properly.** See section 4.
-4. **Season as the calibration axis** instead of remaining observation.
+**The planner's own objective is no longer on this list.** It was item 1, worth
+a nominal 400-500 points, and `tools/belief_components.py` closed it: the cost
+model is faithful, and the whole belief gap is the forecast putting the right
+*amount* of probability on the wrong devices. Out of fold across buildings it
+predicts 9.40 due against a realised 9.46 -- and catches 5.7 of them inside
+17.65 swaps. `docs/V8_HYPOTHESIS_TESTS.md` has the decomposition.
+
+So everything below is a way to change *which* devices rank highest. On this
+problem nothing else moves the score.
+
+1. **Peer contrast, done properly.** See section 4 -- though it has now failed
+   three independent constructions, so the bar for a fourth should be high.
+2. **A tail-weighted survival loss.** The censored labels carry 15,581 events
+   against the binary label's 862, and `E[log T]` is measurably the wrong thing
+   to do with them -- see section 4. Whether a loss aimed at the 42-day region
+   can extract them instead is untested.
+3. **Season as the calibration axis** instead of remaining observation.
+
+**Compute is no longer on this list.** The full-strength retrain was the last
+pure-compute lever and it is measured above: twice the data, an equivalent
+ranker, a worse end-to-end score. What remains is genuinely new information about
+which device dies next, and this project has now searched hard for it.
+
+The emergency-queue rank defect recorded in `V8_HYPOTHESIS_TESTS.md` section 1b is
+now **closed without being built.** Re-running the belief decomposition on V9
+shows the planner *under*-prices deferral by 2.3x (believed 393.4 against a
+realised 907.5), so the self-consistent rank -- which lowers believed deferral
+cost further -- would move the marginal decision the wrong way.
 
 ## 7. Tools you should reuse rather than rebuild
 
@@ -222,8 +267,16 @@ baked-in `train` would have produced a train-only submission.
 | `tools/error_profile.py` | What distinguishes false positives from true positives, feature by feature. |
 | `tools/stack_probe.py` | Is a signal present but under-weighted, or already extracted? |
 | `tools/importance.py` | Permutation importance on the drift model, grouped. |
-| `tools/belief_v6.py` | Believed against realised cost. Start here for item 1 above. |
-| `tools/fit_calibration.py` | Fits the remaining-observation correction, out-of-fold by building. |
+| `tools/belief_v6.py` | Believed against realised cost, as one number. |
+| `tools/belief_components.py` | The same comparison split per cost component and per probability branch, over all 48 scenarios. This is the one that says whether the planner or the forecast is at fault. |
+| `tools/beta_state.py` | Is the within-day slope monotone per device, and does it reach a consistent value at failure? |
+| `tools/beta_controls.py` | The controls that make the previous answer mean anything: is the threshold vacuous, is the rise seasonal, and how much of `beta` is just the margin restated? |
+| `tools/fit_calibration.py` | Fits the remaining-observation correction and the out-of-fold level shortfall, by building. |
+| `tools/build_scenario_frame.py` | Caches the exact population a scenario asks about -- features, out-of-fold probability, label. Run once; every ranking experiment afterwards costs seconds instead of thirteen minutes. |
+| `tools/rank_lab.py` | Scores any candidate ranker against that cache at the swap counts the leaderboard charges. **This is the loop to iterate in.** |
+| `tools/swap_ledger.py` | Every swap and every workday the planner produces, with what each one cost. |
+| `tools/miss_profile.py` | What the *invisible* deaths look like -- the due batteries the model calls safe. |
+| `tools/train_blend.py` | Fits the discriminative head and assembles the shipped model. |
 
 ## 8. Ground rules that have earned their place
 
@@ -242,12 +295,18 @@ baked-in `train` would have produced a train-only submission.
 ## 9. Reproduce the current state
 
 ```bash
-python tools/train_wiener.py --stride 4 --max-iter 250   # ~8 min
-python tools/fit_calibration.py --volatility-scale 1.0   # ~9 min
-python tools/validate_v6.py --folds outputs/v7_folds.joblib \
-    --model models/v7_wiener.joblib --volatility-scale 1.0
-python -m unittest discover -s tests
+python tools/train_wiener.py --stride 4 --max-iter 250     # ~7 min
+python tools/fit_calibration.py --volatility-scale 1.0     # ~13 min
+python tools/build_scenario_frame.py                       # ~13 min, cache it once
+python tools/train_blend.py                                # ~4 min
+python tools/fit_calibration.py --folds outputs/v9_blend_folds.joblib     --model models/v9_blend.joblib --volatility-scale 1.0  # ~14 min
+python tools/validate_v6.py --folds outputs/v9_blend_folds.joblib     --model models/v9_blend.joblib --volatility-scale 1.0     --solver-seconds 0.5 --candidate-margin 12             # ~11 min, expect 1753.46
+python -m unittest discover -s tests                       # 69 tests
 ```
+
+The first two steps rebuild the passage model the blend sits on. If
+`outputs/v7_folds.joblib` and `models/v7_wiener.joblib` already exist, start at
+`build_scenario_frame.py`.
 
 Seeds are fixed in `bsai/wiener.py` (`random_state=20260821`) and
 `batteryswap_solution/optimizer.py` (`random_seed=20260818`).

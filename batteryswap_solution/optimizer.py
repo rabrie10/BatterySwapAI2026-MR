@@ -29,23 +29,15 @@ class OptimizationConfig:
     # more active days, more returns to base, and more of the evaluator's
     # double-counted return travel.
     capacity_roundtrip_fraction: float = 1.0
+    # Multiple of the daily limit allowed as a hard bound on one day's work.
+    # At 2.0 the solver may put two 20.5-hour round trips on one day -- 41 hours,
+    # a guaranteed 100 and about 66 of overtime -- where splitting them costs two
+    # days at 22.5 hours and no daily penalty at all. Three of the 48 train
+    # scenarios put the base in a building that is 10.25 hours from everything,
+    # and they cost 3722.7 against a 2040.0 average, with 5.7 breaching days each.
+    max_daily_hours_factor: float = 2.0
     use_cp_sat: bool = True
     max_planned_rate: float | None = None
-    # Cap planned swaps at ceil(multiplier x E[due] + buffer). The local score
-    # surface is nearly flat in swap count (marginal defer 39.9 vs service 41.4
-    # on the audit), so local validation cannot police volume; the leaderboard
-    # can: every team above us plans under 17 swaps per scenario and early cost
-    # per planned swap scales with the count. E[due] is the calibrated sum of
-    # horizon probabilities, measured before candidate filtering.
-    expected_due_multiplier: float | None = None
-    expected_due_buffer: float = 0.0
-    # Absolute ceiling on planned swaps per scenario. The expected-due budget
-    # scales with the model's own probability level, which measured 1.2x hotter
-    # on the public split's unseen buildings than out-of-fold on train -- hot
-    # enough that a multiplier tuned locally never bound at all (19.2 planned
-    # swaps on public). Every leaderboard team ahead of us plans 12.1-16.7, so
-    # a flat ceiling binds by construction rather than by trusting the level.
-    max_planned_count: int | None = None
 
 
 def planned_swap_limit(battery_count: int, rate: float | None) -> int | None:
@@ -54,34 +46,6 @@ def planned_swap_limit(battery_count: int, rate: float | None) -> int | None:
     if not 0.0 < float(rate) <= 1.0:
         raise ValueError("max_planned_rate must be in (0, 1]")
     return max(1, int(np.ceil(float(rate) * int(battery_count))))
-
-
-def scenario_planned_swap_limit(costs: CostTables, config: OptimizationConfig) -> int | None:
-    """Combine the fleet-rate cap, the expected-due budget and the flat ceiling."""
-    limits: list[int] = []
-    rate_limit = planned_swap_limit(len(costs.battery_ids), config.max_planned_rate)
-    if rate_limit is not None:
-        limits.append(rate_limit)
-    if config.expected_due_multiplier is not None:
-        multiplier = float(config.expected_due_multiplier)
-        buffer = float(config.expected_due_buffer)
-        if multiplier <= 0.0 or buffer < 0.0:
-            raise ValueError("expected-due budget parameters must be non-negative")
-        limits.append(
-            max(
-                1,
-                int(
-                    np.ceil(
-                        multiplier * float(costs.horizon_event_probability.sum()) + buffer
-                    )
-                ),
-            )
-        )
-    if config.max_planned_count is not None:
-        if int(config.max_planned_count) < 1:
-            raise ValueError("max_planned_count must be positive")
-        limits.append(int(config.max_planned_count))
-    return min(limits) if limits else None
 
 
 def _columns(locations: pd.DataFrame) -> tuple[str, str, str]:
@@ -131,7 +95,7 @@ def _greedy_assign(
                     costs.candidate_dates[best_day],
                 )
             )
-    limit = scenario_planned_swap_limit(costs, config)
+    limit = planned_swap_limit(len(costs.battery_ids), config.max_planned_rate)
     selected = sorted(beneficial, key=lambda item: (-item[0], item[1]))
     if limit is not None:
         selected = selected[:limit]
@@ -178,7 +142,7 @@ def optimize_assignments(
     for battery in range(battery_count):
         model.add(sum(service[battery]) + deferred[battery] == 1)
         model.add_hint(deferred[battery], 1)
-    limit = scenario_planned_swap_limit(costs, config)
+    limit = planned_swap_limit(battery_count, config.max_planned_rate)
     if limit is not None:
         model.add(
             sum(
@@ -270,7 +234,9 @@ def optimize_assignments(
         # priced in the objective, with a loose hard bound kept only to stop the
         # solver exploring physically absurd days.
         daily_limit = round(float(settings.worker_limit_daily_hours) * time_scale)
-        model.add(work <= 2 * daily_limit)
+        model.add(
+            work <= round(float(config.max_daily_hours_factor) * daily_limit)
+        )
         over_daily = model.new_bool_var(f"over_daily_{day}")
         model.add(work >= daily_limit + 1).only_enforce_if(over_daily)
         model.add(work <= daily_limit).only_enforce_if(over_daily.negated())

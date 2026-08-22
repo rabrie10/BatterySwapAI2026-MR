@@ -52,11 +52,27 @@ def main() -> None:
     parser.add_argument("--folds", type=Path, default=Path("outputs/v7_folds.joblib"))
     parser.add_argument("--label", default="model")
     parser.add_argument("--report", type=Path, default=None)
+    parser.add_argument(
+        "--no-calibration",
+        action="store_true",
+        help="strip the remaining-observation correction; compare raw models",
+    )
+    parser.add_argument(
+        "--volatility-scale",
+        type=float,
+        default=None,
+        help="override the Wiener volatility scale",
+    )
     args = parser.parse_args()
 
     devices = load_devices(args.dataset / "devices.csv")
     building_of = dict(zip(devices["device_id"], devices["building_id"]))
     bundle = joblib.load(args.folds)
+    for fold_model in bundle["by_building"].values():
+        if args.no_calibration:
+            fold_model.calibration = None
+        if args.volatility_scale is not None:
+            fold_model.volatility_scale = args.volatility_scale
     forecaster = HazardForecaster(
         OofHazardModel(
             by_building=bundle["by_building"],

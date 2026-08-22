@@ -16,12 +16,10 @@ outputs/v5match.json
 outputs/daily_shape.parquet
 outputs/v7_*.json
 outputs/v7_folds.joblib
+outputs/v8_aft_folds.joblib
+outputs/v9_blend_folds.joblib
+outputs/v9_frame.npz
+outputs/v9_*.npz
+outputs/v9_*.csv
+outputs/v9_*.json
 outputs/v8_*.json
-# V10 experiment artifacts: fold-model variants, per-run validation reports
-# and diagnostic frames are all reproducible from tools/; everything worth
-# keeping is committed under docs/. These patterns do not affect files that
-# are already tracked (outputs/schedule_predictions.csv).
-outputs/*.joblib
-outputs/*.json
-outputs/*.parquet
-outputs/*.md
