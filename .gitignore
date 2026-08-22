@@ -25,3 +25,13 @@ outputs/*.joblib
 outputs/*.json
 outputs/*.parquet
 outputs/*.md
+outputs/*.csv
+outputs/*.log
+outputs/*.npz
+outputs/*.txt
+# Dead model variants from the selection-arm experiments (rank calibration and
+# the standalone resurrection gate). Superseded by the shipped v8_cens.joblib
+# and pihybrid.joblib; reproducible from tools/. Named explicitly so the
+# tracked shipping artifacts under models/ are untouched.
+models/v7_rank.joblib
+models/v8_gate.joblib
