@@ -76,6 +76,10 @@ class HazardForecaster:
         """
         self.model = model
         self.probability_scale = float(probability_scale)
+        # Within-scenario rank -> realised-rate recalibration; needs the whole
+        # scenario's rows at once, so it lives here rather than in the model,
+        # where the out-of-fold dispatcher only ever sees one building.
+        self.rank_calibration = getattr(model, "rank_calibration", None)
         # Correction along the remaining-observation axis. The pooled calibration
         # ratio of 0.93 hides an under-prediction of 0.54 in the opening
         # scenarios and an over-prediction of 1.64 in the closing ones, and no
@@ -163,6 +167,10 @@ class HazardForecaster:
                 remaining[np.asarray(positions, dtype=int)],
                 np.asarray(row_devices),
             )
+            if self.rank_calibration is not None and predicted.shape[0] > 0:
+                column = min(11, predicted.shape[1] - 1)
+                factor = self.rank_calibration.factors(predicted[:, column])
+                predicted = np.clip(predicted * factor[:, None], 0.0, 1.0)
             index = np.asarray(positions, dtype=int)
             # The remaining-observation calibration is applied inside the model,
             # where the out-of-fold dispatcher has already chosen the right fold.

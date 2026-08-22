@@ -82,7 +82,11 @@ def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
         building_of=building_of,
         climatology=bundle["climatology"],
     )
-    return HazardForecaster(model, probability_scale=args.probability_scale)
+    forecaster = HazardForecaster(model, probability_scale=args.probability_scale)
+    # Rank recalibration works on the whole merged scenario, so it rides on the
+    # bundle rather than on any single fold model.
+    forecaster.rank_calibration = bundle.get("rank_calibration")
+    return forecaster
 
 
 def main() -> None:
@@ -115,6 +119,8 @@ def main() -> None:
     parser.add_argument("--due-multiplier", type=float, default=None,
                         help="cap planned swaps at ceil(multiplier x E[due] + buffer)")
     parser.add_argument("--due-buffer", type=float, default=0.0)
+    parser.add_argument("--max-planned", type=int, default=None,
+                        help="flat ceiling on planned swaps per scenario")
     parser.add_argument("--robust-samples", type=int, default=4,
                         help="stratified emergency samples in the search objective; "
                         "0 uses the deterministic expected-cost path and the full budget")
@@ -163,6 +169,7 @@ def main() -> None:
                     max_planned_rate=args.max_planned_rate,
                     expected_due_multiplier=args.due_multiplier,
                     expected_due_buffer=args.due_buffer,
+                    max_planned_count=args.max_planned,
                     use_cp_sat=not args.greedy,
                 ),
             ),

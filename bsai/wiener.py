@@ -57,6 +57,9 @@ VOLTAGE_FEATURE = FEATURE_NAMES.index("voltage")
 # Days since the smoothed voltage first went below 2.45 V (-1 when it never
 # has): the survival-evidence axis the dwell adjustment keys on.
 DWELL_FEATURE = FEATURE_NAMES.index("days_below_2.45")
+# Trailing 30-day within-day dV/dT: the internal-resistance channel the
+# knee-onset floor keys on.
+BETA30_FEATURE = FEATURE_NAMES.index("beta_30")
 
 # Windows used to fit the drift and volatility. Every one of these must fit
 # entirely inside a device's pre-crossing history, so long windows are rarer;
@@ -306,6 +309,15 @@ class WienerModel:
                 out,
                 features[:, VOLTAGE_FEATURE].astype(float) - EOL_THRESHOLD,
                 features[:, DWELL_FEATURE].astype(float),
+                remaining,
+            )
+        boost = getattr(self, "knee_boost", None)
+        if boost is not None:
+            out = boost.apply(
+                out,
+                features[:, VOLTAGE_FEATURE].astype(float) - EOL_THRESHOLD,
+                features[:, BETA30_FEATURE].astype(float),
+                remaining,
             )
         if self.calibration is not None:
             out = self.calibration.apply(out, remaining)

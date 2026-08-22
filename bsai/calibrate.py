@@ -135,6 +135,91 @@ class RemainingCalibration:
 
 
 @dataclass
+class RankCalibration:
+    """Map within-scenario probability rank to the realised due rate.
+
+    Measured on the public split, the model's absolute probability level
+    inflates on unseen buildings (production expected-due 8.45/scenario on its
+    own buildings, at least 11.4 deduced on public against a realised ~9.5),
+    which silently defeated a level-based swap budget. The within-scenario
+    RANKING is far more stable across buildings than the level, so the level
+    is re-derived from the rank: battery at rank r gets the out-of-fold
+    realised due rate at rank r, applied as a per-row rescale of its whole
+    horizon grid. Rates are monotone in rank by isotonic fit, so ordering is
+    preserved; the factor is clipped so extreme rows keep some of their own
+    level information.
+    """
+
+    # rates[r-1] = realised P(due in window) at within-scenario rank r.
+    rates: tuple[float, ...] = ()
+    tail_rate: float = 0.004
+    min_factor: float = 0.1
+    max_factor: float = 5.0
+
+    def rate_for_rank(self, ranks: np.ndarray) -> np.ndarray:
+        ranks = np.asarray(ranks, dtype=int)
+        table = np.asarray(self.rates, dtype=float)
+        out = np.full(ranks.shape, self.tail_rate, dtype=float)
+        inside = (ranks >= 1) & (ranks <= table.size)
+        out[inside] = table[ranks[inside] - 1]
+        return out
+
+    def factors(self, probability: np.ndarray) -> np.ndarray:
+        """Per-row factor for one scenario's batteries, ranked by probability."""
+        probability = np.asarray(probability, dtype=float)
+        order = np.argsort(-probability, kind="stable")
+        ranks = np.empty(probability.size, dtype=int)
+        ranks[order] = np.arange(1, probability.size + 1)
+        target = self.rate_for_rank(ranks)
+        factor = target / np.maximum(probability, 1e-4)
+        return np.clip(factor, self.min_factor, self.max_factor)
+
+    @classmethod
+    def fit(
+        cls,
+        scenario: np.ndarray,
+        predicted: np.ndarray,
+        actual: np.ndarray,
+        *,
+        max_rank: int = 60,
+        tail_rate: float | None = None,
+    ) -> "RankCalibration":
+        from sklearn.isotonic import IsotonicRegression
+
+        scenario = np.asarray(scenario)
+        predicted = np.asarray(predicted, dtype=float)
+        actual = np.asarray(actual, dtype=float)
+        ranks: list[int] = []
+        outcomes: list[float] = []
+        tail_mass = 0.0
+        tail_n = 0
+        for value in np.unique(scenario):
+            inside = scenario == value
+            p = predicted[inside]
+            y = actual[inside]
+            order = np.argsort(-p, kind="stable")
+            for position, row in enumerate(order, start=1):
+                if position <= max_rank:
+                    ranks.append(position)
+                    outcomes.append(float(y[row]))
+                else:
+                    tail_mass += float(y[row])
+                    tail_n += 1
+        iso = IsotonicRegression(y_min=0.0, y_max=1.0, increasing=False, out_of_bounds="clip")
+        iso.fit(np.asarray(ranks, dtype=float), np.asarray(outcomes, dtype=float))
+        rates = tuple(float(v) for v in iso.predict(np.arange(1, max_rank + 1, dtype=float)))
+        fitted_tail = tail_mass / tail_n if tail_n else 0.004
+        return cls(rates=rates, tail_rate=float(tail_rate if tail_rate is not None else fitted_tail))
+
+    def describe(self) -> str:
+        probes = (1, 3, 5, 8, 12, 16, 20, 30, 45, 60)
+        pairs = "  ".join(
+            f"r{p}:{self.rates[p-1]:.3f}" for p in probes if p <= len(self.rates)
+        )
+        return f"rank->rate {pairs}  tail:{self.tail_rate:.4f}"
+
+
+@dataclass
 class DwellAdjust:
     """Survival-evidence correction for cells sitting near the threshold.
 
@@ -157,6 +242,13 @@ class DwellAdjust:
     factors: tuple[float, ...] = (1.0, 1.0, 1.0, 1.0)
     min_factor: float = 0.1
     max_factor: float = 2.5
+    # Apply only where the remaining observation window is at least this long.
+    # Ungated, the knockdown measured worse through the planner: in mid and
+    # closing scenarios the demoted cells' budget slots refill with worse
+    # candidates. Gated long-remaining, it acts where the measured effect
+    # lives (opening-block top-5 realised rate 0.51 -> 0.69 under dwell
+    # reordering) and where a wasted swap costs ~170 against ~25 elsewhere.
+    min_remaining: float | None = None
 
     def factor_for(self, margin: np.ndarray, dwell: np.ndarray) -> np.ndarray:
         margin = np.asarray(margin, dtype=float)
@@ -170,11 +262,20 @@ class DwellAdjust:
         factors = np.asarray(self.factors, dtype=float)[band]
         return np.where(inside, factors, 1.0)
 
-    def apply(self, grid: np.ndarray, margin: np.ndarray, dwell: np.ndarray) -> np.ndarray:
+    def apply(
+        self,
+        grid: np.ndarray,
+        margin: np.ndarray,
+        dwell: np.ndarray,
+        remaining: np.ndarray | None = None,
+    ) -> np.ndarray:
         if grid.shape[0] == 0:
             return grid
-        factor = self.factor_for(margin, dwell)[:, None]
-        return np.clip(grid * factor, 0.0, 1.0)
+        factor = self.factor_for(margin, dwell)
+        gate = getattr(self, "min_remaining", None)
+        if gate is not None and remaining is not None:
+            factor = np.where(np.asarray(remaining, dtype=float) >= float(gate), factor, 1.0)
+        return np.clip(grid * factor[:, None], 0.0, 1.0)
 
     @classmethod
     def fit(
