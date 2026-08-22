@@ -109,6 +109,9 @@ Do not repeat these. Every one was validated out-of-fold and rejected.
 | **Stacking** a logistic layer on `logit(p)` plus the most separable features | PR-AUC 0.2913 against the raw 0.3083. A control given only the probability scored 0.2591, so the wrapper itself destroys information. The passage model already extracts the signal. |
 | **Per-device adaptive drift** (random effects) | Disqualified by the stacking result before building: the features it would add are already used. See trap 6. |
 | **Peer contrast** (margin and slope against room/building medians) | 2319.3 against 2145.1, recall −0.036, precision −0.023. See below. |
+| **The planner's own objective**, the 400-500 points that were item 1 below | Not a bug. The believed-against-realised gap of 1210.4 splits 30 % early / 59 % late / 11 % operational, and every per-branch formula is right where the model is right -- believed early on genuinely-due swaps 32.5 against a realised 36.1. See `docs/V8_HYPOTHESIS_TESTS.md` section 1. |
+| **Censored days-to-EOL regression** (log-normal AFT, EM on the Tobit likelihood, `bsai/aft.py`) | 18x more labelled events (15,581 against 862) and strictly worse: precision at 12/15/18/21 swaps per scenario 0.304/0.271/0.251/0.231 against the Wiener model's 0.370/0.349/0.325/0.302, and worse recall at every point too. Section 2. |
+| **`beta` as a monotone state variable**, and with it the gamma and inverse-Gaussian processes | No barrier. `beta`'s spread at crossing (p90/p10 2.22) is the same as its spread at 0.40 V of margin (2.43), it saturates 0.1 V before end of life, and it tracks the margin at Spearman −0.79. Section 3. |
 
 The peer-contrast failure is worth understanding, because the prior evidence was
 the strongest in the whole phase. Measured *inside the swapped group* -- so
@@ -200,15 +203,34 @@ baked-in `train` would have produced a train-only submission.
 
 ## 6. What is still unexplored, ranked
 
-1. **The planner's own objective, roughly 400-500 points.** `_expected_score`
-   believes **1176.8** where the evaluator charges **2328.2**, correlation 0.613
-   (`tools/belief_v6.py`). The analytic ranking says the best achievable timing
-   at 16 swaps is about 1450; the planner delivers 1961. Nobody has attacked
-   this. It is the largest measured, unexploited gap in the whole project.
-2. **Full-strength retrain.** Everything ships at stride 4 and 250 iterations,
+**The planner's own objective is no longer on this list.** It was item 1, worth
+a nominal 400-500 points, and `tools/belief_components.py` closed it: the cost
+model is faithful, and the whole belief gap is the forecast putting the right
+*amount* of probability on the wrong devices. Out of fold across buildings it
+predicts 9.40 due against a realised 9.46 -- and catches 5.7 of them inside
+17.65 swaps. `docs/V8_HYPOTHESIS_TESTS.md` has the decomposition.
+
+So everything below is a way to change *which* devices rank highest. On this
+problem nothing else moves the score.
+
+1. **Full-strength retrain.** Everything ships at stride 4 and 250 iterations,
    chosen for fast iteration. Stride 2 with 400 iterations has never been run.
-3. **Peer contrast, done properly.** See section 4.
+   It is the only lever here that is pure compute.
+2. **Peer contrast, done properly.** See section 4. Still the only measured
+   source of *between-device* information in the project.
+3. **A tail-weighted survival loss.** The censored labels carry 15,581 events
+   against the binary label's 862, and `E[log T]` is measurably the wrong thing
+   to do with them -- see section 4. Whether a loss aimed at the 42-day region
+   can extract them instead is untested.
 4. **Season as the calibration axis** instead of remaining observation.
+
+One structural defect is recorded but unmeasured: the emergency-queue rank in
+`build_expected_cost_tables` sums horizon probability over the whole fleet, where
+the evaluator's queue only ever holds the batteries the plan misses. That
+over-prices deferral and biases toward servicing. `V8_HYPOTHESIS_TESTS.md`
+section 1b gives the closed form for the self-consistent version, which is O(|D|)
+per search evaluation. **Measure it before building it** -- it moves the belief in
+the direction that already carries the larger error.
 
 ## 7. Tools you should reuse rather than rebuild
 
@@ -222,7 +244,10 @@ baked-in `train` would have produced a train-only submission.
 | `tools/error_profile.py` | What distinguishes false positives from true positives, feature by feature. |
 | `tools/stack_probe.py` | Is a signal present but under-weighted, or already extracted? |
 | `tools/importance.py` | Permutation importance on the drift model, grouped. |
-| `tools/belief_v6.py` | Believed against realised cost. Start here for item 1 above. |
+| `tools/belief_v6.py` | Believed against realised cost, as one number. |
+| `tools/belief_components.py` | The same comparison split per cost component and per probability branch, over all 48 scenarios. This is the one that says whether the planner or the forecast is at fault. |
+| `tools/beta_state.py` | Is the within-day slope monotone per device, and does it reach a consistent value at failure? |
+| `tools/beta_controls.py` | The controls that make the previous answer mean anything: is the threshold vacuous, is the rise seasonal, and how much of `beta` is just the margin restated? |
 | `tools/fit_calibration.py` | Fits the remaining-observation correction, out-of-fold by building. |
 
 ## 8. Ground rules that have earned their place

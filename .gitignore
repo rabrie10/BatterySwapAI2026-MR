@@ -16,4 +16,5 @@ outputs/v5match.json
 outputs/daily_shape.parquet
 outputs/v7_*.json
 outputs/v7_folds.joblib
+outputs/v8_aft_folds.joblib
 outputs/v8_*.json
