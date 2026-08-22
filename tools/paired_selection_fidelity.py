@@ -169,7 +169,9 @@ def main() -> None:
         median_x = float(
             (end_times.dt.normalize() + pd.Timedelta(days=30.0) - dates[-1]).dt.days.median()
         )
-        their_skip = median_x < 100.0
+        # v2 _selection_exchange skips at X < 50 (v1 used 100); mirror the
+        # shipped constant for the diagnostic column.
+        their_skip = median_x < 50.0
         my_skip = index >= 40
 
         # `ordered`: their membership+days, applied order-preservingly.
@@ -310,10 +312,17 @@ def write_section() -> None:
         f"| incumbent merely re-sorted by (day, battery) | {s['mean_delta_sortonly']:+.1f} |",
         f"| measured arm (A+B refilled, X-gated s_40-47) | {s['mean_delta_mine_xgated']:+.1f} |",
         "",
-        "**Verdict: NOT faithful.** The integration inverts the measured arm "
-        "(+16.6 vs -119.6). Named rule differences, largest first:",
+        "**Verdict (v2 exchange, re-replayed after the fixes): FAITHFUL in "
+        "machinery.** As-integrated now matches the order-preserved application "
+        "of its own decisions within insertion minutiae (end-of-day-group vs "
+        "cheapest-slot, ~5/scen; day mismatches 0). The residual gap to the "
+        "measured -119.6 is FLAG content and gate set, not machinery: clamped "
+        "staleness (item 2 below), dead dip (3), the p>0.05 refill floor and "
+        "full-fleet cap basis, and the X<50 skip set -- the A2 section below "
+        "closes most of it in the flags. For the record, the v1 integration "
+        "measured +16.6/scen; items 1 and 4-5 are FIXED in v2:",
         "",
-        "1. **Route destruction (integration bug).** `_selection_exchange` returns "
+        "1. **Route destruction (v1 bug, FIXED in v2).** v1 returned "
         "`sort_values([\"day\", \"battery\"])`, re-ordering EVERY worked day's route "
         "alphabetically (the incumbent order is the local search's routed order; "
         f"the evaluator prices row order). Re-sorting the incumbent alone costs "

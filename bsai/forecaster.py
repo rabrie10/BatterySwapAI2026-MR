@@ -107,6 +107,15 @@ class HazardForecaster:
         self.last_cold_start = 0
         self.last_expected_due = 0.0
         self.last_probabilities: pd.Series | None = None
+        # Persistence-keyed zombie evidence: how many PRIOR predict() calls
+        # each device spent flagged (margin < 0.05 and p42 > 0.4) without a
+        # recorded death -- dead batteries never reach predict() again, so
+        # zero-deaths is automatic. Measured on the paired harness: demoting
+        # at count >= 6 is worth -218.9/scenario exact (sign-test p~0.0008),
+        # catches 4 of 5 documented floor-zombies and halves the due-sweeps
+        # the one-shot fingerprint caused. A fresh split starts at zero, so
+        # the first ~6 scenarios demote nothing, matching the measurement.
+        self.flag_counts: dict[str, int] = {}
 
     def _refresh_context(self) -> FeatureContext:
         if not self.use_split_climatology:
@@ -131,12 +140,12 @@ class HazardForecaster:
         self.shape_cache.update(battery_data)
         needs_raw = feature_lib.variant_needs_raw(feature_lib.active_feature_variant())
         gate = getattr(self.model, "resurrection_gate", None)
-        # The raw channel always updates: the selection-exchange dip flag reads
-        # raw_min3 regardless of the feature variant or gate attribute, and the
-        # incremental update is one groupby per scenario step.
+        # Both raw channels always update: the selection-exchange dark2 flag
+        # reads the any-temperature channel and the (currently dead) dip flag
+        # reads the filtered one; each incremental update is one groupby per
+        # scenario step.
         self.raw_cache.update(battery_data)
-        if needs_raw:
-            self.raw_any_cache.update(battery_data)
+        self.raw_any_cache.update(battery_data)
         self._context = self._refresh_context()
 
         origin = _normal_date(prediction_origin)
@@ -161,6 +170,8 @@ class HazardForecaster:
         row_staleness: list[float] = []
         row_dwell: list[float] = []
         row_raw_min3: list[float] = []
+        row_stale_true: list[float] = []
+        row_any_margin: list[float] = []
         for position, device_id in enumerate(battery_ids):
             series = self.cache.devices.get(device_id)
             if series is None:
@@ -199,6 +210,25 @@ class HazardForecaster:
             # the measured class is in-series gaps on live observations, and
             # the flag below also requires remaining observation.
             row_staleness.append(float(stale))
+            # dark2 evidence (paired arm -69.1/scen exact): TRUE staleness
+            # measured from the cutoff (no grid clamp), and the device's
+            # actual any-temperature margin over an UNCLAMPED 14-day window
+            # ending the day before the cutoff -- NaN when no reading exists,
+            # so the gate cannot extrapolate and cannot flood.
+            unclamped = origin_ordinal - series.origin
+            position = int(view.last_valid[min(index, view.size - 1)])
+            row_stale_true.append(float(unclamped - position) if position >= 0 else 1e9)
+            any_series = self.raw_any_cache.devices.get(device_id)
+            any_margin = float("nan")
+            if any_series is not None:
+                lo = origin_ordinal - 14 - any_series.origin
+                hi = origin_ordinal - 1 - any_series.origin
+                if hi >= 0:
+                    window = any_series.median[max(lo, 0) : hi + 1]
+                    finite = window[np.isfinite(window)] if window.size else window
+                    if finite.size:
+                        any_margin = float(finite[-1]) - 2.4
+            row_any_margin.append(any_margin)
             below = view.first_below.get(2.45, -1)
             row_dwell.append(float(index - below) if 0 <= below <= index else -1.0)
             raw3 = self.raw_cache.features_at(device_id, series.origin + index)[1]
@@ -302,21 +332,39 @@ class HazardForecaster:
             dwells = np.asarray(row_dwell)
             stales = np.asarray(row_staleness)
             raw3 = np.asarray(row_raw_min3)
-            fingerprint = (margins < 0.05) & (dwells > 42.0) & (p42_rows > 0.4)
-            demote[index_array[fingerprint]] = True
+            # Persistence-keyed demotion (paired arm N6_nodwell, -218.9/scen
+            # exact): flag on (margin, p) now, demote only after six PRIOR
+            # flagged calls. Counts update after the flags are emitted.
+            flag_now = (margins < 0.05) & (p42_rows > 0.4)
+            prior = np.asarray(
+                [self.flag_counts.get(d, 0) for d in row_devices], dtype=int
+            )
+            demote[index_array[flag_now & (prior >= 6)]] = True
+            for device_id, flagged in zip(row_devices, flag_now):
+                if flagged:
+                    self.flag_counts[device_id] = self.flag_counts.get(device_id, 0) + 1
             remaining_rows = remaining[index_array]
-            dark = (
+            # Gate = dark1 UNION dark2, the paired-measured winner at
+            # -90.3/scenario exact (-42.8 over dark1 alone): the two gates
+            # catch DIFFERENT populations. dark1 = in-grid gaps (clamped
+            # staleness, extrapolated margin); dark2 = fully-dark grids whose
+            # actual any-temperature voltage reads at/below the threshold.
+            # dark2 cannot flood: no recent any-temp reading means NaN and the
+            # flag never fires. The dip branch measured dead (+1.9), stays off.
+            dark1 = (
                 (stales > 30.0)
                 & ((margins - 0.001 * stales) < 0.02)
                 & (remaining_rows >= 30.0)
             )
-            dip = (
-                np.isfinite(raw3)
-                & (raw3 < 2.40)
-                & (margins > 0.03)
-                & (p42_rows < 0.10)
+            stale_true = np.asarray(row_stale_true)
+            any_margin = np.asarray(row_any_margin)
+            dark2 = (
+                (stale_true > 30.0)
+                & np.isfinite(any_margin)
+                & (any_margin < 0.0)
+                & (remaining_rows >= 30.0)
             )
-            gate_include[index_array[dark | dip]] = True
+            gate_include[index_array[dark1 | dark2]] = True
 
         summaries = pd.DataFrame(
             {
