@@ -1,0 +1,199 @@
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_0  total=   1745.0  served=  7  due=  9  missed=  5  cold=  0   16.0s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_1  total=   2078.9  served= 10  due= 13  missed=  7  cold=  0    8.1s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_2  total=   1964.5  served= 15  due= 17  missed=  6  cold=  0   12.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_3  total=   1982.4  served= 15  due= 19  missed=  6  cold=  0    8.2s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_4  total=   3018.5  served= 10  due= 14  missed=  6  cold=  0    9.2s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_5  total=   1118.1  served= 17  due= 14  missed=  2  cold=  0   12.5s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_6  total=   1875.3  served= 21  due= 18  missed=  4  cold=  0   10.8s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_7  total=   1943.4  served= 18  due= 14  missed=  4  cold=  0    8.4s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_8  total=   1275.1  served= 23  due= 14  missed=  1  cold=  0   10.1s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+    s_9  total=   1078.2  served= 16  due= 10  missed=  1  cold=  0    9.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_10  total=   1117.6  served= 15  due= 10  missed=  2  cold=  0    8.4s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_11  total=   1001.6  served= 16  due= 10  missed=  1  cold=  0    8.8s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_12  total=   1752.9  served= 17  due= 11  missed=  4  cold=  0    9.0s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_13  total=   2998.5  served= 18  due= 14  missed=  7  cold=  0    8.8s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_14  total=   2897.4  served= 17  due= 12  missed=  6  cold=  0    8.4s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_15  total=   2709.6  served= 13  due= 13  missed=  7  cold=  0    8.7s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_16  total=   4655.6  served= 11  due= 15  missed= 11  cold=  0    9.0s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_17  total=   2685.8  served= 21  due= 15  missed=  5  cold=  0    9.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_18  total=   2323.3  served= 14  due= 11  missed=  5  cold=  0    8.2s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_19  total=   1950.3  served= 16  due=  8  missed=  3  cold=  0    7.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_20  total=   2526.8  served= 15  due=  8  missed=  5  cold=  0    7.7s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_21  total=   3828.6  served= 15  due=  9  missed=  6  cold=  0    9.4s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_22  total=   2459.1  served= 14  due=  8  missed=  5  cold=  0    8.0s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_23  total=   4396.5  served= 16  due=  9  missed=  7  cold=  0    9.3s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_24  total=   2708.3  served= 16  due=  9  missed=  5  cold=  0    7.8s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_25  total=   3355.7  served= 13  due=  9  missed=  6  cold=  0    8.2s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_26  total=   3549.0  served= 10  due=  7  missed=  6  cold=  0    7.7s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_27  total=   1984.1  served= 12  due=  6  missed=  4  cold=  0    7.7s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_28  total=   2516.1  served= 12  due=  6  missed=  5  cold=  0    7.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_29  total=   1588.2  served= 11  due=  4  missed=  3  cold=  0    7.8s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_30  total=   1746.2  served= 13  due=  5  missed=  3  cold=  0    8.3s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_31  total=   2561.1  served= 17  due=  8  missed=  5  cold=  0    9.0s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_32  total=   1866.0  served= 18  due= 10  missed=  3  cold=  0    9.4s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_33  total=   2083.8  served= 16  due=  9  missed=  4  cold=  0    8.5s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_34  total=   2093.8  served= 10  due=  9  missed=  5  cold=  0    8.0s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_35  total=   2636.0  served= 11  due= 10  missed=  6  cold=  0    7.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_36  total=   2553.0  served= 13  due=  8  missed=  5  cold=  0    8.0s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_37  total=   1718.0  served= 19  due=  6  missed=  2  cold=  0    9.5s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_38  total=   1801.7  served= 11  due=  5  missed=  4  cold=  0    9.2s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_39  total=   1606.3  served= 15  due=  7  missed=  4  cold=  0   10.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_40  total=   1615.2  served= 26  due=  7  missed=  2  cold=  0   13.3s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_41  total=   1698.6  served= 32  due=  6  missed=  1  cold=  0    9.7s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_42  total=   1793.1  served= 33  due=  8  missed=  2  cold=  0   10.3s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_43  total=   1505.2  served= 30  due=  7  missed=  1  cold=  0   15.6s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_44  total=   1163.9  served= 36  due=  6  missed=  0  cold=  0   10.9s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_45  total=    926.2  served= 29  due=  3  missed=  0  cold=  0   12.2s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_46  total=    800.9  served= 28  due=  2  missed=  0  cold=  0   13.3s
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:199: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))
+   s_47  total=    820.0  served= 37  due=  2  missed=  0  cold=  0   10.8s
+
+{
+  "n_scenarios": 48,
+  "mean_total_cost": 2126.53,
+  "median_total_cost": 1957.4,
+  "p90_total_cost": 3119.65,
+  "max_total_cost": 4655.63,
+  "components": {
+    "battery_swap": 5.36,
+    "building_change": 12.85,
+    "room_change": 8.23,
+    "travel": 40.32,
+    "overtime": 70.59,
+    "daily_limit": 83.33,
+    "weekly_limit": 95.83,
+    "late_swap": 1045.83,
+    "early_swap": 764.18
+  },
+  "decisions": {
+    "served_per_scenario": 17.46,
+    "due_per_scenario": 9.46,
+    "missed_per_scenario": 4.0,
+    "cold_start_per_scenario": 0.0,
+    "expected_due_per_scenario": 9.4,
+    "recall": 0.577,
+    "precision": 0.313
+  },
+  "runtime": {
+    "mean_seconds_per_scenario": 9.57,
+    "max_seconds_per_scenario": 15.96,
+    "projected_minutes_for_96": 17.6
+  },
+  "block_means": [
+    1965.8,
+    1853.9,
+    3103.2,
+    2501.1,
+    2044.8,
+    1290.4
+  ],
+  "block_mean_sd": 616.5,
+  "due_battery_audit": {
+    "n_due": 454,
+    "n_missed": 192,
+    "median_probability_served": 0.5007,
+    "median_probability_missed": 0.0088,
+    "missed_with_probability_below_0.02": 110,
+    "missed_with_probability_below_0.05": 133,
+    "missed_with_probability_below_0.2": 189,
+    "missed_with_probability_below_0.5": 191
+  }
+}
+
+anchors: all-defer 3324.7, naive oracle 205.2, planner oracle 77.8 (scenarios 0-11 only)
+total wall time 517s

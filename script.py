@@ -1,9 +1,20 @@
 """Official BatterySwapAI submission entry point.
 
-Task 1 is the V7 Wiener first-passage model in ``bsai``; Task 2 is the existing
-``batteryswap_solution`` planner, which reaches 77.83 on train scenarios 0-11
-when the risk it is given is correct. The two meet at the v1 forecast contract,
-so the model can be replaced without touching any scheduling code.
+Task 1 is the V8 phase-1 Wiener first-passage model in ``bsai``; Task 2 is the
+existing ``batteryswap_solution`` planner, which reaches 77.83 on train
+scenarios 0-11 when the risk it is given is correct. The two meet at the v1
+forecast contract, so the model can be replaced without touching any scheduling
+code.
+
+**The default artifact is the public-leaderboard incumbent and nothing else.**
+V8 phase 1 (``models/v7_wiener.joblib``, commit ``db85121``) scored **2078.28**
+on public. Two later generations scored worse from a better local number, in
+opposite directions: V9 (``models/v9_blend.joblib``, ``c36d4a3``, local 1753.46)
+went to **2137.22** by planning one more swap per scenario for zero extra
+catches, and V19 (``157513e``, local 1715.9) went to **2113.43** by cutting
+volume and missing real failures. Local out-of-fold rank does not decide what
+ships here; a confirmed public score does. ``_describe_model`` below logs the
+identity of whatever is actually loaded, so a silent swap cannot happen twice.
 
 The planner instance is deliberately shared across every scenario:
 ``make_submissions`` calls the loader once per scenario, and the smoothing cache
@@ -33,7 +44,10 @@ from bsai.runtime import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/v9_blend.joblib")
+# The public incumbent. See the module docstring: this is the only artifact with
+# a confirmed leaderboard score better than every alternative measured so far.
+DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
+INCUMBENT_MODEL_VERSION = "bsai-wiener/v1"
 
 
 def _float_env(name: str, default: float) -> float:
@@ -44,24 +58,62 @@ def _int_env(name: str, default: int) -> int:
     return int(os.environ.get(name, default))
 
 
+def _describe_model(model: object, path: Path) -> str:
+    """One line naming exactly which Task 1 model is about to plan.
+
+    A joblib path is not an identity: ``models/v7_wiener.joblib`` is rewritten
+    in place by ``tools/fit_calibration.py``, so the calibration factors are
+    part of what has to be visible. This string is logged at INFO on every run
+    and asserted against in ``tests/test_submission_identity.py``.
+    """
+    calibration = getattr(model, "calibration", None)
+    factors = getattr(calibration, "factors", ())
+    return (
+        f"task1 model={type(model).__module__}.{type(model).__name__} "
+        f"version={getattr(model, 'model_version', '?')} "
+        f"path={path} "
+        f"volatility_scale={getattr(model, 'volatility_scale', '?')} "
+        f"level_scale={getattr(model, 'level_scale', 1.0)} "
+        f"calibration={[round(float(f), 4) for f in factors] or None}"
+    )
+
+
 def load_forecaster() -> HazardForecaster | None:
     """Load the shipped model, or None so the planner uses its own fallback.
 
-    ``models/v9_blend.joblib`` unpickles as ``bsai.blend.BlendedModel``, which
-    holds a ``bsai.wiener.WienerModel``, a scikit-learn head and a
-    ``bsai.calibrate.RemainingCalibration``. ``COPY bsai/ ./bsai`` covers all of
-    them -- see HANDOVER.md trap 9, where a missing module silently downgraded
-    the submission to the voltage-trend forecaster.
+    ``models/v7_wiener.joblib`` unpickles as ``bsai.wiener.WienerModel`` holding
+    a ``bsai.calibrate.RemainingCalibration``; ``models/v9_blend.joblib`` (kept
+    for comparison, not shipped) additionally needs ``bsai.blend.BlendedModel``
+    and scikit-learn heads. ``COPY bsai/ ./bsai`` covers all of them -- see
+    HANDOVER.md trap 9, where a missing module silently downgraded the
+    submission to the voltage-trend forecaster.
+
+    The identity of what was loaded is logged rather than assumed. Set
+    ``BATTERYSWAP_ALLOW_NON_INCUMBENT=1`` to run a non-incumbent artifact
+    deliberately; without it a mismatch is logged as a warning so it shows up in
+    the submission transcript.
     """
     path = Path(os.environ.get("BATTERYSWAP_MODEL_PATH", DEFAULT_MODEL_PATH))
     if not path.exists():
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)
         return None
     try:
-        return HazardForecaster(joblib.load(path))
+        model = joblib.load(path)
     except Exception:
         LOGGER.exception("Could not load %s; falling back to voltage trend", path)
         return None
+    LOGGER.info("%s", _describe_model(model, path))
+    version = getattr(model, "model_version", None)
+    if version != INCUMBENT_MODEL_VERSION and not os.environ.get(
+        "BATTERYSWAP_ALLOW_NON_INCUMBENT"
+    ):
+        LOGGER.warning(
+            "loaded %s, not the public incumbent %s -- V9 (bsai-blend/v2) scored "
+            "2137.22 on public against V8's 2078.28",
+            version,
+            INCUMBENT_MODEL_VERSION,
+        )
+    return HazardForecaster(model)
 
 
 def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> PlannerConfig:

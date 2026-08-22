@@ -136,6 +136,12 @@ def main() -> None:
         help="record the predicted probability of every genuinely due battery",
     )
     parser.add_argument("--blocks", type=int, default=6, help="non-overlapping blocks")
+    parser.add_argument(
+        "--served-out",
+        type=Path,
+        default=None,
+        help="write the planned-swap and due sets per scenario to this JSON",
+    )
     args = parser.parse_args()
 
     devices = load_devices(args.dataset / "devices.csv")
@@ -180,6 +186,7 @@ def main() -> None:
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset)
     rows: list[dict] = []
     audit: list[dict] = []
+    served_rows: list[dict] = []
     started = time.time()
 
     for index, (scenario, locs, cut, not_dead) in enumerate(
@@ -220,6 +227,18 @@ def main() -> None:
                         "served": battery in served,
                     }
                 )
+        if args.served_out is not None:
+            # The identity of every planned swap, so the false positives can be
+            # profiled without paying for a second planner run. Population A of
+            # docs/FINAL_FP_ANALYSIS.md is exactly (served - due).
+            served_rows.append(
+                {
+                    "scenario": scenario["name"],
+                    "scenario_index": index,
+                    "served": sorted(served),
+                    "due": sorted(due),
+                }
+            )
         entry = {component: float(scores[component]) for component in cost_components}
         entry.update(
             scenario=scenario["name"],
@@ -258,6 +277,10 @@ def main() -> None:
         f"planner oracle 77.8 (scenarios 0-11 only)"
     )
     print(f"total wall time {time.time() - started:.0f}s")
+
+    if args.served_out is not None:
+        args.served_out.parent.mkdir(parents=True, exist_ok=True)
+        args.served_out.write_text(json.dumps(served_rows, indent=1))
 
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(
