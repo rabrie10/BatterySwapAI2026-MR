@@ -28,14 +28,15 @@ allowed to justify a submission:
 | V6 | 2526.0 |
 | V7 | 2293.2 |
 | V8 phase 1, on branch `claude/v8-precision` | 2145.1 |
-| **V9 blend, on branch `claude/v9-timing-and-packing`** | **1806.7** |
+| **V9 blend, on branch `claude/v9-timing-and-packing`** | **1753.5** |
 | perfect knowledge, same planner (scenarios 0-11) | 77.8 |
 
 V8 phase 1 is committed at `db85121`, a clean fast-forward from `main`, 62 tests
 passing, submission path verified. **It has not been submitted yet.**
 
-**V9 is the current best: 1806.71, a paired −338.46 against V8 with t = 5.30 and
-42/48 wins.** Precision 0.313 -> 0.398 *and* recall 0.584 -> 0.617, which no
+**V9 is the current best: 1753.46, a paired −391.71 against V8 with t = 6.44 and
+41/48 wins, and all six non-overlapping blocks improve.** Precision 0.313 -> 0.404
+*and* recall 0.584 -> 0.626, which no
 earlier generation managed -- every previous gain in one came out of the other.
 The write-up is `docs/V9_BLEND.md`; the two-line version is that the Wiener
 first-passage law is right about the *shape* of the CDF and wrong about its
@@ -129,6 +130,9 @@ Do not repeat these. Every one was validated out-of-fold and rejected.
 | **`end_time` as a leak** -- does a device's data stop when it dies? | No. 445 of 461 devices share one export date, and dying devices keep reporting for a median 204 days after their EOL. |
 | **An oracle-free swap-day policy** | The planner puts the median swap on day 1 of a 42-day window and the naive headroom looks like 333 per scenario; fitted on three blocks and scored on the other three it is 56. Day 1 is close to correct -- with a 0.5/10 asymmetric loss the optimum is the 4.8th percentile of the predicted failure time. |
 | **Shrinking the local search** to buy deadline headroom | At `uncertain_local_search_evaluations = 20`, `repair_reserve` is floored at 20 so `general_budget` becomes **zero**: no general move runs, the plan stays at the raw CP-SAT seed and the repair loop grinds. 1827.85 at 16.56 s per scenario against 1806.71 at 12.78. Worse *and* slower. |
+| **A dedicated prune pass**, a separate budget for dropping the weakest swaps | −7.07, sem 11.3, 5/48 wins, and it removes almost nothing. **With move order (−15) and the x11 budget (−72, far too slow), that is three independent attacks on the planner. It is not where the remaining points are.** |
+| **Cost-sensitive head training**, weighting rows by what the error really costs | Mixed sign, inside noise. |
+| **A head on the strided grid** (88,013 cutoffs against 19,890) | Worse at every swap count. Same 82 dying devices; the population mismatch costs more than the volume buys. |
 
 The peer-contrast failure is worth understanding, because the prior evidence was
 the strongest in the whole phase. Measured *inside the swapped group* -- so
@@ -237,19 +241,20 @@ problem nothing else moves the score.
    19,890 rows, the strided grid has 88,013 cutoffs of the same devices.
 2. **Peer contrast, done properly.** See section 4. Still the only measured
    source of *between-device* information in the project.
-3. **A tail-weighted survival loss.** The censored labels carry 15,581 events
+3. **Horizon-grid density, further.** Going from seven thresholds to ten was worth
+   −53. Whether fifteen or twenty keeps paying is untested, and it is free at
+   inference. This is the cheapest untried lever in the project.
+4. **A tail-weighted survival loss.** The censored labels carry 15,581 events
    against the binary label's 862, and `E[log T]` is measurably the wrong thing
    to do with them -- see section 4. Whether a loss aimed at the 42-day region
    can extract them instead is untested.
-4. **Season as the calibration axis** instead of remaining observation.
+5. **Season as the calibration axis** instead of remaining observation.
 
-One structural defect is recorded but unmeasured: the emergency-queue rank in
-`build_expected_cost_tables` sums horizon probability over the whole fleet, where
-the evaluator's queue only ever holds the batteries the plan misses. That
-over-prices deferral and biases toward servicing. `V8_HYPOTHESIS_TESTS.md`
-section 1b gives the closed form for the self-consistent version, which is O(|D|)
-per search evaluation. **Measure it before building it** -- it moves the belief in
-the direction that already carries the larger error.
+The emergency-queue rank defect recorded in `V8_HYPOTHESIS_TESTS.md` section 1b is
+now **closed without being built.** Re-running the belief decomposition on V9
+shows the planner *under*-prices deferral by 2.3x (believed 393.4 against a
+realised 907.5), so the self-consistent rank -- which lowers believed deferral
+cost further -- would move the marginal decision the wrong way.
 
 ## 7. Tools you should reuse rather than rebuild
 
@@ -296,7 +301,7 @@ python tools/fit_calibration.py --volatility-scale 1.0     # ~13 min
 python tools/build_scenario_frame.py                       # ~13 min, cache it once
 python tools/train_blend.py                                # ~4 min
 python tools/fit_calibration.py --folds outputs/v9_blend_folds.joblib     --model models/v9_blend.joblib --volatility-scale 1.0  # ~14 min
-python tools/validate_v6.py --folds outputs/v9_blend_folds.joblib     --model models/v9_blend.joblib --volatility-scale 1.0     --solver-seconds 0.5 --candidate-margin 12             # ~11 min, expect 1806.71
+python tools/validate_v6.py --folds outputs/v9_blend_folds.joblib     --model models/v9_blend.joblib --volatility-scale 1.0     --solver-seconds 0.5 --candidate-margin 12             # ~11 min, expect 1753.46
 python -m unittest discover -s tests                       # 69 tests
 ```
 

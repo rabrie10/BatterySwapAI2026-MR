@@ -103,6 +103,8 @@ def main() -> None:
     parser.add_argument("--late-multiplier", type=float, default=1.0)
     parser.add_argument("--candidate-margin", type=float, default=24.0)
     parser.add_argument("--emergency-rank-scale", type=float, default=1.0)
+    parser.add_argument("--prune", type=int, default=0,
+                        help="evaluations spent offering the weakest swaps for removal")
     parser.add_argument(
         "--move-order",
         choices=("legacy", "interleaved"),
@@ -160,6 +162,7 @@ def main() -> None:
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
                 move_order=args.move_order,
+                prune_evaluations=args.prune,
                 optimizer=OptimizationConfig(
                     solver_seconds=args.solver_seconds,
                     capacity_roundtrip_fraction=args.capacity_roundtrip,

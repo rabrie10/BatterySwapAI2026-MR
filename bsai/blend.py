@@ -57,10 +57,14 @@ from .wiener import WienerModel
 DECISION_HORIZON = 42
 MIN_PROBABILITY = 1e-12
 
-# Horizons the head is stacked over. Short enough to keep the 42-day decision
-# sharp, long enough that the tail of the grid is anchored by data rather than by
-# extrapolation.
-HEAD_HORIZONS = (14, 21, 28, 42, 63, 91, 126)
+# Horizons the head is stacked over. Each one is a fresh labelling of the same
+# rows, so the grid density is how much of the 82 events' timing the head gets to
+# see: going from seven thresholds to ten took the blend from PR-AUC 0.3872 to
+# 0.4129 and the timing screen at fifteen swaps from 1485 to 1403, against a
+# seed-to-seed spread of 34. Density costs nothing at inference -- ``head_grid``
+# always evaluates the model's own 24-point horizon grid whatever it was fitted
+# on -- so the only price is training time.
+HEAD_HORIZONS = (7, 14, 21, 28, 35, 42, 56, 70, 91, 126)
 HEAD_SEEDS = (20260822, 1, 2, 3, 7)
 
 HEAD_PARAMS = dict(

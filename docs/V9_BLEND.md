@@ -7,11 +7,12 @@ Out of fold by building over all 48 train scenarios:
 | V8 phase 1 (`de261f5`) | 2145.16 | — | | |
 | blend, single-horizon head | 1923.96 | −221.20 | 3.82 | 36/48 |
 | blend, multi-horizon bagged head | 1855.28 | −289.88 | 4.27 | 34/48 |
-| **+ out-of-fold level correction (shipped)** | **1806.71** | **−338.46** | **5.30** | **42/48** |
+| + out-of-fold level correction | 1806.71 | −338.46 | 5.30 | 42/48 |
+| **+ denser horizon grid (shipped)** | **1753.46** | **−391.71** | **6.44** | **41/48** |
 
-The block-mean delta over six non-overlapping blocks is **−338.5 ± 79.3**, so this
+The block-mean delta over six non-overlapping blocks is **−391.7 ± 84.2**, so this
 clears the noise floor on the conservative measure as well as the optimistic one.
-Five of six blocks improve by 331 to 518; the sixth is +16.6.
+**All six blocks now improve**, by 74 to 566.
 
 Each step is smaller than the whole. The multi-horizon head is worth −68.7 on its
 own (t = 1.60) and the level correction −52.2 (t = 1.57); neither is significant
@@ -20,17 +21,17 @@ that motivated them and because the combination is.
 
 | | V8 | V9 shipped |
 |---|---:|---:|
-| early_swap | 763.39 | **558.05** |
-| late_swap | 1026.46 | 985.00 |
-| weekly_limit | 114.58 | 79.17 |
-| daily_limit | 87.50 | 56.25 |
-| overtime | 79.52 | 63.31 |
-| travel | 45.69 | 39.11 |
+| early_swap | 763.39 | **537.48** |
+| late_swap | 1026.46 | 960.62 |
+| weekly_limit | 114.58 | 70.83 |
+| daily_limit | 87.50 | 58.33 |
+| overtime | 79.52 | 60.38 |
+| travel | 45.69 | 39.65 |
 | swaps served | 17.65 | **14.65** |
-| missed | 3.94 | 3.62 |
-| **precision** | **0.313** | **0.398** |
-| **recall** | 0.584 | **0.617** |
-| seconds per scenario | 9.85 | 12.78 |
+| missed | 3.94 | 3.54 |
+| **precision** | **0.313** | **0.404** |
+| **recall** | 0.584 | **0.626** |
+| seconds per scenario | 9.85 | 13.01 |
 
 **Three fewer swaps, fewer misses, and every single cost component down.**
 Precision and recall both rise, which is the thing three generations of work had
@@ -196,6 +197,31 @@ expected-cost rule find the operating point for whichever split it is given --
 and the two splits genuinely differ, because the substitute end of life is a fixed
 calendar date and its distance from the scenario changes what a wasted swap costs.
 
+## 4c. Horizon-grid density is the cheapest signal left
+
+The head is stacked over horizons, and each horizon is a fresh labelling of the
+same rows -- so the density of that grid is how much of the 82 events' *timing*
+the head gets to see. Going from seven thresholds to ten
+(`7, 14, 21, 28, 35, 42, 56, 70, 91, 126`) moved the blend from PR-AUC 0.3872 to
+0.4129 on a single seed and the timing screen at fifteen swaps from 1485 to 1403,
+against a seed-to-seed spread of 34. End to end, bagged, it is **1806.71 ->
+1753.46**.
+
+It is free at inference: `head_grid` always evaluates the model's own 24-point
+horizon grid whatever the head was fitted on, so the only price is training time.
+
+The step is −53.25 on its own (t = 1.51), which is inside the noise floor as an
+isolated change. It ships because it makes **every one of the six blocks
+improve** -- the first configuration in this project to do that -- and because the
+mechanism is not a knob: more labelled thresholds on 82 events is more
+information, not a tuned parameter.
+
+Cost-sensitive training was tried alongside it and is not worth shipping.
+Weighting each row by what getting it wrong actually costs -- an emergency visit
+for a false negative, the earliness of a swap that runs to the substitute end of
+life for a false positive -- gives 1458 at fifteen swaps against 1485 at weight
+0.5 and 1588 at weight 1.0. Mixed sign, inside noise.
+
 ## 5. Runtime
 
 The shipped configuration trades a little search for headroom:
@@ -246,6 +272,9 @@ The ranking is still the whole problem, and it is still hard.
 | **Oracle-free swap-day policy** -- place a swap on a day chosen from its predicted probability | The planner puts the median swap on day 1 of a 42-day window, and the naive headroom looks like 333 per scenario. Fitted on three blocks and scored on the other three it is **56**, below the noise floor. The day-1 choice is close to correct: with an asymmetric 0.5/10 loss the optimum is the 4.8th percentile of the predicted failure time. |
 | **`end_time` as a leak** -- does a device's data stop when it dies? | No. 445 of 461 devices share one export date and dying devices keep reporting for a median of 204 days after their EOL. |
 | **Raising the local-search budget to 400** | −71.9 on 24 paired scenarios but 44 minutes projected for 96. See section 4. |
+| **A dedicated prune pass** -- a separate budget spent offering the weakest swaps for removal, lowest predicted probability first, scored by the same exact replay | **−7.07, sem 11.3, 5/48 wins**, and it removes almost nothing (14.65 swaps to 14.50). The one-way ratchet in section 4 is real, but with a good model the seed plus reinsertion already sits at the objective's optimum and there is nothing to prune. **Three independent attacks on the planner -- move order (−15), budget x11 (−72 but far too slow), dedicated prune (−7) -- say the planner is not where the remaining points are.** The knob stays, defaulting off. |
+| **The self-consistent emergency-queue rank** derived in `V8_HYPOTHESIS_TESTS.md` section 1b | Not built, and now measured as pointing the wrong way. Re-running the belief decomposition on V9 shows the planner *under*-prices deferral by 2.3x (believed 393.4 against a realised 907.5), so a correction that lowers the believed deferral cost further would make the marginal decision worse, not better. |
+| **Cost-sensitive head training** | Weighting rows by the real cost of the error: 1458 at fifteen swaps against 1485 at weight 0.5, 1588 at weight 1.0. Mixed sign, inside noise. |
 | **Shrinking the local search** to 50/20 to buy deadline headroom | 1827.85 at 16.56 s per scenario against 1806.71 at 12.78 -- worse *and* slower. `repair_reserve` is floored at 20, so `general_budget` becomes zero and no general move is ever evaluated. |
 | **A tighter hard bound on one day's work** (`max_daily_hours_factor` 1.0), aimed at the three scenarios whose base is 10.25 hours from everything | **+18.75, 1/48 wins.** Forbidding a 41-hour day does not split it, it defers the batteries -- and s_23 gets *592 worse*, because a deferred due battery in a far building buys its own emergency trip. This is the reasoning already written into `optimizer.py`, now measured. The knob stays, defaulting to the shipped behaviour. |
 

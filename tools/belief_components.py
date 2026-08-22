@@ -280,6 +280,9 @@ def main() -> None:
     parser.add_argument("--report", type=Path, default=Path("outputs/v8_belief_components.json"))
     parser.add_argument("--limit", type=int, default=16)
     parser.add_argument("--volatility-scale", type=float, default=1.0)
+    parser.add_argument("--solver-seconds", type=float, default=1.0)
+    parser.add_argument("--candidate-margin", type=float, default=24.0)
+    parser.add_argument("--move-order", default="interleaved")
     args = parser.parse_args()
 
     devices = load_devices(args.dataset / "devices.csv")
@@ -297,7 +300,9 @@ def main() -> None:
     config = PlannerConfig(
         local_search_evaluations=80,
         uncertain_local_search_evaluations=35,
-        optimizer=OptimizationConfig(solver_seconds=1.0),
+        candidate_margin_hours=args.candidate_margin,
+        move_order=args.move_order,
+        optimizer=OptimizationConfig(solver_seconds=args.solver_seconds),
     )
     planner = CompetitionPlanner(forecaster=forecaster, config=config)
 

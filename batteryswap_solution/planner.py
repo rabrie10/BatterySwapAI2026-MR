@@ -42,6 +42,15 @@ class PlannerConfig:
     # can *remove* a swap. "interleaved" round-robins the classes and puts
     # removals first, so the search can go in both directions.
     move_order: str = "interleaved"
+    # A dedicated budget for dropping swaps, spent after the general search.
+    # The general loop gets fifteen evaluations at the shipped settings and the
+    # move classes compete for them, so a removal is only ever tried if the
+    # round robin reaches one. This pass guarantees the weakest swaps are
+    # offered up, lowest predicted probability first, which is where the
+    # optimizer's trip batching does its damage: a battery nobody ranks highly
+    # is precisely the one whose end of life is distant, so it pays close to the
+    # full wasted-swap cost to save a share of one building visit.
+    prune_evaluations: int = 0
     candidate_margin_hours: float = 24.0
     max_candidates: int = 150
     optimizer: OptimizationConfig = field(default_factory=OptimizationConfig)
@@ -665,6 +674,40 @@ class CompetitionPlanner(Planner):
                     break
             if not accepted:
                 break
+        # Prune: offer the weakest swaps up for removal, cheapest belief first.
+        # Each candidate is scored by the same exact replay the rest of the
+        # search uses, so a removal is kept only when the plan is really better.
+        prune_budget = int(self.config.prune_evaluations)
+        if prune_budget > 0:
+            offered = sorted(
+                (
+                    battery_id
+                    for battery_id, day in assignments.items()
+                    if day is not None
+                ),
+                key=lambda battery_id: (priority[battery_id], battery_id),
+            )[:prune_budget]
+            for battery_id in offered:
+                if assignments[battery_id] is None:
+                    continue
+                candidate_assignments = assignments.copy()
+                candidate_assignments[battery_id] = None
+                candidate = build(candidate_assignments)
+                candidate_score = self._expected_score(
+                    candidate,
+                    costs,
+                    due_samples,
+                    locations,
+                    travel_costs,
+                    settings,
+                    start,
+                    replay_context,
+                )
+                if candidate_score + 1e-9 < incumbent_score:
+                    assignments = candidate_assignments
+                    incumbent = candidate
+                    incumbent_score = candidate_score
+
         self.last_expected_improvement = max(all_defer_score - incumbent_score, 0.0)
         if (
             self.last_expected_improvement + 1e-9
