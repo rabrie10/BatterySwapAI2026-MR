@@ -112,6 +112,12 @@ def main() -> None:
         help="override the Wiener volatility scale; the level must be calibrated "
         "on the scenario population, not the training cutoffs",
     )
+    parser.add_argument("--due-multiplier", type=float, default=None,
+                        help="cap planned swaps at ceil(multiplier x E[due] + buffer)")
+    parser.add_argument("--due-buffer", type=float, default=0.0)
+    parser.add_argument("--robust-samples", type=int, default=4,
+                        help="stratified emergency samples in the search objective; "
+                        "0 uses the deterministic expected-cost path and the full budget")
     parser.add_argument("--per-battery", action="store_true",
                         help="decide each battery on its own cost; no joint search")
     parser.add_argument("--work-cost", type=float, default=0.25)
@@ -150,10 +156,13 @@ def main() -> None:
                 uncertain_local_search_evaluations=args.uncertain_search,
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
+                robust_emergency_samples=args.robust_samples,
                 optimizer=OptimizationConfig(
                     solver_seconds=args.solver_seconds,
                     capacity_roundtrip_fraction=args.capacity_roundtrip,
                     max_planned_rate=args.max_planned_rate,
+                    expected_due_multiplier=args.due_multiplier,
+                    expected_due_buffer=args.due_buffer,
                     use_cp_sat=not args.greedy,
                 ),
             ),

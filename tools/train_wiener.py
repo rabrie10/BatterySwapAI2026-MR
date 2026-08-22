@@ -260,12 +260,11 @@ def _increment_groups(frame, cache, horizons) -> np.ndarray:
             if series is None:
                 continue
             margin = series.smooth_voltage
-            crossing = int(frame.crossing[block[0]])
             last = int(frame.last_observed[block[0]])
-            limit = last if crossing < 0 else min(last, crossing - 1)
             cutoffs = frame.cutoff[block]
             ends = cutoffs + horizon
-            usable = (ends <= limit) & (cutoffs >= 0)
+            # Mirrors build_increment_targets: windows may end past the crossing.
+            usable = (ends <= last) & (cutoffs >= 0)
             if not usable.any():
                 continue
             chosen = block[usable]
