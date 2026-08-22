@@ -243,6 +243,8 @@ The ranking is still the whole problem, and it is still hard.
 | **Oracle-free swap-day policy** -- place a swap on a day chosen from its predicted probability | The planner puts the median swap on day 1 of a 42-day window, and the naive headroom looks like 333 per scenario. Fitted on three blocks and scored on the other three it is **56**, below the noise floor. The day-1 choice is close to correct: with an asymmetric 0.5/10 loss the optimum is the 4.8th percentile of the predicted failure time. |
 | **`end_time` as a leak** -- does a device's data stop when it dies? | No. 445 of 461 devices share one export date and dying devices keep reporting for a median of 204 days after their EOL. |
 | **Raising the local-search budget to 400** | −71.9 on 24 paired scenarios but 44 minutes projected for 96. See section 4. |
+| **Shrinking the local search** to 50/20 to buy deadline headroom | 1827.85 at 16.56 s per scenario against 1806.71 at 12.78 -- worse *and* slower. `repair_reserve` is floored at 20, so `general_budget` becomes zero and no general move is ever evaluated. |
+| **A tighter hard bound on one day's work** (`max_daily_hours_factor` 1.0), aimed at the three scenarios whose base is 10.25 hours from everything | **+18.75, 1/48 wins.** Forbidding a 41-hour day does not split it, it defers the batteries -- and s_23 gets *592 worse*, because a deferred due battery in a far building buys its own emergency trip. This is the reasoning already written into `optimizer.py`, now measured. The knob stays, defaulting to the shipped behaviour. |
 
 ## 8. Reproduce
 
