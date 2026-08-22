@@ -50,6 +50,13 @@ class PlannerConfig:
     # -- the fingerprint sweeps real dues; under a binding cap the swap set is
     # substitution-saturated. Off by default; kept for future tighter rules.
     slot_demotion: bool = False
+    # The JOINT selection exchange: defer zombie-fingerprint planned batteries
+    # AND add dark-channel gate batteries AND refill to the cap, as one pass.
+    # Measured on the paired-incumbent harness (exact deltas, official scorer,
+    # all 48 scenarios): -79.2/scenario, 33 wins / 13 losses, sign-test
+    # p = 0.0045. Either side alone is neutral-to-harmful; the value is the
+    # directed exchange (see outputs/paired_selection.md).
+    selection_exchange: bool = True
     # Deterministic capacity post-pass that runs after the local search and
     # repairs the daily/weekly limit hits the budgeted search left behind,
     # then merges adjacent light days (CompetitionPlanner._capacity_repair).
@@ -1023,6 +1030,176 @@ class CompetitionPlanner(Planner):
             incumbent_operational = float(details["total_cost"])
         return incumbent
 
+    def _selection_exchange(
+        self,
+        plan: pd.DataFrame,
+        full_costs: CostTables,
+        forecast,
+        dates: pd.DatetimeIndex,
+        defer_day: pd.Timestamp,
+        locations: pd.DataFrame,
+        candidate_ids: set[str],
+        limit: int | None,
+    ) -> pd.DataFrame:
+        """The measured joint exchange: zombies out, gate batteries in, refill.
+
+        Implements the paired-harness arm 'A+B refilled to limit' with the
+        fidelity corrections from outputs/paired_selection.md: row order is
+        preserved (row order within a day IS the route -- re-sorting cost
+        +77.8/scenario on its own), adds displace the lowest-probability
+        planned battery when at the cap, placement is nearest-planned-visit
+        first for adds and refills alike, the refill pool is the candidate
+        set, and the regime gate skips only the closing scenarios (median
+        X < 50) where the arms measured the exchange harmful.
+        """
+        summaries = getattr(forecast, "summaries", None)
+        if summaries is None or summaries.empty or "gate_include" not in summaries:
+            return plan
+        end_times = pd.to_datetime(locations["end_time"])
+        if getattr(end_times.dt, "tz", None) is not None:
+            end_times = end_times.dt.tz_localize(None)
+        median_x = float(
+            (end_times.dt.normalize() + pd.Timedelta(days=30.0) - dates[-1]).dt.days.median()
+        )
+        if median_x < 50.0:
+            return plan
+        flags = summaries.set_index(summaries["battery_id"].astype(str))
+        zombies = set(flags.index[flags["slot_demote"].astype(bool)])
+        gates = set(flags.index[flags["gate_include"].astype(bool)])
+        if not zombies and not gates:
+            return plan
+
+        horizon_end = dates[-1]
+        rows: list[tuple[pd.Timestamp, str]] = [
+            (pd.Timestamp(day).normalize(), str(battery))
+            for day, battery in zip(plan["day"], plan["battery"])
+        ]
+        position_of = {b: i for i, b in enumerate(full_costs.battery_ids)}
+        probability = full_costs.horizon_event_probability
+        id_column = "battery_id" if "battery_id" in locations else "battery"
+        building_column = "building_id" if "building_id" in locations else "building"
+        loc = locations.copy()
+        loc[id_column] = loc[id_column].astype(str)
+        building_of = dict(zip(loc[id_column], loc[building_column].astype(str)))
+
+        def planned_items() -> list[tuple[int, pd.Timestamp, str]]:
+            return [
+                (i, day, battery)
+                for i, (day, battery) in enumerate(rows)
+                if day <= horizon_end
+            ]
+
+        def best_day(battery: str) -> pd.Timestamp | None:
+            index = position_of.get(battery)
+            if index is None:
+                return None
+            order = np.argsort(full_costs.service_cost[index])
+            for j in order:
+                day = full_costs.candidate_dates[j]
+                if day == full_costs.candidate_dates[-1] and day.weekday() == 6:
+                    continue
+                return day
+            return None
+
+        def placement_day(battery: str) -> pd.Timestamp | None:
+            anchor = best_day(battery)
+            building = building_of.get(battery)
+            visits = [
+                day
+                for _, day, other in planned_items()
+                if other != battery and building_of.get(other) == building
+            ]
+            if not visits or anchor is None:
+                return anchor
+            return min(visits, key=lambda day: (abs((day - anchor).days), day))
+
+        def move_to_defer(battery: str) -> None:
+            for i, (day, other) in enumerate(rows):
+                if other == battery:
+                    rows.pop(i)
+                    rows.append((pd.Timestamp(defer_day).normalize(), battery))
+                    return
+
+        def insert_planned(battery: str, day: pd.Timestamp) -> None:
+            # Remove the battery's existing (deferred) row, then insert at the
+            # END of the target day's group so existing routes are untouched.
+            for i, (_, other) in enumerate(rows):
+                if other == battery:
+                    rows.pop(i)
+                    break
+            insert_at = len(rows)
+            seen_day = False
+            for i, (row_day, _) in enumerate(rows):
+                if row_day == day:
+                    seen_day = True
+                    insert_at = i + 1
+                elif seen_day and row_day != day:
+                    insert_at = i
+                    break
+                elif not seen_day and row_day > day:
+                    insert_at = i
+                    break
+            rows.insert(insert_at, (day, battery))
+
+        planned = {b for _, _, b in planned_items()}
+        cap = int(limit) if limit is not None else len(planned) + len(gates)
+
+        # 1. Zombies out.
+        for battery in sorted(zombies & planned):
+            move_to_defer(battery)
+            planned.discard(battery)
+
+        def displace_weakest() -> bool:
+            victims = [
+                (float(probability[position_of[b]]), b)
+                for _, _, b in planned_items()
+                if b not in gates and position_of.get(b) is not None
+            ]
+            if not victims:
+                return False
+            _, victim = min(victims)
+            move_to_defer(victim)
+            planned.discard(victim)
+            return True
+
+        # 2. Gate batteries in; displace the weakest planned battery at the cap.
+        for battery in sorted(gates - planned):
+            day = placement_day(battery)
+            if day is None:
+                continue
+            if len(planned) >= cap and not displace_weakest():
+                break
+            insert_planned(battery, day)
+            planned.add(battery)
+
+        # 3. Refill headroom from the candidate pool by probability.
+        if len(planned) < cap:
+            pool = sorted(
+                (
+                    (float(-probability[position_of[b]]), b)
+                    for b in candidate_ids
+                    if b not in planned and b not in zombies and b not in gates
+                    and position_of.get(b) is not None
+                ),
+            )
+            for negative_p, battery in pool:
+                if len(planned) >= cap:
+                    break
+                if -negative_p <= 0.05:
+                    break
+                day = placement_day(battery)
+                if day is None:
+                    continue
+                insert_planned(battery, day)
+                planned.add(battery)
+
+        return pd.DataFrame(
+            {
+                "day": pd.DatetimeIndex([day for day, _ in rows]),
+                "battery": [battery for _, battery in rows],
+            }
+        ).reset_index(drop=True)
+
     def plan(
         self,
         battery_data: pd.DataFrame,
@@ -1032,6 +1209,11 @@ class CompetitionPlanner(Planner):
     ) -> pd.DataFrame:
         start = infer_scenario_start(battery_data)
         fallback = self._all_defer(locations, start, settings)
+        # Any config mutation below (X-banded cap, full-fleet budget) is
+        # scenario-local: a reused planner instance must not inherit the
+        # previous scenario's frozen slot limit. Found by the paired harness:
+        # the budget mutation froze the cap at scenario 0's value.
+        entry_config = self.config
         try:
             dates, defer_day = self._planning_clock(start, settings)
             if self.config.planned_cap_by_median_x:
@@ -1157,6 +1339,17 @@ class CompetitionPlanner(Planner):
                     defer_day,
                 )
             plan = self._restore_excluded(plan, excluded, defer_day)
+            if self.config.selection_exchange:
+                plan = self._selection_exchange(
+                    plan,
+                    full_costs,
+                    forecast,
+                    dates,
+                    defer_day,
+                    locations,
+                    candidate_ids,
+                    self.config.optimizer.max_planned_count,
+                )
             check_plan_valid(plan, locations, start_time=start)
             fast_score = self._operational_score(
                 plan, locations, travel_costs, settings, start
@@ -1179,3 +1372,5 @@ class CompetitionPlanner(Planner):
             LOGGER.exception("Task 2 optimization failed; returning valid all-defer plan")
             check_plan_valid(fallback, locations, start_time=start)
             return fallback
+        finally:
+            self.config = entry_config

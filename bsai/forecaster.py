@@ -40,6 +40,7 @@ from .hazard import HazardModel
 from .rawdaily import RawDailyCache
 from .shape import ShapeCache, align_to
 from .smoothing import SmoothingCache
+from .v12_rawany import RawAnyCache
 
 _EPOCH = pd.Timestamp("1970-01-01")
 _MAX_TAIL_DAYS = 400.0
@@ -94,11 +95,13 @@ class HazardForecaster:
         self.model_version = model.model_version
         self.cache = SmoothingCache()
         self.shape_cache = ShapeCache()
-        # Raw-daily channel for the variant feature sets. Gated on the active
-        # feature variant exactly like the variant rows themselves: under the
-        # default "base" variant this cache is never updated or read, so the
-        # base path is byte-identical to before.
+        # Raw-daily channels for the variant feature sets (10-30 degC filtered
+        # and any-temperature). Gated on the active feature variant exactly
+        # like the variant rows themselves: under the default "base" variant
+        # these caches are never updated or read (unless a resurrection gate
+        # asks for the filtered one), so the base path is byte-identical.
         self.raw_cache = RawDailyCache()
+        self.raw_any_cache = RawAnyCache()
         self.use_split_climatology = use_split_climatology
         self._context: FeatureContext | None = None
         self.last_cold_start = 0
@@ -128,10 +131,12 @@ class HazardForecaster:
         self.shape_cache.update(battery_data)
         needs_raw = feature_lib.variant_needs_raw(feature_lib.active_feature_variant())
         gate = getattr(self.model, "resurrection_gate", None)
-        if needs_raw or gate is not None:
-            # The resurrection gate reads the raw 3-day minimum even when the
-            # feature variant itself does not use the raw channel.
-            self.raw_cache.update(battery_data)
+        # The raw channel always updates: the selection-exchange dip flag reads
+        # raw_min3 regardless of the feature variant or gate attribute, and the
+        # incremental update is one groupby per scenario step.
+        self.raw_cache.update(battery_data)
+        if needs_raw:
+            self.raw_any_cache.update(battery_data)
         self._context = self._refresh_context()
 
         origin = _normal_date(prediction_origin)
@@ -177,6 +182,9 @@ class HazardForecaster:
                 raw=partial(self.raw_cache.features_at, device_id)
                 if needs_raw
                 else None,
+                raw_any=partial(self.raw_any_cache.features_at, device_id)
+                if needs_raw
+                else None,
             )
             if row is None:
                 continue
@@ -185,14 +193,15 @@ class HazardForecaster:
             row_devices.append(device_id)
             value, stale = view.value_at_or_before(index)
             row_margin.append(float(value) - 2.4)
+            # Clamped staleness, exactly matching the frame the exchange gates
+            # were measured on. An overhang-corrected variant was tried and
+            # flooded the dark gate with long-ended devices (validated +520):
+            # the measured class is in-series gaps on live observations, and
+            # the flag below also requires remaining observation.
             row_staleness.append(float(stale))
             below = view.first_below.get(2.45, -1)
             row_dwell.append(float(index - below) if 0 <= below <= index else -1.0)
-            raw3 = (
-                self.raw_cache.features_at(device_id, series.origin + index)[1]
-                if (needs_raw or gate is not None)
-                else float("nan")
-            )
+            raw3 = self.raw_cache.features_at(device_id, series.origin + index)[1]
             row_raw_min3.append(float(raw3))
 
         count = len(battery_ids)
@@ -276,23 +285,38 @@ class HazardForecaster:
                 "prob_no_observed_eol_by_horizon": observed_tail + unobserved,
             }
         )
-        # Zombie fingerprint for the planner's slot allocation: small margin,
-        # long dwell below 2.45 without a crossing, high predicted probability.
-        # The five such batteries hold four of the fifteen planned slots in
-        # nearly every scenario (realised due rate ~0.15) while genuine dues
-        # at p~0.18 sit ranks past the cap. The flag demotes them in the ORDER
-        # only -- their probability stays in the expected-due budget, which is
-        # why the five probability-knockdown attempts before this all died.
+        # Selection-exchange flags for the planner's post-pass. Measured on the
+        # paired-incumbent harness (exact deltas, official scorer, 48
+        # scenarios): the joint exchange -- defer zombie-fingerprint planned
+        # batteries AND force-include dark-channel batteries AND refill to the
+        # cap -- is worth -79.2/scenario (33 wins / 13 losses, sign-test
+        # p=0.0045), while either side alone is neutral-to-harmful. Flags
+        # only: probabilities are untouched, so the expected-due budget and
+        # the cost tables are unchanged.
         demote = np.zeros(count, dtype=bool)
+        gate_include = np.zeros(count, dtype=bool)
         if positions:
             index_array = np.asarray(positions, dtype=int)
             p42_rows = grid[index_array, min(11, grid.shape[1] - 1)]
-            fingerprint = (
-                (np.asarray(row_margin) < 0.05)
-                & (np.asarray(row_dwell) > 42.0)
-                & (p42_rows > 0.4)
-            )
+            margins = np.asarray(row_margin)
+            dwells = np.asarray(row_dwell)
+            stales = np.asarray(row_staleness)
+            raw3 = np.asarray(row_raw_min3)
+            fingerprint = (margins < 0.05) & (dwells > 42.0) & (p42_rows > 0.4)
             demote[index_array[fingerprint]] = True
+            remaining_rows = remaining[index_array]
+            dark = (
+                (stales > 30.0)
+                & ((margins - 0.001 * stales) < 0.02)
+                & (remaining_rows >= 30.0)
+            )
+            dip = (
+                np.isfinite(raw3)
+                & (raw3 < 2.40)
+                & (margins > 0.03)
+                & (p42_rows < 0.10)
+            )
+            gate_include[index_array[dark | dip]] = True
 
         summaries = pd.DataFrame(
             {
@@ -301,6 +325,7 @@ class HazardForecaster:
                 "remaining_observation_days": remaining,
                 "cold_start": ~np.isin(np.arange(count), positions),
                 "slot_demote": demote,
+                "gate_include": gate_include,
             }
         )
         metadata = ForecastMetadata(

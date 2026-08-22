@@ -113,13 +113,22 @@ class RemainingCalibration:
         remaining = np.asarray(remaining, dtype=float)
         predicted = np.asarray(predicted, dtype=float)
         actual = np.asarray(actual, dtype=float)
+        pooled = float(actual.sum()) / max(float(predicted.sum()), 1e-9)
         factors: list[float] = []
         for low, high in zip(edges[:-1], edges[1:]):
             inside = (remaining >= low) & (remaining < high)
             mass = float(predicted[inside].sum())
             events = float(actual[inside].sum())
-            if inside.sum() == 0 or mass <= 1e-9 or events < min_events:
+            if inside.sum() == 0 or mass <= 1e-9:
                 factors.append(1.0)
+                continue
+            if events < min_events:
+                # A thin bucket used to fall back to 1.0, which left the
+                # shortest-remaining bucket uncorrected in 3 of 5 folds and the
+                # closing-block expected-due count running 2.09x hot. Shrink
+                # toward the pooled ratio instead of toward no-correction.
+                shrunk = (events + 10.0 * pooled) / (mass + 10.0)
+                factors.append(float(np.clip(shrunk, MIN_FACTOR, MAX_FACTOR)))
                 continue
             factors.append(float(np.clip(events / mass, MIN_FACTOR, MAX_FACTOR)))
         return cls(edges=tuple(edges), factors=tuple(factors))
