@@ -22,6 +22,8 @@ consequences are wired in below:
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
 
@@ -31,9 +33,11 @@ from batteryswap_solution.forecast import (
     RiskForecast,
 )
 
+from . import features as feature_lib
 from .calibrate import RemainingCalibration
 from .features import DeviceView, FeatureContext, feature_row, fleet_climatology
 from .hazard import HazardModel
+from .rawdaily import RawDailyCache
 from .shape import ShapeCache, align_to
 from .smoothing import SmoothingCache
 
@@ -90,6 +94,11 @@ class HazardForecaster:
         self.model_version = model.model_version
         self.cache = SmoothingCache()
         self.shape_cache = ShapeCache()
+        # Raw-daily channel for the variant feature sets. Gated on the active
+        # feature variant exactly like the variant rows themselves: under the
+        # default "base" variant this cache is never updated or read, so the
+        # base path is byte-identical to before.
+        self.raw_cache = RawDailyCache()
         self.use_split_climatology = use_split_climatology
         self._context: FeatureContext | None = None
         self.last_cold_start = 0
@@ -117,6 +126,12 @@ class HazardForecaster:
     ) -> RiskForecast:
         self.cache.update(battery_data)
         self.shape_cache.update(battery_data)
+        needs_raw = feature_lib.variant_needs_raw(feature_lib.active_feature_variant())
+        gate = getattr(self.model, "resurrection_gate", None)
+        if needs_raw or gate is not None:
+            # The resurrection gate reads the raw 3-day minimum even when the
+            # feature variant itself does not use the raw channel.
+            self.raw_cache.update(battery_data)
         self._context = self._refresh_context()
 
         origin = _normal_date(prediction_origin)
@@ -137,6 +152,10 @@ class HazardForecaster:
         rows: list[list[float]] = []
         positions: list[int] = []
         row_devices: list[str] = []
+        row_margin: list[float] = []
+        row_staleness: list[float] = []
+        row_dwell: list[float] = []
+        row_raw_min3: list[float] = []
         for position, device_id in enumerate(battery_ids):
             series = self.cache.devices.get(device_id)
             if series is None:
@@ -150,13 +169,31 @@ class HazardForecaster:
                 self.shape_cache.devices.get(device_id), series.origin, len(series)
             )
             row = feature_row(
-                view, index, series.origin + index, self._context, shape_view
+                view,
+                index,
+                series.origin + index,
+                self._context,
+                shape_view,
+                raw=partial(self.raw_cache.features_at, device_id)
+                if needs_raw
+                else None,
             )
             if row is None:
                 continue
             rows.append(row)
             positions.append(position)
             row_devices.append(device_id)
+            value, stale = view.value_at_or_before(index)
+            row_margin.append(float(value) - 2.4)
+            row_staleness.append(float(stale))
+            below = view.first_below.get(2.45, -1)
+            row_dwell.append(float(index - below) if 0 <= below <= index else -1.0)
+            raw3 = (
+                self.raw_cache.features_at(device_id, series.origin + index)[1]
+                if (needs_raw or gate is not None)
+                else float("nan")
+            )
+            row_raw_min3.append(float(raw3))
 
         count = len(battery_ids)
         self.last_cold_start = count - len(positions)
@@ -171,6 +208,26 @@ class HazardForecaster:
                 column = min(11, predicted.shape[1] - 1)
                 factor = self.rank_calibration.factors(predicted[:, column])
                 predicted = np.clip(predicted * factor[:, None], 0.0, 1.0)
+            if gate is not None and predicted.shape[0] > 0:
+                column = min(11, predicted.shape[1] - 1)
+                p42 = predicted[:, column]
+                floors = gate.floors(
+                    p42,
+                    np.asarray(row_margin, dtype=float),
+                    np.asarray(row_staleness, dtype=float),
+                    np.asarray(row_raw_min3, dtype=float),
+                )
+                lift = floors > p42
+                if lift.any():
+                    scale = np.ones_like(p42)
+                    scale[lift] = floors[lift] / np.maximum(p42[lift], 1e-4)
+                    predicted = np.clip(predicted * scale[:, None], 0.0, 1.0)
+                    # A gated row whose CDF was uniformly tiny keeps its shape;
+                    # make sure the floor value itself is reached at the window.
+                    predicted[lift, column] = np.maximum(
+                        predicted[lift, column], floors[lift]
+                    )
+                    predicted = np.maximum.accumulate(predicted, axis=1)
             index = np.asarray(positions, dtype=int)
             # The remaining-observation calibration is applied inside the model,
             # where the out-of-fold dispatcher has already chosen the right fold.
@@ -219,12 +276,31 @@ class HazardForecaster:
                 "prob_no_observed_eol_by_horizon": observed_tail + unobserved,
             }
         )
+        # Zombie fingerprint for the planner's slot allocation: small margin,
+        # long dwell below 2.45 without a crossing, high predicted probability.
+        # The five such batteries hold four of the fifteen planned slots in
+        # nearly every scenario (realised due rate ~0.15) while genuine dues
+        # at p~0.18 sit ranks past the cap. The flag demotes them in the ORDER
+        # only -- their probability stays in the expected-due budget, which is
+        # why the five probability-knockdown attempts before this all died.
+        demote = np.zeros(count, dtype=bool)
+        if positions:
+            index_array = np.asarray(positions, dtype=int)
+            p42_rows = grid[index_array, min(11, grid.shape[1] - 1)]
+            fingerprint = (
+                (np.asarray(row_margin) < 0.05)
+                & (np.asarray(row_dwell) > 42.0)
+                & (p42_rows > 0.4)
+            )
+            demote[index_array[fingerprint]] = True
+
         summaries = pd.DataFrame(
             {
                 "battery_id": battery_ids.to_numpy(),
                 "horizon_probability": horizon_cdf,
                 "remaining_observation_days": remaining,
                 "cold_start": ~np.isin(np.arange(count), positions),
+                "slot_demote": demote,
             }
         )
         metadata = ForecastMetadata(

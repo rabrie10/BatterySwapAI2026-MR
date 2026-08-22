@@ -121,6 +121,11 @@ def main() -> None:
     parser.add_argument("--due-buffer", type=float, default=0.0)
     parser.add_argument("--max-planned", type=int, default=None,
                         help="flat ceiling on planned swaps per scenario")
+    parser.add_argument("--no-demotion", action="store_true",
+                        help="ignore the forecast's slot_demote fingerprint")
+    parser.add_argument("--cap-bands", type=str, default=None,
+                        help="X-banded caps 'upper:cap,upper:cap,...' ascending by upper; "
+                        "X = median(end_time+30d - window end) in days")
     parser.add_argument("--robust-samples", type=int, default=4,
                         help="stratified emergency samples in the search objective; "
                         "0 uses the deterministic expected-cost path and the full budget")
@@ -154,6 +159,12 @@ def main() -> None:
             ),
         )
     else:
+        cap_bands = None
+        if args.cap_bands:
+            cap_bands = tuple(
+                (float(part.split(":")[0]), int(part.split(":")[1]))
+                for part in args.cap_bands.split(",")
+            )
         planner = CompetitionPlanner(
             forecaster=forecaster,
             config=PlannerConfig(
@@ -163,6 +174,8 @@ def main() -> None:
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
                 robust_emergency_samples=args.robust_samples,
+                planned_cap_by_median_x=cap_bands,
+                slot_demotion=not args.no_demotion,
                 optimizer=OptimizationConfig(
                     solver_seconds=args.solver_seconds,
                     capacity_roundtrip_fraction=args.capacity_roundtrip,

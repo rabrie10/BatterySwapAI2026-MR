@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import logging
 
 import numpy as np
@@ -20,7 +20,7 @@ from .costs import (
 from .forecast import RiskForecaster, VoltageTrendForecaster, validate_forecast
 from .optimizer import OptimizationConfig, optimize_assignments, scenario_planned_swap_limit
 from .replay import ReplayContext, build_replay_context, replay_operational_cost
-from .routing import order_assignments
+from .routing import order_assignments, route_buildings, travel_lookup
 
 
 LOGGER = logging.getLogger(__name__)
@@ -37,6 +37,24 @@ class PlannerConfig:
     emergency_rank_scale: float = 1.0
     candidate_margin_hours: float = 24.0
     max_candidates: int = 150
+    # Planned-swap ceiling as a function of the scenario's median wasted-swap
+    # price X = (observation end + 30 d) - window end, which is known at plan
+    # time. The ranking's top-12 realised rate is 0.60 in high-X scenarios and
+    # 0.21 in the mid range (and no amount of foresight fixes the mid range:
+    # a 21-day peek only reaches 0.15 on the still-alive dues), so volume is
+    # spent where the ranking earns it and withheld where it cannot.
+    # Bands: (x_upper_bound, cap), evaluated in order; None disables.
+    planned_cap_by_median_x: tuple[tuple[float, int], ...] | None = None
+    # Act on the forecast's slot_demote fingerprint (see bsai/forecaster.py).
+    # Measured 2026-08-22: demotion-only arm cost ~+60-100 (misses 4.25->4.48)
+    # -- the fingerprint sweeps real dues; under a binding cap the swap set is
+    # substitution-saturated. Off by default; kept for future tighter rules.
+    slot_demotion: bool = False
+    # Deterministic capacity post-pass that runs after the local search and
+    # repairs the daily/weekly limit hits the budgeted search left behind,
+    # then merges adjacent light days (CompetitionPlanner._capacity_repair).
+    # Kill switch: construct the planner with capacity_repair=False.
+    capacity_repair: bool = True
     optimizer: OptimizationConfig = field(default_factory=OptimizationConfig)
 
 
@@ -634,6 +652,377 @@ class CompetitionPlanner(Planner):
             return all_defer
         return incumbent
 
+    # ------------------------------------------------------------------
+    # Capacity post-pass. Deterministic; runs after the local search and
+    # before _restore_excluded. Enabled by PlannerConfig.capacity_repair.
+    # ------------------------------------------------------------------
+    def _capacity_repair(
+        self,
+        plan: pd.DataFrame,
+        costs: CostTables,
+        locations: pd.DataFrame,
+        travel_costs: pd.DataFrame,
+        settings,
+        start: pd.Timestamp,
+        defer_day: pd.Timestamp,
+    ) -> pd.DataFrame:
+        """Repair the capacity-limit hits the budgeted local search left behind.
+
+        The evaluator charges a flat 100 per day whose hours exceed the daily
+        limit (strict >) and per Monday-anchored week bucket at or above the
+        weekly limit, plus 2x(hours - 8) overtime per day. The local search
+        repairs these with whatever budget survives its general moves; this
+        pass is the dedicated finisher with exact acceptance. Two measured
+        caveats bound what finishing can earn (tools/capacity_pass_probe.py on
+        s_4/s_21): the historical 25-35h mega-days are far-cluster geometry --
+        every building ~8h from base, so any split buys a second ~16h-travel
+        day that inherits the first day's return carry (evaluate.py carries a
+        day's return travel into the next workday) and trips its own limit --
+        and a large share of the validation's daily/weekly component is
+        emergency-day cost from missed forecasts, which no plan repair can
+        touch. On such days this pass proves irreducibility by finding no
+        improving move and leaves them alone. What it does fix:
+
+        * for every day over the daily limit and every worked day inside a hit
+          week bucket, try moving each building group, each contiguous
+          route segment (the split that actually fixes a chained multi-building
+          day: single-building removals leave it over the limit), the whole
+          day, and each single battery to nearby days (+-1..3, +-7, +-14), the
+          group's timing-optimal day, and the nearest existing workdays --
+          week fixes only consider targets in a different week bucket;
+        * once nothing is over a limit, try merging adjacent light days when
+          the merge saves operational cost outright (a return trip against the
+          overtime it buys) without degrading the combined objective.
+
+        A move is accepted iff exact-replay operational delta plus the timing
+        delta from ``costs.service_cost`` is strictly negative (merges must
+        also save operational cost on their own: a merge funded purely by
+        expected timing is the local search's job, not capacity repair). The
+        planned set never changes, so the deferred-emergency term of the
+        search objective cancels and acceptance is exactly the deterministic
+        objective delta. Robust emergency sampling
+        (``robust_emergency_samples > 0``) averages emergency replays into the
+        search objective; this pass deliberately ignores that coupling -- the
+        shipped configuration runs with sampling off.
+
+        Determinism: hit days and weeks are visited in sorted order, groups
+        and targets are enumerated in sorted order, budgets truncate that
+        deterministic enumeration, and each round accepts the strict minimum
+        of (delta, target day, sorted batteries). Every accepted move lowers
+        the objective by more than 1e-9, so the loop cannot cycle; the caps
+        below only bound the worst case. Candidate plans re-route only the
+        touched days (day routes are independent in the evaluator), which
+        keeps a candidate at one small routing call plus one ~ms replay.
+        """
+
+        max_rounds = 40         # accepted moves; each costs one detailed replay
+        round_replays = 120     # candidate replays per round
+        total_replays = 600     # candidate replays for the whole pass (~ms each)
+        merge_headroom = 6.0    # pre-filter slack over the daily limit for merges
+
+        loc = locations.copy().set_index(locations["battery"].astype(str))
+        building_column = "building" if "building" in loc else "building_id"
+        room_column = "room" if "room" in loc else "room_id"
+        base = str(settings.base_location)
+        building_of = {
+            battery_id: str(loc.loc[battery_id, building_column])
+            for battery_id in loc.index
+        }
+        room_of = {
+            battery_id: str(loc.loc[battery_id, room_column])
+            for battery_id in loc.index
+        }
+        battery_positions = {
+            battery_id: index for index, battery_id in enumerate(costs.battery_ids)
+        }
+        priority = {
+            battery_id: float(costs.horizon_event_probability[index])
+            for index, battery_id in enumerate(costs.battery_ids)
+        }
+        travel = travel_lookup(travel_costs)
+        replay_context = build_replay_context(locations, travel_costs, settings, start)
+        date_index = {date: index for index, date in enumerate(costs.candidate_dates)}
+        last_date = costs.candidate_dates[-1]
+        defer_norm = pd.Timestamp(defer_day).normalize()
+
+        def route_day(batteries: list[str]) -> list[str]:
+            """One day's evaluator row order, exactly as order_assignments emits it."""
+            by_building: dict[str, list[str]] = {}
+            for battery_id in sorted(batteries):
+                by_building.setdefault(building_of[battery_id], []).append(battery_id)
+            building_order = [base] if base in by_building else []
+            building_order.extend(route_buildings(list(by_building), base, travel))
+            rows: list[str] = []
+            for building in building_order:
+                by_room: dict[str, list[str]] = {}
+                for battery_id in by_building[building]:
+                    by_room.setdefault(room_of[battery_id], []).append(battery_id)
+                for room in sorted(
+                    by_room,
+                    key=lambda room: (
+                        -max(priority.get(battery, 0.0) for battery in by_room[room]),
+                        room,
+                    ),
+                ):
+                    rows.extend(
+                        sorted(
+                            by_room[room],
+                            key=lambda battery: (-priority.get(battery, 0.0), battery),
+                        )
+                    )
+            return rows
+
+        # The plan at this point names exactly the candidate batteries; days
+        # outside the cost tables' candidate dates are the deferred tail. The
+        # incoming per-day row order is kept verbatim (it is the local
+        # search's routed order); only days a move touches are re-routed.
+        day_rows: dict[pd.Timestamp, list[str]] = {}
+        deferred: list[str] = []
+        assignments: dict[str, pd.Timestamp | None] = {}
+        for row in plan.itertuples(index=False):
+            day = pd.Timestamp(row.day).normalize()
+            battery_id = str(row.battery)
+            if day in date_index:
+                assignments[battery_id] = day
+                day_rows.setdefault(day, []).append(battery_id)
+            else:
+                assignments[battery_id] = None
+                deferred.append(battery_id)
+        deferred = sorted(deferred)
+
+        def frame_of(rows_by_day: dict[pd.Timestamp, list[str]]) -> pd.DataFrame:
+            days: list[pd.Timestamp] = []
+            batteries: list[str] = []
+            for day in sorted(rows_by_day):
+                for battery_id in rows_by_day[day]:
+                    days.append(day)
+                    batteries.append(battery_id)
+            days.extend([defer_norm] * len(deferred))
+            batteries.extend(deferred)
+            return pd.DataFrame(
+                {"day": pd.DatetimeIndex(days), "battery": batteries}
+            )
+
+        def moved_rows(
+            group: list[str], target: pd.Timestamp
+        ) -> dict[pd.Timestamp, list[str]]:
+            group_set = set(group)
+            rows = dict(day_rows)
+            for source in sorted({assignments[battery_id] for battery_id in group}):
+                remaining = [b for b in rows[source] if b not in group_set]
+                if remaining:
+                    rows[source] = route_day(remaining)
+                else:
+                    del rows[source]
+            rows[target] = route_day(rows.get(target, []) + group)
+            return rows
+
+        def operational(current: pd.DataFrame, with_details: bool = False):
+            return replay_operational_cost(
+                current,
+                locations,
+                travel_costs,
+                settings,
+                start,
+                include_details=with_details,
+                context=replay_context,
+            )
+
+        def timing_delta(batteries: list[str], target: pd.Timestamp) -> float:
+            target_index = date_index[target]
+            return float(
+                sum(
+                    costs.service_cost[battery_positions[battery_id], target_index]
+                    - costs.service_cost[
+                        battery_positions[battery_id],
+                        date_index[assignments[battery_id]],
+                    ]
+                    for battery_id in batteries
+                )
+            )
+
+        def week_bucket(day: pd.Timestamp) -> int:
+            return int((day - start).days) // 7
+
+        incumbent = frame_of(day_rows)
+        details = operational(incumbent, with_details=True)
+        incumbent_operational = float(details["total_cost"])
+        spent = 0
+
+        for _ in range(max_rounds):
+            if not day_rows:
+                break
+            worked_days = sorted(day_rows)
+            day_hours = {
+                pd.Timestamp(record["day"]): float(record["hours"])
+                for record in details["_daily_records"]
+            }
+            hit_days = sorted(
+                pd.Timestamp(record["day"])
+                for record in details["_daily_records"]
+                if record["limit_hit"] and pd.Timestamp(record["day"]) in day_rows
+            )
+            hit_buckets = sorted(
+                {
+                    week_bucket(pd.Timestamp(record["week_start"]))
+                    for record in details["_weekly_records"]
+                    if record["limit_hit"]
+                }
+            )
+
+            def day_groups(day: pd.Timestamp) -> tuple[list[list[str]], list[list[str]]]:
+                """(structural groups, single batteries) for one worked day.
+
+                Structural groups -- contiguous route segments, per-building
+                groups, the whole day -- come first in the enumeration:
+                chained multi-building days are only fixable by shedding
+                several buildings at once, and the cheap subsets to shed are
+                prefixes/suffixes of the route. Singles are enumerated last so
+                a tight budget is spent on moves that can actually clear a hit.
+                """
+                batteries = day_rows[day]
+                by_building: dict[str, list[str]] = {}
+                building_sequence: list[str] = []
+                for battery_id in batteries:  # row order == route order
+                    building = building_of[battery_id]
+                    if building not in by_building:
+                        by_building[building] = []
+                        building_sequence.append(building)
+                    by_building[building].append(battery_id)
+                groups: list[list[str]] = []
+                for split in range(1, len(building_sequence)):
+                    prefix: list[str] = []
+                    for building in building_sequence[:split]:
+                        prefix.extend(by_building[building])
+                    suffix: list[str] = []
+                    for building in building_sequence[split:]:
+                        suffix.extend(by_building[building])
+                    groups.append(prefix)
+                    groups.append(suffix)
+                groups.extend(
+                    by_building[building] for building in sorted(by_building)
+                )
+                if len(by_building) > 1:
+                    groups.append(list(batteries))
+                singles = [[battery_id] for battery_id in sorted(batteries)]
+                return [sorted(group) for group in groups], singles
+
+            def group_targets(day: pd.Timestamp, group: list[str]) -> list[pd.Timestamp]:
+                positions = [battery_positions[battery_id] for battery_id in group]
+                best_day = costs.candidate_dates[
+                    int(np.argmin(costs.service_cost[positions].sum(axis=0)))
+                ]
+                targets = [
+                    day + pd.Timedelta(days=offset)
+                    for offset in (1, -1, 2, -2, 3, -3, 7, -7, 14, -14)
+                ]
+                targets.append(best_day)
+                targets.extend(
+                    sorted(
+                        (other for other in worked_days if other != day),
+                        key=lambda other: (abs((other - day).days), other),
+                    )[:4]
+                )
+                return targets
+
+            # Targets iterate on the outside so every structural group gets
+            # its nearby-day shot before the budget can run out.
+            candidates: list[tuple[list[str], pd.Timestamp]] = []
+            fix_days: list[tuple[pd.Timestamp, int | None]] = [
+                (day, None) for day in hit_days
+            ]
+            for bucket in hit_buckets:
+                fix_days.extend(
+                    (day, bucket)
+                    for day in worked_days
+                    if week_bucket(day) == bucket
+                )
+            deferred_singles: list[tuple[list[str], pd.Timestamp]] = []
+            for day, bucket in fix_days:
+                structural, singles = day_groups(day)
+                target_lists = {
+                    tuple(group): group_targets(day, group)
+                    for group in structural + singles
+                }
+                longest = max((len(t) for t in target_lists.values()), default=0)
+                for rank in range(longest):
+                    for group in structural:
+                        targets = target_lists[tuple(group)]
+                        if rank < len(targets):
+                            target = targets[rank]
+                            if bucket is None or week_bucket(target) != bucket:
+                                candidates.append((group, target))
+                    for group in singles:
+                        targets = target_lists[tuple(group)]
+                        if rank < len(targets):
+                            target = targets[rank]
+                            if bucket is None or week_bucket(target) != bucket:
+                                deferred_singles.append((group, target))
+            candidates.extend(deferred_singles)
+            if not candidates:
+                # Nothing over a limit: try merging adjacent light days. The
+                # replay delta prices the saved return trip against overtime
+                # and any freshly tripped limit exactly.
+                daily_limit_hours = float(settings.worker_limit_daily_hours)
+                for left, right in zip(worked_days, worked_days[1:]):
+                    combined = day_hours.get(left, 0.0) + day_hours.get(right, 0.0)
+                    if combined > daily_limit_hours + merge_headroom:
+                        continue
+                    candidates.append((sorted(day_rows[left]), right))
+                    candidates.append((sorted(day_rows[right]), left))
+
+            best_key: tuple[float, pd.Timestamp, tuple[str, ...]] | None = None
+            best_rows: dict[pd.Timestamp, list[str]] | None = None
+            best_group: list[str] | None = None
+            best_target: pd.Timestamp | None = None
+            seen: set[tuple[tuple[str, ...], pd.Timestamp]] = set()
+            round_spent = 0
+            for group, target in candidates:
+                if round_spent >= round_replays or spent >= total_replays:
+                    break
+                if target not in date_index:
+                    continue
+                if target == last_date and target.weekday() == 6:
+                    # evaluate.py cannot close a plan with work on its final Sunday.
+                    continue
+                key = (tuple(group), target)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if all(assignments[battery_id] == target for battery_id in group):
+                    continue
+                candidate_rows = moved_rows(group, target)
+                candidate_operational = float(
+                    operational(frame_of(candidate_rows))["total_cost"]
+                )
+                round_spent += 1
+                spent += 1
+                operational_delta = candidate_operational - incumbent_operational
+                # Every accepted move must save operational cost outright.
+                # Timing only guards (the combined delta below): a move funded
+                # by expected timing is the local search's jurisdiction, and
+                # measured on the 48-scenario A/B such accepts realize badly
+                # (s_33 +225, s_37 +171 from two timing-funded "fixes" that
+                # bought fresh limit hits against an expected-timing credit).
+                if operational_delta >= -1e-9:
+                    continue
+                delta = operational_delta + timing_delta(group, target)
+                candidate_key = (delta, target, tuple(group))
+                if delta < -1e-9 and (best_key is None or candidate_key < best_key):
+                    best_key = candidate_key
+                    best_rows = candidate_rows
+                    best_group = group
+                    best_target = target
+            if best_key is None:
+                break
+            day_rows = best_rows
+            for battery_id in best_group:
+                assignments[battery_id] = best_target
+            incumbent = frame_of(day_rows)
+            details = operational(incumbent, with_details=True)
+            incumbent_operational = float(details["total_cost"])
+        return incumbent
+
     def plan(
         self,
         battery_data: pd.DataFrame,
@@ -645,6 +1034,27 @@ class CompetitionPlanner(Planner):
         fallback = self._all_defer(locations, start, settings)
         try:
             dates, defer_day = self._planning_clock(start, settings)
+            if self.config.planned_cap_by_median_x:
+                end_times = pd.to_datetime(locations["end_time"])
+                if getattr(end_times.dt, "tz", None) is not None:
+                    end_times = end_times.dt.tz_localize(None)
+                median_x = float(
+                    (
+                        end_times.dt.normalize()
+                        + pd.Timedelta(days=float(settings.unobserved_eol_days))
+                        - dates[-1]
+                    ).dt.days.median()
+                )
+                cap = None
+                for upper, value in self.config.planned_cap_by_median_x:
+                    if median_x <= float(upper):
+                        cap = int(value)
+                        break
+                if cap is not None:
+                    self.config = replace(
+                        self.config,
+                        optimizer=replace(self.config.optimizer, max_planned_count=cap),
+                    )
             forecast = self._forecast(battery_data, locations, start, dates)
             full_costs = build_expected_cost_tables(
                 forecast,
@@ -654,6 +1064,22 @@ class CompetitionPlanner(Planner):
                 late_risk_multiplier=self.config.late_risk_multiplier,
                 emergency_rank_scale=self.config.emergency_rank_scale,
             )
+            # The expected-due budget is computed on the FULL fleet before any
+            # exclusion. Demoting a battery from the slot allocation must not
+            # shrink the budget its probability justified -- collapsing both at
+            # once is the mechanism that killed every probability-knockdown
+            # attempt before this.
+            full_limit = scenario_planned_swap_limit(full_costs, self.config.optimizer)
+            if full_limit is not None:
+                self.config = replace(
+                    self.config,
+                    optimizer=replace(
+                        self.config.optimizer,
+                        max_planned_count=full_limit,
+                        expected_due_multiplier=None,
+                        max_planned_rate=None,
+                    ),
+                )
             # Search only over batteries servicing could plausibly help. Every
             # search evaluation is linear in the battery count, and roughly
             # nine of some four hundred are ever due, so this is the difference
@@ -663,6 +1089,27 @@ class CompetitionPlanner(Planner):
                 margin_hours=self.config.candidate_margin_hours,
                 max_candidates=self.config.max_candidates,
             )
+            demoted: set[str] = set()
+            summaries = getattr(forecast, "summaries", None)
+            if (
+                self.config.slot_demotion
+                and summaries is not None
+                and not summaries.empty
+                and "slot_demote" in summaries.columns
+            ):
+                flagged = summaries.loc[
+                    summaries["slot_demote"].astype(bool), "battery_id"
+                ].astype(str)
+                demoted = set(flagged)
+            if demoted:
+                keep = np.asarray(
+                    [
+                        row
+                        for row in keep
+                        if full_costs.battery_ids[row] not in demoted
+                    ],
+                    dtype=int,
+                )
             costs = full_costs.take(keep)
             candidate_ids = set(costs.battery_ids)
             excluded = [
@@ -697,6 +1144,18 @@ class CompetitionPlanner(Planner):
                 start,
                 defer_day,
             )
+            if self.config.capacity_repair:
+                # Deterministic capacity post-pass: exact-replay repair of
+                # daily/weekly limit hits, then light-day merges.
+                plan = self._capacity_repair(
+                    plan,
+                    costs,
+                    candidate_locations,
+                    travel_costs,
+                    settings,
+                    start,
+                    defer_day,
+                )
             plan = self._restore_excluded(plan, excluded, defer_day)
             check_plan_valid(plan, locations, start_time=start)
             fast_score = self._operational_score(

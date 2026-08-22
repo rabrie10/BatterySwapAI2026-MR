@@ -135,6 +135,119 @@ class RemainingCalibration:
 
 
 @dataclass
+class ResurrectionGate:
+    """Rescue batteries the smoothed channel has gone dark on.
+
+    The official smoothing only accepts readings between 10 and 30 degC, so a
+    cold room silences a device for weeks: its features freeze, its predicted
+    probability collapses toward zero, and it fails unseen -- 28% of the
+    mid-year missed dues sit on exactly this dead channel. Measured on the
+    out-of-fold frame, two plan-time-computable gates identify them:
+
+    * dark-decay: staleness > 30 d and (margin - 0.001 x staleness) < 0.02
+      -- 60 rows realising 0.567;
+    * raw-dip: raw 3-day minimum below 2.40 V while the smoothed margin still
+      reads above 0.03 and p < 0.1 -- 27 rows realising 0.519.
+
+    Union: 82 rows realising 0.524, carrying 0.90 currently-missed dues per
+    scenario at median p 0.005. The override floors the gated rows' whole CDF
+    at the class rate (fitted out-of-fold, shrunk), which clears every
+    break-even decisively -- unlike the knee floor's marginal 0.1-0.27 rates,
+    which only churned selection.
+    """
+
+    stale_min: float = 30.0
+    mext_max: float = 0.02
+    raw_dip: float = 2.40
+    dip_margin_min: float = 0.03
+    dip_p_max: float = 0.10
+    rate_dark: float = 0.45
+    rate_dip: float = 0.40
+    max_per_scenario: int = 3
+
+    def floors(
+        self,
+        probability: np.ndarray,
+        margin: np.ndarray,
+        staleness: np.ndarray,
+        raw_min3: np.ndarray,
+    ) -> np.ndarray:
+        probability = np.asarray(probability, dtype=float)
+        margin = np.asarray(margin, dtype=float)
+        staleness = np.asarray(staleness, dtype=float)
+        raw_min3 = np.asarray(raw_min3, dtype=float)
+
+        dark = (staleness > self.stale_min) & (
+            (margin - 0.001 * staleness) < self.mext_max
+        )
+        dip = (
+            np.isfinite(raw_min3)
+            & (raw_min3 < self.raw_dip)
+            & (margin > self.dip_margin_min)
+            & (probability < self.dip_p_max)
+        )
+        floor = np.where(dark, self.rate_dark, 0.0)
+        floor = np.maximum(floor, np.where(dip, self.rate_dip, 0.0))
+        gated = floor > probability
+        if gated.sum() > self.max_per_scenario:
+            # Keep the strongest evidence: deepest staleness-adjusted deficit.
+            deficit = np.where(gated, floor - probability, -np.inf)
+            keep = np.argsort(-deficit)[: self.max_per_scenario]
+            mask = np.zeros_like(gated)
+            mask[keep] = True
+            floor = np.where(mask, floor, 0.0)
+        return floor
+
+    @classmethod
+    def fit(
+        cls,
+        scenario: np.ndarray,
+        probability: np.ndarray,
+        margin: np.ndarray,
+        staleness: np.ndarray,
+        raw_min3: np.ndarray,
+        due: np.ndarray,
+        *,
+        shrink: float = 15.0,
+        prior: float = 0.25,
+        min_events: int = 8,
+    ) -> "ResurrectionGate":
+        """Class rates from realised frequencies, shrunk toward a low prior."""
+        template = cls()
+        probability = np.asarray(probability, dtype=float)
+        margin = np.asarray(margin, dtype=float)
+        staleness = np.asarray(staleness, dtype=float)
+        raw_min3 = np.asarray(raw_min3, dtype=float)
+        due = np.asarray(due, dtype=float)
+
+        dark = (staleness > template.stale_min) & (
+            (margin - 0.001 * staleness) < template.mext_max
+        )
+        dip = (
+            np.isfinite(raw_min3)
+            & (raw_min3 < template.raw_dip)
+            & (margin > template.dip_margin_min)
+            & (probability < template.dip_p_max)
+        )
+
+        def shrunk_rate(mask: np.ndarray) -> float:
+            n = float(mask.sum())
+            events = float(due[mask].sum())
+            if events < min_events:
+                return 0.0  # not enough evidence: gate disabled
+            return float((events + shrink * prior) / (n + shrink))
+
+        return cls(rate_dark=shrunk_rate(dark), rate_dip=shrunk_rate(dip))
+
+    def describe(self) -> str:
+        return (
+            f"dark(stale>{self.stale_min:.0f}, mext<{self.mext_max}) -> {self.rate_dark:.3f}; "
+            f"dip(raw3<{self.raw_dip}, margin>{self.dip_margin_min}, p<{self.dip_p_max}) "
+            f"-> {self.rate_dip:.3f}; max {self.max_per_scenario}/scenario"
+        )
+
+
+@dataclass
 class RankCalibration:
     """Map within-scenario probability rank to the realised due rate.
 
