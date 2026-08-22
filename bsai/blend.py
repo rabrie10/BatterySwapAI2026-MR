@@ -79,6 +79,12 @@ class BlendedModel:
     wiener: WienerModel
     heads: list
     weight: float = 0.5
+    # Out-of-fold, a calibration fitted in sample under-predicts on a building it
+    # has never seen: the remaining-observation correction lands at 0.89 of the
+    # realised count across the five held-out folds. The shipped model is fitted
+    # on all five buildings and deployed on none of them, so it inherits that
+    # same gap. tools/fit_calibration.py measures it and writes it here.
+    level_scale: float = 1.0
     calibration: object | None = None
     horizons: tuple[int, ...] = HORIZON_GRID
     feature_names: tuple[str, ...] = field(default_factory=lambda: tuple(FEATURE_NAMES))
@@ -163,6 +169,7 @@ class BlendedModel:
         # No record can be filed once observation has ended, whatever the head
         # believes; the passage model already zeroes those columns.
         out = np.where(passage <= 0.0, 0.0, out)
+        out = out * float(self.level_scale)
         if self.calibration is not None:
             out = self.calibration.apply(out, remaining)
         return np.maximum.accumulate(np.clip(out, 0.0, 1.0), axis=1)

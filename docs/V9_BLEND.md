@@ -5,41 +5,38 @@ Out of fold by building over all 48 train scenarios:
 | configuration | local | delta | t | wins |
 |---|---:|---:|---:|---:|
 | V8 phase 1 (`de261f5`) | 2145.16 | — | | |
-| V9 blend, single-horizon head | 1923.96 | −221.20 | 3.82 | 36/48 |
-| **V9 blend, multi-horizon bagged head** | **1855.28** | **−289.88** | **4.27** | **34/48** |
+| blend, single-horizon head | 1923.96 | −221.20 | 3.82 | 36/48 |
+| blend, multi-horizon bagged head | 1855.28 | −289.88 | 4.27 | 34/48 |
+| **+ out-of-fold level correction (shipped)** | **1806.71** | **−338.46** | **5.30** | **42/48** |
 
-The block-mean delta over six non-overlapping blocks is **−289.9 ± 114.5**, so
-this clears the noise floor on the conservative measure as well as the optimistic
-one. Five of the six blocks improve. The multi-horizon head is worth −68.7
-against the single-horizon one on its own (t = 1.60, 28/48), which is not
-significant in isolation; it is kept because it also raises precision, costs
-nothing at inference and is faster end to end.
+The block-mean delta over six non-overlapping blocks is **−338.5 ± 79.3**, so this
+clears the noise floor on the conservative measure as well as the optimistic one.
+Five of six blocks improve by 331 to 518; the sixth is +16.6.
 
-| | V8 | V9 |
+Each step is smaller than the whole. The multi-horizon head is worth −68.7 on its
+own (t = 1.60) and the level correction −52.2 (t = 1.57); neither is significant
+in isolation, and they are kept because they point the same way as the measurement
+that motivated them and because the combination is.
+
+| | V8 | V9 shipped |
 |---|---:|---:|
-| early_swap | 763.39 | **494.75** |
-| late_swap | 1026.46 | 1100.42 |
-| weekly_limit | 114.58 | 70.83 |
-| daily_limit | 87.50 | 62.50 |
-| overtime | 79.52 | 63.38 |
-| travel | 45.69 | 38.47 |
-| swaps served | 17.65 | **13.46** |
-| missed | 3.94 | 4.00 |
-| **precision** | **0.313** | **0.406** |
-| recall | 0.584 | 0.577 |
-| seconds per scenario | 9.85 | 10.30 |
+| early_swap | 763.39 | **558.05** |
+| late_swap | 1026.46 | 985.00 |
+| weekly_limit | 114.58 | 79.17 |
+| daily_limit | 87.50 | 56.25 |
+| overtime | 79.52 | 63.31 |
+| travel | 45.69 | 39.11 |
+| swaps served | 17.65 | **14.65** |
+| missed | 3.94 | 3.62 |
+| **precision** | **0.313** | **0.398** |
+| **recall** | 0.584 | **0.617** |
+| seconds per scenario | 9.85 | 12.78 |
 
-**Four fewer swaps, the same misses, 269 points less earliness and 85 points less
-capacity penalty.** That is the shape of the public gap: of the 942 points between
-us and first place, `early_swap` was +634 and the capacity penalties +248.
-
-One block regresses. Scenarios 32-39 go from 1970.4 to 2210.9, and the reason is
-visible: the plan serves 9.50 there against 8.00 due and misses 5.25 against 3.88.
-The model now **under**-swaps in that block -- earliness falls 211 and lateness
-rises 458. Predicted mass is 8.45 per scenario against a realised 9.46, so the
-level is about 11% low. That is the next thing to measure, and it is the place
-where local and the leaderboard disagree: locally the optimum wants more swaps,
-the leaderboard says fewer.
+**Three fewer swaps, fewer misses, and every single cost component down.**
+Precision and recall both rise, which is the thing three generations of work had
+not managed: every previous gain in one cost the other. That is the shape of the
+public gap -- of the 942 points between us and first place, `early_swap` was +634
+and the capacity penalties +248.
 
 ---
 
@@ -173,18 +170,54 @@ day packing -- but it costs 26 s per scenario, which projects to 44 minutes for 
 and blows the 30-minute cap. Not shipped. **If the evaluation budget ever grows,
 this is the first knob to turn.**
 
+## 4b. The level was 11% low out of fold, and it mattered in exactly one place
+
+The multi-horizon blend left one block worse: scenarios 32-39 went from 1970.4 to
+2210.9, serving 9.50 against 8.00 due and missing 5.25 against 3.88. It was
+**under**-swapping there.
+
+The cause is measurable and general. `RemainingCalibration` is fitted on four
+buildings and applied to the fifth, and across the five held-out folds the
+corrected prediction lands at **0.89** of the realised count. The shipped model is
+fitted on all five buildings and deployed on none of them, so it inherits the same
+gap -- an in-sample calibration is optimistic about a building it has never seen.
+
+`tools/fit_calibration.py` now measures that shortfall and writes it onto the
+artifact as `BlendedModel.level_scale`. It came out at **×1.119**, and applying it
+scores **1806.71** against 1855.28 -- with the gain concentrated almost entirely in
+the block that was wrong (−247.8 there, ±16 in every other block). A hand-set 1.15
+scored 1803.07, so the derived value and the swept value agree; the derived one
+ships because it is a measurement rather than a knob.
+
+This is not swap-count tuning, and the distinction matters because local and the
+leaderboard disagree about swap count: locally the optimum wants more swaps, the
+leaderboard says fewer. A *calibrated* probability lets the planner's own
+expected-cost rule find the operating point for whichever split it is given --
+and the two splits genuinely differ, because the substitute end of life is a fixed
+calendar date and its distance from the scenario changes what a wasted swap costs.
+
 ## 5. Runtime
 
 The shipped configuration trades a little search for headroom:
 `solver_seconds 0.5` and `candidate_margin_hours 12` against the previous 1.0 and
 24. Measured effect on the score: **+4.5**, which is noise.
 
-The end result is **10.30 seconds per scenario, projecting to 18.8 minutes for
-96** -- essentially unchanged from the previous submission's 18.0, despite five
-extra models in the forecast. Swapping four fewer batteries makes the search and
-every replay cheaper, and that pays for the head. The soft deadline in
-`bsai/runtime.py` is deliberately left at 17 minutes: the machinery that stops a
-run scoring zero should not be loosened for a marginal quality gain.
+The end result is **12.78 seconds per scenario, projecting to 22.7 minutes for
+96** against the previous submission's 18.0. The soft deadline in
+`bsai/runtime.py` is deliberately left at 17 minutes, so the last quarter of the
+run will plan with the cheap search: that is what the governor is for, and the
+search is measurably worth little now that the model is better -- interleaving the
+move classes is worth −15 and quadrupling the budget −72, against −338 for the
+model. The machinery that stops a run scoring zero should not be loosened to
+recover a fraction of that.
+
+**Do not try to buy the time back by shrinking the search.** At
+`uncertain_local_search_evaluations = 20` the budget arithmetic gives
+`repair_reserve = 20` and therefore `general_budget = 0`: no general move is ever
+evaluated, the plan stays at the raw CP-SAT seed, and the repair loop grinds over
+its limit-hit days. Measured: **1827.85 and 16.56 seconds per scenario**, with a
+worst scenario of 63 -- worse *and* slower than the 80/35 that ships. The cliff is
+at `uncertain <= repair_reserve`, which is floored at 20.
 
 ## 6. What this does not fix
 
