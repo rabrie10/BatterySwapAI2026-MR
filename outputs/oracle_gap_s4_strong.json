@@ -1,0 +1,138 @@
+{
+  "diagnostic_only": true,
+  "n_scenarios": 1,
+  "summary": {
+    "all_defer": {
+      "mean_total_cost": 5851.7143,
+      "median_total_cost": 5851.7143,
+      "p90_total_cost": 5851.7143,
+      "components": {
+        "battery_swap": 3.5,
+        "building_change": 12.0,
+        "room_change": 7.0,
+        "travel": 190.909,
+        "overtime": 378.3053,
+        "daily_limit": 900.0,
+        "weekly_limit": 200.0,
+        "late_swap": 4160.0,
+        "early_swap": 0.0
+      }
+    },
+    "exact_eol_raw": {
+      "mean_total_cost": 1498.6667,
+      "median_total_cost": 1498.6667,
+      "p90_total_cost": 1498.6667,
+      "components": {
+        "battery_swap": 3.5,
+        "building_change": 12.0,
+        "room_change": 7.0,
+        "travel": 160.0193,
+        "overtime": 316.1473,
+        "daily_limit": 700.0,
+        "weekly_limit": 300.0,
+        "late_swap": 0.0,
+        "early_swap": 0.0
+      }
+    },
+    "exact_eol_routed": {
+      "mean_total_cost": 1498.4582,
+      "median_total_cost": 1498.4582,
+      "p90_total_cost": 1498.4582,
+      "components": {
+        "battery_swap": 3.5,
+        "building_change": 12.0,
+        "room_change": 7.0,
+        "travel": 159.9498,
+        "overtime": 316.0083,
+        "daily_limit": 700.0,
+        "weekly_limit": 300.0,
+        "late_swap": 0.0,
+        "early_swap": 0.0
+      }
+    },
+    "oracle_planner": {
+      "mean_total_cost": 376.087,
+      "median_total_cost": 376.087,
+      "p90_total_cost": 376.087,
+      "components": {
+        "battery_swap": 3.5,
+        "building_change": 8.0,
+        "room_change": 6.0,
+        "travel": 64.9087,
+        "overtime": 116.1783,
+        "daily_limit": 100.0,
+        "weekly_limit": 0.0,
+        "late_swap": 30.0,
+        "early_swap": 47.5
+      }
+    },
+    "measured_gaps": {
+      "route_order_gain_exact_schedule": 0.2085,
+      "day_selection_and_batching_gain": 1122.3712,
+      "oracle_residual": 376.087
+    }
+  },
+  "elapsed_seconds": 10.036,
+  "scenarios": [
+    {
+      "battery_swap": 3.5,
+      "building_change": 12.0,
+      "room_change": 7.0,
+      "travel": 190.909,
+      "overtime": 378.30533333333335,
+      "daily_limit": 900.0,
+      "weekly_limit": 200.0,
+      "late_swap": 4160.0,
+      "early_swap": 0.0,
+      "total_cost": 5851.714333333333,
+      "policy": "all_defer",
+      "scenario": "s_4",
+      "scenario_index": 4
+    },
+    {
+      "battery_swap": 3.5,
+      "building_change": 12.0,
+      "room_change": 7.0,
+      "travel": 160.01933333333335,
+      "overtime": 316.14733333333334,
+      "daily_limit": 700.0,
+      "weekly_limit": 300.0,
+      "late_swap": 0.0,
+      "early_swap": 0.0,
+      "total_cost": 1498.6666666666667,
+      "policy": "exact_eol_raw",
+      "scenario": "s_4",
+      "scenario_index": 4
+    },
+    {
+      "battery_swap": 3.5,
+      "building_change": 12.0,
+      "room_change": 7.0,
+      "travel": 159.94983333333334,
+      "overtime": 316.0083333333333,
+      "daily_limit": 700.0,
+      "weekly_limit": 300.0,
+      "late_swap": 0.0,
+      "early_swap": 0.0,
+      "total_cost": 1498.4581666666668,
+      "policy": "exact_eol_routed",
+      "scenario": "s_4",
+      "scenario_index": 4
+    },
+    {
+      "battery_swap": 3.5,
+      "building_change": 8.0,
+      "room_change": 6.0,
+      "travel": 64.90866666666668,
+      "overtime": 116.17833333333334,
+      "daily_limit": 100.0,
+      "weekly_limit": 0.0,
+      "late_swap": 30.0,
+      "early_swap": 47.5,
+      "total_cost": 376.087,
+      "policy": "oracle_planner",
+      "scenario": "s_4",
+      "scenario_index": 4
+    }
+  ]
+}
