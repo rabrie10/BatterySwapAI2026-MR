@@ -1007,3 +1007,183 @@ class PiHybridModel:
 
     def cdf_at(self, grid_values: np.ndarray, days: np.ndarray) -> np.ndarray:
         return next(iter(self.by_building.values())).cdf_at(grid_values, days)
+
+
+class PiFilterCache:
+    """Incremental forward filter over the smoothed margin, per device.
+
+    Rides the forecaster's ``SmoothingCache`` (no re-smoothing): each
+    ``update_from`` consumes the grid days added since the last call and
+    advances the per-device changepoint filter exactly as the batch
+    ``make_tracks`` + ``causal_scales`` + ``forward_pi`` pipeline does --
+    hold-merge on exact repeats, causal expanding-MAD observation scale
+    (refresh schedule 30/+28, fleet fallback before 30 increments), plateau
+    jump mixture, pure-core plunge, transition after emission.
+
+    One deliberate deviation: the LAST grid day is deferred until a later
+    update finalizes it, because a scenario cut can land mid-day and the
+    boundary day's median is provisional (SmoothingCache re-reads it); a
+    sequential filter cannot roll back a consumed observation. The pi feature
+    therefore lags at most one observation day behind the batch tables.
+
+    Post-EOL behaviour needs no special casing: a replacement battery's
+    recovery jump is large upward evidence, which the pure-core plunge
+    emission converts into a fast collapse of the onset posterior.
+    """
+
+    def __init__(self, params: TwoPhaseParams, fleet_scale: float) -> None:
+        self.params = params
+        self.fleet_scale = float(fleet_scale)
+        self.devices: dict[str, dict] = {}
+
+    def _new_state(self) -> dict:
+        p = self.params
+        return {
+            "next_index": 0,
+            "days": [],
+            "margins": [],
+            "zhist": [],
+            "scale": float("nan"),
+            "next_refresh": 30,
+            "a1": float(np.log1p(-p.pi0)),
+            "a2": float(np.log(max(p.pi0, MIN_PI0))),
+            "pi": float(p.pi0),
+        }
+
+    def update_from(self, smoothing) -> None:
+        for device_id, series in smoothing.devices.items():
+            state = self.devices.get(device_id)
+            if state is None:
+                state = self._new_state()
+                self.devices[device_id] = state
+            self._advance(state, series)
+
+    def _advance(self, state: dict, series) -> None:
+        p = self.params
+        values = series.smooth_voltage
+        # Defer the (possibly provisional) last grid day.
+        stop = len(values) - 1
+        index = state["next_index"]
+        while index < stop:
+            value = values[index]
+            if np.isfinite(value):
+                margin = float(value) - EOL_THRESHOLD
+                day = int(series.origin + index)
+                if not state["days"]:
+                    state["days"].append(day)
+                    state["margins"].append(margin)
+                elif margin != state["margins"][-1]:
+                    dm = margin - state["margins"][-1]
+                    dt = float(day - state["days"][-1])
+                    count = len(state["zhist"])  # increments before this one
+                    if count >= state["next_refresh"] or (
+                        count >= 30 and np.isnan(state["scale"])
+                    ):
+                        past = np.asarray(state["zhist"], dtype=float)
+                        med = float(np.median(past))
+                        state["scale"] = max(
+                            1.4826 * float(np.median(np.abs(past - med))), 5e-5
+                        )
+                        state["next_refresh"] = count + 28
+                    scale = (
+                        state["scale"]
+                        if np.isfinite(state["scale"])
+                        else self.fleet_scale
+                    )
+                    s2dt = scale * scale * dt
+                    l1 = float(
+                        _log_emission(
+                            np.asarray([dm]), np.asarray([dt]), np.asarray([s2dt]),
+                            p.mu1, p.sigma1, p.lam, p.sigma_j,
+                        )[0]
+                    )
+                    l2 = float(
+                        _log_emission(
+                            np.asarray([dm]), np.asarray([dt]), np.asarray([s2dt]),
+                            p.mu2, p.sigma2, 0.0, p.sigma_j,
+                        )[0]
+                    )
+                    a1 = state["a1"] + l1
+                    a2 = state["a2"] + l2
+                    stay = dt * np.log1p(-p.rho)
+                    switch = np.log(-np.expm1(stay))
+                    a2 = float(np.logaddexp(a2, a1 + switch))
+                    a1 = float(a1 + stay)
+                    norm = float(np.logaddexp(a1, a2))
+                    state["a1"] = a1 - norm
+                    state["a2"] = a2 - norm
+                    state["pi"] = float(np.exp(state["a2"]))
+                    state["zhist"].append(abs(dm) / np.sqrt(dt))
+                    state["days"].append(day)
+                    state["margins"].append(margin)
+            index += 1
+        state["next_index"] = max(state["next_index"], stop)
+
+    def state_of(self, device: str) -> tuple[float, float]:
+        """(pi_posterior, pi_drift) at the last finalized observation."""
+        p = self.params
+        state = self.devices.get(str(device))
+        if state is None or not state["days"]:
+            return 0.0, -2.0e-4
+        days = state["days"]
+        margins = state["margins"]
+        import bisect
+
+        last = days[-1]
+        anchor = bisect.bisect_right(days, last - 42.0) - 1
+        anchor = max(anchor, 0)
+        span = float(last - days[anchor])
+        if span <= 0:
+            drift = p.mu1
+        else:
+            slope = (margins[-1] - margins[anchor]) / span
+            weight = span / (span + 21.0)
+            drift = weight * slope + (1.0 - weight) * p.mu1
+        pi = state["pi"]
+        return pi, pi * p.mu2 + (1.0 - pi) * drift
+
+
+@dataclass
+class ProductionPiHybrid:
+    """Deployment wrapper: production 66-feature Wiener GBDT + live pi filter.
+
+    Loads through ``script.py``'s unchanged path
+    (``HazardForecaster(joblib.load(path))``): the forecaster sees the
+    ``pi_cache`` attribute and feeds it the smoothing cache each ``predict``
+    (the ``resurrection_gate`` attachment precedent), so the pi features are
+    computed incrementally from the split's own data -- no train-time tables.
+    """
+
+    inner: object  # production WienerModel (66 features, calibration inside)
+    pi_cache: PiFilterCache
+    climatology: np.ndarray
+    horizons: tuple[int, ...] = HORIZON_GRID
+    feature_names: tuple[str, ...] = tuple(FEATURE_NAMES) + PI_FEATURE_NAMES
+    model_version: str = "bsai-wiener/v1+pi-prod"
+
+    @property
+    def calibration(self):
+        return getattr(self.inner, "calibration", None)
+
+    def context(self) -> FeatureContext:
+        return FeatureContext(climatology=self.climatology)
+
+    def predict_grid(
+        self,
+        features: np.ndarray,
+        remaining: np.ndarray,
+        devices: np.ndarray | None = None,
+    ) -> np.ndarray:
+        rows = features.shape[0]
+        if rows == 0:
+            return np.zeros((0, len(self.horizons)))
+        if devices is None:
+            raise ValueError("ProductionPiHybrid needs device ids for the pi filter")
+        extra = np.empty((rows, 2), dtype=features.dtype)
+        for row in range(rows):
+            extra[row] = self.pi_cache.state_of(str(devices[row]))
+        extended = np.hstack([features, extra])
+        return self.inner.predict_grid(extended, remaining)
+
+    def cdf_at(self, grid_values: np.ndarray, days: np.ndarray) -> np.ndarray:
+        return self.inner.cdf_at(grid_values, days)

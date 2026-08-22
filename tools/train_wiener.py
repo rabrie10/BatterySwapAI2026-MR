@@ -32,6 +32,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from batteryswap_public.utils import load_devices
 
+from bsai import features as feature_lib
 from bsai.features import fleet_climatology
 from bsai.hazard import build_training_frame
 from bsai.shape import ShapeCache
@@ -74,7 +75,26 @@ def main() -> None:
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--max-iter", type=int, default=250)
     parser.add_argument("--no-shape", action="store_true", help="ablate the within-day features")
+    parser.add_argument(
+        "--feature-variant",
+        choices=sorted(feature_lib.FEATURE_VARIANTS),
+        default="base",
+        help="feature set to train on; 'invariant' is the V12 building-"
+        "invariant variant (see docs/TRANSFER_STRESS.md)",
+    )
+    parser.add_argument(
+        "--knee-weight",
+        type=float,
+        default=0.0,
+        help="extra weight on increment windows ending within 21 d of the "
+        "device's crossing: weight = 1 + w. Counters the 2.3-2.4x knee "
+        "under-representation and drift magnitude shrinkage measured in "
+        "outputs/roadblock_report.md (L2 ii-iv). 0 disables.",
+    )
     args = parser.parse_args()
+
+    feature_lib.set_feature_variant(args.feature_variant)
+    variant_names = tuple(feature_lib.active_feature_names())
 
     started = time.time()
     devices = load_devices(args.dataset / "devices.csv")
@@ -91,6 +111,16 @@ def main() -> None:
     shape_cache = None if args.no_shape else ShapeCache()
     if shape_cache is not None:
         shape_cache.update(raw)
+    raw_cache = None
+    raw_any_cache = None
+    if feature_lib.variant_needs_raw(args.feature_variant):
+        from bsai.rawdaily import RawDailyCache
+        from bsai.v12_rawany import RawAnyCache
+
+        raw_cache = RawDailyCache()
+        raw_cache.update(raw)
+        raw_any_cache = RawAnyCache()
+        raw_any_cache.update(raw)
     del raw
     print(f"  {len(cache.devices)} devices, {time.time() - started:.0f}s", flush=True)
 
@@ -109,14 +139,33 @@ def main() -> None:
         )
 
     print("building cutoffs...", flush=True)
-    frame = build_training_frame(
-        cache,
-        eol_index,
-        building_of,
-        observation_index,
-        shape_cache=shape_cache,
-        stride=args.stride,
-    )
+    if args.feature_variant == "base":
+        frame = build_training_frame(
+            cache,
+            eol_index,
+            building_of,
+            observation_index,
+            shape_cache=shape_cache,
+            stride=args.stride,
+        )
+    else:
+        # Variant rows need the raw-daily adapter, which the frozen
+        # hazard.build_training_frame cannot pass; the tools-side twin
+        # reproduces its cutoff population exactly.
+        sys.path.insert(0, str(REPO_ROOT / "tools"))
+        from v12_frame import build_variant_training_frame
+
+        frame = build_variant_training_frame(
+            cache,
+            eol_index,
+            building_of,
+            observation_index,
+            shape_cache=shape_cache,
+            raw_cache=raw_cache,
+            raw_any_cache=raw_any_cache,
+            variant=args.feature_variant,
+            stride=args.stride,
+        )
     truth = (
         (frame.crossing >= 0)
         & (frame.crossing > frame.cutoff)
@@ -133,7 +182,22 @@ def main() -> None:
     )
 
     print("building observed increments...", flush=True)
-    design, drop = build_increment_targets(frame, cache, FIT_HORIZONS)
+    window_weights = None
+    if args.knee_weight > 0:
+        sys.path.insert(0, str(REPO_ROOT / "tools"))
+        from v12_fit import build_increment_targets_with_meta, knee_weights
+
+        design, drop, end_to_crossing = build_increment_targets_with_meta(
+            frame, cache, FIT_HORIZONS
+        )
+        window_weights = knee_weights(end_to_crossing, args.knee_weight)
+        print(
+            f"  knee-regime share {(window_weights > 1.0).mean():.4f}, "
+            f"weight 1+{args.knee_weight:g}",
+            flush=True,
+        )
+    else:
+        design, drop = build_increment_targets(frame, cache, FIT_HORIZONS)
     print(
         f"  {design.shape[0]} windows, mean fall {drop.mean():.5f} V, "
         f"{time.time() - started:.0f}s",
@@ -151,6 +215,25 @@ def main() -> None:
     increment_groups = _increment_groups(frame, cache, FIT_HORIZONS)
     assert increment_groups.size == design.shape[0]
 
+    def fit_model(rows=None) -> WienerModel:
+        block = slice(None) if rows is None else rows
+        if window_weights is None:
+            return WienerModel.fit(
+                design[block],
+                drop[block],
+                climatology,
+                params={"max_iter": args.max_iter},
+            )
+        from v12_fit import fit_wiener_weighted
+
+        return fit_wiener_weighted(
+            design[block],
+            drop[block],
+            climatology,
+            sample_weight=window_weights[block],
+            params={"max_iter": args.max_iter},
+        )
+
     print(f"fitting {args.folds} grouped folds...", flush=True)
     oof = np.zeros(len(frame), dtype=float)
     fold_models: dict[str, WienerModel] = {}
@@ -161,12 +244,8 @@ def main() -> None:
         held_out = set(np.unique(increment_groups)) - set(
             np.unique(increment_groups[train_rows])
         )
-        model = WienerModel.fit(
-            design[train_rows],
-            drop[train_rows],
-            climatology,
-            params={"max_iter": args.max_iter},
-        )
+        model = fit_model(train_rows)
+        model.feature_names = variant_names
         mask = np.isin(frame.building, list(held_out))
         if mask.any():
             oof[mask] = model.probabilities(
@@ -196,9 +275,12 @@ def main() -> None:
         model.volatility_scale = best_scale
 
     print("fitting production model on all buildings...", flush=True)
-    production = WienerModel.fit(
-        design, drop, climatology, params={"max_iter": args.max_iter}
-    )
+    production = fit_model()
+    production.feature_names = variant_names
+    if args.feature_variant != "base":
+        production.model_version = f"bsai-wiener/v1+{args.feature_variant}"
+    if args.knee_weight > 0:
+        production.model_version += f"+k{args.knee_weight:g}"
     production.volatility_scale = best_scale
     args.out.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(production, args.out)
@@ -211,6 +293,8 @@ def main() -> None:
             {
                 "model_version": production.model_version,
                 "within_day_features": not args.no_shape,
+                "feature_variant": args.feature_variant,
+                "knee_weight": args.knee_weight,
                 "n_features": int(frame.features.shape[1]),
                 "stride_days": int(args.stride),
                 "fit_horizons": list(FIT_HORIZONS),

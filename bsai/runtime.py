@@ -24,8 +24,8 @@ from batteryswap_public.interfaces import Planner
 
 LOGGER = logging.getLogger(__name__)
 
-SOFT_DEADLINE_SECONDS = 17 * 60
-HARD_DEADLINE_SECONDS = 25 * 60
+SOFT_DEADLINE_SECONDS = 20 * 60
+HARD_DEADLINE_SECONDS = 26 * 60
 
 
 class BudgetedPlanner(Planner):

@@ -138,6 +138,12 @@ class HazardForecaster:
     ) -> RiskForecast:
         self.cache.update(battery_data)
         self.shape_cache.update(battery_data)
+        # Pi-hybrid models carry an incremental changepoint filter that rides
+        # the smoothing cache (no re-smoothing); same attachment pattern as
+        # the resurrection gate below.
+        pi_cache = getattr(self.model, "pi_cache", None)
+        if pi_cache is not None:
+            pi_cache.update_from(self.cache)
         needs_raw = feature_lib.variant_needs_raw(feature_lib.active_feature_variant())
         gate = getattr(self.model, "resurrection_gate", None)
         # Both raw channels always update: the selection-exchange dark2 flag

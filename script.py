@@ -71,7 +71,10 @@ def load_forecaster() -> HazardForecaster | None:
 def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> PlannerConfig:
     due_multiplier = os.environ.get("BATTERYSWAP_DUE_MULTIPLIER", "1.6")
     return PlannerConfig(
-        late_risk_multiplier=_float_env("BATTERYSWAP_LATE_RISK_MULTIPLIER", 1.0),
+        # 1.8 under the binding cap measured -130 locally; the same knob was
+        # noise uncapped (V6 sweeps). The cap makes the tilt fill the slots
+        # with likelier dues and service them earlier.
+        late_risk_multiplier=_float_env("BATTERYSWAP_LATE_RISK_MULTIPLIER", 1.8),
         minimum_expected_improvement=_float_env(
             "BATTERYSWAP_MINIMUM_EXPECTED_IMPROVEMENT", 0.0
         ),
