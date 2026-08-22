@@ -29,14 +29,8 @@ Out-of-fold by building, official `evaluate_plan()` over all 48 train scenarios:
 | all-defer (service nothing) | 3324.7 |
 | shipped v3 | 2644.9 |
 | V6 hazard classifier | 2526.0 |
-| V7 Wiener | 2293.2 |
-| V8 phase 1 (remaining-observation calibration) | 2145.1 |
-| **this branch (V10: censored drift + deterministic objective + swap budget)** | **1997.5 / 1986.7** (two runs) |
+| **this branch (V7 Wiener)** | **2293.2** |
 | perfect knowledge, this planner (scenarios 0-11) | 77.8 |
-
-The V10 changes and the full measurement record, including seven approaches
-that were validated and rejected this generation, are in
-[`docs/V10_FINDINGS.md`](docs/V10_FINDINGS.md).
 
 The submission run plans all 48 train scenarios in 476 s with nothing degraded
 or deferred, projecting about 18 minutes for the 96 public and private

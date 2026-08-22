@@ -54,12 +54,6 @@ from .margin import EOL_THRESHOLD
 from .smoothing import SmoothingCache
 
 VOLTAGE_FEATURE = FEATURE_NAMES.index("voltage")
-# Days since the smoothed voltage first went below 2.45 V (-1 when it never
-# has): the survival-evidence axis the dwell adjustment keys on.
-DWELL_FEATURE = FEATURE_NAMES.index("days_below_2.45")
-# Trailing 30-day within-day dV/dT: the internal-resistance channel the
-# knee-onset floor keys on.
-BETA30_FEATURE = FEATURE_NAMES.index("beta_30")
 
 # Windows used to fit the drift and volatility. Every one of these must fit
 # entirely inside a device's pre-crossing history, so long windows are rarer;
@@ -82,21 +76,12 @@ DEFAULT_PARAMS = dict(
 
 
 def first_passage_probability(
-    margin: np.ndarray, drop: np.ndarray, sigma: np.ndarray,
-    reflection_weight: float = 1.0,
+    margin: np.ndarray, drop: np.ndarray, sigma: np.ndarray
 ) -> np.ndarray:
     """P(a Wiener path from ``margin`` reaches zero within the window).
 
     ``drop`` is the expected fall over the window and ``sigma`` the standard
     deviation of that fall, both already in margin units.
-
-    ``reflection_weight`` scales the touch-and-recover term. For a raw Brownian
-    path it is 1. The smoothed series is a seven-day trailing median whose
-    within-window minimum sits close to its endpoint, so the full reflection
-    term manufactures certainty at small margins -- batteries that in reality
-    hover just above the threshold for months (the p90 dwell below 2.45 is 85
-    days). Weight 0 prices the endpoint only; the right value is measured, not
-    assumed.
     """
     margin = np.asarray(margin, dtype=float)
     drop = np.asarray(drop, dtype=float)
@@ -112,7 +97,7 @@ def first_passage_probability(
     exponent = np.clip(2.0 * drop * safe_margin / sigma**2, -MAX_EXPONENT, MAX_EXPONENT)
     second = np.exp(exponent + norm.logcdf((-safe_margin - drop) / sigma))
 
-    out = np.clip(first + float(reflection_weight) * second, 0.0, 1.0)
+    out = np.clip(first + second, 0.0, 1.0)
     return np.where(already, 1.0, out)
 
 
@@ -123,16 +108,9 @@ def build_increment_targets(
 ) -> tuple[np.ndarray, np.ndarray]:
     """How far the margin actually fell over each window that we can observe.
 
-    A window starts strictly before the device's crossing, so the fitted
-    dynamics describe a battery that is alive at the decision point. The window
-    is allowed to *end* past the crossing: excluding those windows censors the
-    steepest observed drops -- exactly the paths that cross -- and biases the
-    drift shallow at the knee, which is where the model must not be shallow.
-    Measured on the fleet, observation continues a median of 204 days past the
-    recorded EOL, so the post-crossing margin is available. A device whose
-    battery is replaced inside the window recovers upward and would understate
-    the fall, so a window that contains the crossing counts at least the full
-    margin: the cell verifiably reached the barrier.
+    A window is used only if it lies wholly before the device's crossing, so the
+    fitted dynamics describe a battery that is still alive -- which is the only
+    state the first-passage model is ever asked about.
     """
     designs: list[np.ndarray] = []
     drops: list[np.ndarray] = []
@@ -159,11 +137,10 @@ def build_increment_targets(
                 continue
             crossing = int(frame.crossing[block[0]])
             last = int(frame.last_observed[block[0]])
+            limit = last if crossing < 0 else min(last, crossing - 1)
             cutoffs = frame.cutoff[block]
             ends = cutoffs + horizon
-            # Cutoffs are pre-crossing by construction; the window may end past
-            # the crossing so the steepest observed drops stay in the fit.
-            usable = (ends <= last) & (cutoffs >= 0)
+            usable = (ends <= limit) & (cutoffs >= 0)
             if not usable.any():
                 continue
             chosen = block[usable]
@@ -172,17 +149,8 @@ def build_increment_targets(
             finite = np.isfinite(here) & np.isfinite(there)
             if not finite.any():
                 continue
-            drop = here[finite] - there[finite]
-            if crossing >= 0:
-                # A window containing the crossing verifiably fell the whole
-                # margin, even if a replacement lifted the series afterwards.
-                crossed = (
-                    (cutoffs[usable][finite] < crossing)
-                    & (ends[usable][finite] >= crossing)
-                )
-                drop = np.where(crossed, np.maximum(drop, here[finite]), drop)
             rows.append(chosen[finite])
-            values.append(drop)
+            values.append(here[finite] - there[finite])
         if not rows:
             continue
         index = np.concatenate(rows)
@@ -213,16 +181,10 @@ class WienerModel:
     scatter: HistGradientBoostingRegressor
     climatology: np.ndarray
     volatility_scale: float = 1.0
-    # Weight on the touch-and-recover reflection term; see
-    # first_passage_probability. Measured, not assumed.
-    reflection_weight: float = 1.0
     # Correction along the remaining-observation axis; see bsai/calibrate.py.
     # Applied here rather than in the forecaster so the out-of-fold dispatcher
     # routes each device to its own fold's correction automatically.
     calibration: object | None = None
-    # Survival-evidence correction near the threshold; see bsai/calibrate.py.
-    # Applied before the calibration, on the same per-fold dispatch.
-    dwell_adjust: object | None = None
     horizons: tuple[int, ...] = HORIZON_GRID
     feature_names: tuple[str, ...] = tuple(FEATURE_NAMES)
     model_version: str = "bsai-wiener/v1"
@@ -281,9 +243,7 @@ class WienerModel:
             * self.volatility_scale
         )
         margin = features[:, VOLTAGE_FEATURE].astype(float) - EOL_THRESHOLD
-        # getattr: artifacts pickled before this field existed default to 1.0.
-        weight = float(getattr(self, "reflection_weight", 1.0))
-        return first_passage_probability(margin, drop, sigma, weight)
+        return first_passage_probability(margin, drop, sigma)
 
     def predict_grid(
         self,
@@ -303,22 +263,6 @@ class WienerModel:
         probability = self.probabilities(tall, effective.reshape(-1))
         probability = np.where(effective.reshape(-1) <= 0.0, 0.0, probability)
         out = probability.reshape(len(self.horizons), rows).T
-        adjust = getattr(self, "dwell_adjust", None)
-        if adjust is not None:
-            out = adjust.apply(
-                out,
-                features[:, VOLTAGE_FEATURE].astype(float) - EOL_THRESHOLD,
-                features[:, DWELL_FEATURE].astype(float),
-                remaining,
-            )
-        boost = getattr(self, "knee_boost", None)
-        if boost is not None:
-            out = boost.apply(
-                out,
-                features[:, VOLTAGE_FEATURE].astype(float) - EOL_THRESHOLD,
-                features[:, BETA30_FEATURE].astype(float),
-                remaining,
-            )
         if self.calibration is not None:
             out = self.calibration.apply(out, remaining)
         return np.maximum.accumulate(np.clip(out, 0.0, 1.0), axis=1)

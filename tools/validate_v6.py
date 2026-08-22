@@ -82,11 +82,7 @@ def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
         building_of=building_of,
         climatology=bundle["climatology"],
     )
-    forecaster = HazardForecaster(model, probability_scale=args.probability_scale)
-    # Rank recalibration works on the whole merged scenario, so it rides on the
-    # bundle rather than on any single fold model.
-    forecaster.rank_calibration = bundle.get("rank_calibration")
-    return forecaster
+    return HazardForecaster(model, probability_scale=args.probability_scale)
 
 
 def main() -> None:
@@ -107,6 +103,14 @@ def main() -> None:
     parser.add_argument("--late-multiplier", type=float, default=1.0)
     parser.add_argument("--candidate-margin", type=float, default=24.0)
     parser.add_argument("--emergency-rank-scale", type=float, default=1.0)
+    parser.add_argument("--prune", type=int, default=0,
+                        help="evaluations spent offering the weakest swaps for removal")
+    parser.add_argument(
+        "--move-order",
+        choices=("legacy", "interleaved"),
+        default="interleaved",
+        help="how the local search spends its evaluation budget; see PlannerConfig",
+    )
     parser.add_argument("--max-planned-rate", type=float, default=None)
     parser.add_argument("--probability-scale", type=float, default=1.0)
     parser.add_argument(
@@ -116,25 +120,15 @@ def main() -> None:
         help="override the Wiener volatility scale; the level must be calibrated "
         "on the scenario population, not the training cutoffs",
     )
-    parser.add_argument("--due-multiplier", type=float, default=None,
-                        help="cap planned swaps at ceil(multiplier x E[due] + buffer)")
-    parser.add_argument("--due-buffer", type=float, default=0.0)
-    parser.add_argument("--max-planned", type=int, default=None,
-                        help="flat ceiling on planned swaps per scenario")
-    parser.add_argument("--no-demotion", action="store_true",
-                        help="ignore the forecast's slot_demote fingerprint")
-    parser.add_argument("--cap-bands", type=str, default=None,
-                        help="X-banded caps 'upper:cap,upper:cap,...' ascending by upper; "
-                        "X = median(end_time+30d - window end) in days")
-    parser.add_argument("--robust-samples", type=int, default=4,
-                        help="stratified emergency samples in the search objective; "
-                        "0 uses the deterministic expected-cost path and the full budget")
     parser.add_argument("--per-battery", action="store_true",
                         help="decide each battery on its own cost; no joint search")
     parser.add_argument("--work-cost", type=float, default=0.25)
     parser.add_argument("--no-emergency-ops", action="store_true",
                         help="price deferral on lateness alone, as the V5 prototype did")
     parser.add_argument("--capacity-roundtrip", type=float, default=1.0)
+    parser.add_argument("--max-daily-factor", type=float, default=2.0,
+                        help="hard bound on one day's work, as a multiple of the "
+                             "24-hour daily limit; 1.0 forbids two far round trips")
     parser.add_argument("--greedy", action="store_true", help="skip CP-SAT")
     parser.add_argument(
         "--audit",
@@ -159,12 +153,6 @@ def main() -> None:
             ),
         )
     else:
-        cap_bands = None
-        if args.cap_bands:
-            cap_bands = tuple(
-                (float(part.split(":")[0]), int(part.split(":")[1]))
-                for part in args.cap_bands.split(",")
-            )
         planner = CompetitionPlanner(
             forecaster=forecaster,
             config=PlannerConfig(
@@ -173,16 +161,13 @@ def main() -> None:
                 uncertain_local_search_evaluations=args.uncertain_search,
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
-                robust_emergency_samples=args.robust_samples,
-                planned_cap_by_median_x=cap_bands,
-                slot_demotion=not args.no_demotion,
+                move_order=args.move_order,
+                prune_evaluations=args.prune,
                 optimizer=OptimizationConfig(
                     solver_seconds=args.solver_seconds,
                     capacity_roundtrip_fraction=args.capacity_roundtrip,
+                    max_daily_hours_factor=args.max_daily_factor,
                     max_planned_rate=args.max_planned_rate,
-                    expected_due_multiplier=args.due_multiplier,
-                    expected_due_buffer=args.due_buffer,
-                    max_planned_count=args.max_planned,
                     use_cp_sat=not args.greedy,
                 ),
             ),

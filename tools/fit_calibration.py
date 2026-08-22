@@ -154,6 +154,16 @@ def main() -> None:
     print("=== AFTER (out-of-fold correction) ===")
     print(block_table(frame, "corrected"))
 
+    # What the out-of-fold correction still misses. A calibration fitted on four
+    # buildings under-predicts on the fifth, and the shipped model -- fitted on
+    # all five, deployed on none -- inherits the same gap, so this single scalar
+    # is measured here and carried on the artifact rather than passed as a flag.
+    shortfall = float(
+        np.clip(frame.due.sum() / max(frame.corrected.sum(), 1e-9), 0.8, 1.4)
+    )
+    print()
+    print(f"out-of-fold level shortfall: x{shortfall:.3f}")
+
     production = RemainingCalibration.fit(
         frame.remaining.to_numpy(), frame.predicted.to_numpy(), frame.due.to_numpy()
     )
@@ -168,11 +178,15 @@ def main() -> None:
     for building, model in bundle["by_building"].items():
         model.volatility_scale = args.volatility_scale
         model.calibration = per_fold.get(fold_of_building[building], production)
+        if hasattr(model, "level_scale"):
+            model.level_scale = shortfall
     joblib.dump(bundle, args.folds)
 
     shipped = joblib.load(args.model)
     shipped.volatility_scale = args.volatility_scale
     shipped.calibration = production
+    if hasattr(shipped, "level_scale"):
+        shipped.level_scale = shortfall
     joblib.dump(shipped, args.model)
     print(f"\nwrote calibration into {args.folds} and {args.model}")
 
@@ -183,6 +197,7 @@ def main() -> None:
                 "edges": list(production.edges),
                 "factors": list(production.factors),
                 "volatility_scale": args.volatility_scale,
+                "level_scale": round(shortfall, 4),
             },
             indent=2,
         )
