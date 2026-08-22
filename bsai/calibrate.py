@@ -132,3 +132,186 @@ class RemainingCalibration:
             span = f"{low:>6.0f}-{high:>6.0f}" if high < 1e8 else f"{low:>6.0f}+     "
             lines.append(f"  remaining {span} d   x{factor:.3f}")
         return "\n".join(lines)
+
+
+@dataclass
+class DwellAdjust:
+    """Survival-evidence correction for cells sitting near the threshold.
+
+    A cell freshly below 2.45 V mostly crosses within the window (realised
+    0.80 at predicted 0.81), but the longer it has dipped *without* crossing
+    the less likely the next 42 days are to record an EOL: realised 0.29 at
+    15-42 days of dwell and 0.18 at 43-90, while the model's confidence RISES
+    with dwell (0.84, 0.90) because the volatility it observes feeds the
+    passage arithmetic. Four batteries with per-device voltage floors just
+    above 2.40 generate a wasted swap in nearly every scenario this way.
+
+    The pattern is fleet-wide (19 batteries, 11 buildings), physical
+    (survival evidence), and independent of building identity, so it is
+    corrected here with one multiplicative factor per dwell band, fitted
+    out-of-fold, applied only to rows within ``margin_cap`` of the threshold.
+    """
+
+    margin_cap: float = 0.05
+    edges: tuple[float, ...] = (0.0, 14.0, 42.0, 90.0, 1e9)
+    factors: tuple[float, ...] = (1.0, 1.0, 1.0, 1.0)
+    min_factor: float = 0.1
+    max_factor: float = 2.5
+
+    def factor_for(self, margin: np.ndarray, dwell: np.ndarray) -> np.ndarray:
+        margin = np.asarray(margin, dtype=float)
+        dwell = np.asarray(dwell, dtype=float)
+        inside = (margin < self.margin_cap) & (dwell >= 0.0)
+        band = np.clip(
+            np.searchsorted(np.asarray(self.edges, dtype=float), dwell, side="right") - 1,
+            0,
+            len(self.factors) - 1,
+        )
+        factors = np.asarray(self.factors, dtype=float)[band]
+        return np.where(inside, factors, 1.0)
+
+    def apply(self, grid: np.ndarray, margin: np.ndarray, dwell: np.ndarray) -> np.ndarray:
+        if grid.shape[0] == 0:
+            return grid
+        factor = self.factor_for(margin, dwell)[:, None]
+        return np.clip(grid * factor, 0.0, 1.0)
+
+    @classmethod
+    def fit(
+        cls,
+        margin: np.ndarray,
+        dwell: np.ndarray,
+        predicted: np.ndarray,
+        actual: np.ndarray,
+        *,
+        margin_cap: float = 0.05,
+        edges: tuple[float, ...] = (0.0, 14.0, 42.0, 90.0, 1e9),
+        min_events: int = 8,
+    ) -> "DwellAdjust":
+        margin = np.asarray(margin, dtype=float)
+        dwell = np.asarray(dwell, dtype=float)
+        predicted = np.asarray(predicted, dtype=float)
+        actual = np.asarray(actual, dtype=float)
+        inside = (margin < margin_cap) & (dwell >= 0.0)
+        factors: list[float] = []
+        template = cls(margin_cap=margin_cap, edges=edges)
+        for low, high in zip(edges[:-1], edges[1:]):
+            band = inside & (dwell >= low) & (dwell < high)
+            mass = float(predicted[band].sum())
+            events = float(actual[band].sum())
+            if band.sum() < 20 or events < min_events or mass <= 1e-9:
+                factors.append(1.0)
+                continue
+            factors.append(
+                float(np.clip(events / mass, template.min_factor, template.max_factor))
+            )
+        return cls(margin_cap=margin_cap, edges=tuple(edges), factors=tuple(factors))
+
+    def describe(self) -> str:
+        parts = []
+        for (low, high), factor in zip(zip(self.edges[:-1], self.edges[1:]), self.factors):
+            span = f"{low:.0f}-{high:.0f}" if high < 1e8 else f"{low:.0f}+"
+            parts.append(f"dwell {span}d x{factor:.2f}")
+        return f"margin<{self.margin_cap:.3f}: " + "  ".join(parts)
+
+
+# Reliability bands. Three because the bias changes sign along this axis and
+# 454 due rows cannot support more; the isotonic within each band does the
+# rest of the pooling.
+RELIABILITY_EDGES = (0.0, 90.0, 220.0, 1e9)
+
+
+@dataclass
+class ReliabilityCalibration:
+    """Isotonic reliability repair within coarse remaining-observation bands.
+
+    The multiplicative correction balanced the aggregate due count per band by
+    scaling every probability with one factor, which pushed mid-probability
+    batteries into the top bucket: measured at scenario cutoffs, rows predicted
+    above 0.7 realise 0.36 while rows predicted 0.5-0.7 realise 0.41. The
+    planner prices swap-versus-defer off these numbers, so the top of the
+    distribution being anti-monotone turns directly into wasted swaps in the
+    scenarios where a wasted swap is most expensive.
+
+    This correction maps predicted probability to realised frequency with an
+    isotonic fit inside each remaining-observation band, so the aggregate count
+    and the shape are repaired together. It is applied as a per-row rescale of
+    the whole horizon grid, which preserves monotonicity across horizons.
+    """
+
+    edges: tuple[float, ...] = RELIABILITY_EDGES
+    # Per band: (grid of predicted probabilities, isotonic values at that grid).
+    curves: tuple[tuple[tuple[float, ...], tuple[float, ...]], ...] = ()
+    horizon_column: int = 11  # index of the 42-day horizon in HORIZON_GRID
+    min_factor: float = 0.2
+    max_factor: float = 3.0
+
+    def _band_of(self, remaining: np.ndarray) -> np.ndarray:
+        edges = np.asarray(self.edges, dtype=float)
+        remaining = np.clip(np.asarray(remaining, dtype=float), 0.0, None)
+        return np.clip(np.searchsorted(edges, remaining, side="right") - 1, 0, len(self.curves) - 1)
+
+    def factor_for(self, probability: np.ndarray, remaining: np.ndarray) -> np.ndarray:
+        probability = np.asarray(probability, dtype=float)
+        bands = self._band_of(remaining)
+        mapped = np.empty_like(probability)
+        for band in np.unique(bands):
+            xs, ys = self.curves[int(band)]
+            mask = bands == band
+            mapped[mask] = np.interp(probability[mask], xs, ys)
+        factor = mapped / np.maximum(probability, 1e-4)
+        return np.clip(factor, self.min_factor, self.max_factor)
+
+    def apply(self, grid: np.ndarray, remaining: np.ndarray) -> np.ndarray:
+        if grid.shape[0] == 0 or not self.curves:
+            return grid
+        column = min(self.horizon_column, grid.shape[1] - 1)
+        factor = self.factor_for(grid[:, column], remaining)[:, None]
+        return np.clip(grid * factor, 0.0, 1.0)
+
+    @classmethod
+    def fit(
+        cls,
+        remaining: np.ndarray,
+        predicted: np.ndarray,
+        actual: np.ndarray,
+        *,
+        edges: tuple[float, ...] = RELIABILITY_EDGES,
+        min_events: int = 25,
+        horizon_column: int = 11,
+    ) -> "ReliabilityCalibration":
+        from sklearn.isotonic import IsotonicRegression
+
+        remaining = np.clip(np.asarray(remaining, dtype=float), 0.0, None)
+        predicted = np.asarray(predicted, dtype=float)
+        actual = np.asarray(actual, dtype=float)
+        curves: list[tuple[tuple[float, ...], tuple[float, ...]]] = []
+        for low, high in zip(edges[:-1], edges[1:]):
+            inside = (remaining >= low) & (remaining < high)
+            events = float(actual[inside].sum())
+            if inside.sum() < 200 or events < min_events:
+                # Too thin to reshape: identity curve.
+                curves.append(((0.0, 1.0), (0.0, 1.0)))
+                continue
+            iso = IsotonicRegression(
+                y_min=0.0, y_max=1.0, increasing=True, out_of_bounds="clip"
+            )
+            iso.fit(predicted[inside], actual[inside])
+            xs = np.unique(
+                np.concatenate(
+                    [[0.0, 1.0], np.quantile(predicted[inside], np.linspace(0, 1, 41))]
+                )
+            )
+            ys = iso.predict(xs)
+            curves.append((tuple(map(float, xs)), tuple(map(float, ys))))
+        return cls(edges=tuple(edges), curves=tuple(curves), horizon_column=horizon_column)
+
+    def describe(self) -> str:
+        lines = []
+        for (low, high), (xs, ys) in zip(zip(self.edges[:-1], self.edges[1:]), self.curves):
+            span = f"{low:>5.0f}-{high:>5.0f}" if high < 1e8 else f"{low:>5.0f}+"
+            probes = (0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 0.9)
+            mapped = np.interp(probes, xs, ys)
+            pairs = "  ".join(f"{p:.2f}->{m:.2f}" for p, m in zip(probes, mapped))
+            lines.append(f"  remaining {span} d: {pairs}")
+        return "\n".join(lines)
