@@ -33,7 +33,7 @@ from bsai.runtime import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/v9_blend.joblib")
+DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
 
 
 def _float_env(name: str, default: float) -> float:
@@ -72,7 +72,7 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         ),
         local_search_evaluations=local,
         uncertain_local_search_evaluations=uncertain,
-        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 4),
+        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 0),
         candidate_margin_hours=_float_env("BATTERYSWAP_CANDIDATE_MARGIN", 12.0),
         optimizer=OptimizationConfig(solver_seconds=solver_seconds),
     )
@@ -91,9 +91,9 @@ def load_competition_planner() -> Planner:
         return planner
 
     config = build_planner_config(
-        _float_env("BATTERYSWAP_SOLVER_SECONDS", 0.5),
-        _int_env("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", 80),
-        _int_env("BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS", 35),
+        _float_env("BATTERYSWAP_SOLVER_SECONDS", 1.0),
+        _int_env("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", 240),
+        _int_env("BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS", 240),
     )
     inner = CompetitionPlanner(forecaster=load_forecaster(), config=config)
     fast = build_planner_config(0.25, 12, 6)
