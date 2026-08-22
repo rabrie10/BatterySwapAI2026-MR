@@ -1,0 +1,2 @@
+C:\Users\mbnas\.vscode\BatterySwapAI\BatterySwapAI2026-MR\.claude\worktrees\batteryswapai-final-optimization-8dc2c6\tools\validate_v6.py:281: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+  horizon_end = start + pd.Timedelta(days=float(settings.planning_window_days))

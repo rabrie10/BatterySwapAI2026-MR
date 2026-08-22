@@ -43,11 +43,19 @@ from batteryswap_solution.optimizer import OptimizationConfig
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 
 from bsai.forecaster import HazardForecaster
+from bsai.rerank import (
+    CompensatedBarrierScorer,
+    OracleScorer,
+    RankRemapModel,
+    SecondModelScorer,
+    SumScorer,
+)
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
 
 ALL_DEFER_ANCHOR = 3324.7
 NAIVE_ORACLE_ANCHOR = 205.2
+_BUILDING_OF: dict[str, str] = {}
 
 
 class FallbackCounter(logging.Handler):
@@ -72,7 +80,8 @@ class FallbackCounter(logging.Handler):
 def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
     if args.production:
         model = joblib.load(args.model)
-        return HazardForecaster(model, probability_scale=args.probability_scale)
+        return HazardForecaster(_maybe_rerank(model, args),
+                                probability_scale=args.probability_scale)
     bundle = joblib.load(args.folds)
     if args.volatility_scale is not None:
         for fold_model in bundle["by_building"].values():
@@ -82,7 +91,59 @@ def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
         building_of=building_of,
         climatology=bundle["climatology"],
     )
-    return HazardForecaster(model, probability_scale=args.probability_scale)
+    return HazardForecaster(_maybe_rerank(model, args),
+                            probability_scale=args.probability_scale)
+
+
+def _maybe_rerank(model, args):
+    """Wrap the model in the order-only remap, outside the fold dispatcher.
+
+    The remap has to see the whole scenario at once -- a rank inside one
+    building is not a rank inside a scenario -- and ``OofHazardModel`` is what
+    the forecaster hands every row to, so the wrapper goes on the outside.
+    """
+    if args.rerank_oracle:
+        devices = load_devices(args.dataset / "devices.csv")
+        end = pd.to_datetime(devices["end_time"], utc=True).dt.tz_localize(None)
+        epoch = pd.Timestamp("1970-01-01")
+        end_ordinal = {
+            str(d): float((t.normalize() - epoch) / pd.Timedelta(days=1))
+            for d, t in zip(devices["device_id"], end)
+        }
+        table = pd.read_csv(args.dataset / "eol_times.csv")
+        recorded = table[table["end_time"].notna()]
+        eol_ordinal = {
+            str(d): float((pd.Timestamp(t).normalize() - epoch) / pd.Timedelta(days=1))
+            for d, t in zip(recorded["device_id"], recorded["end_time"])
+        }
+        return RankRemapModel(
+            base=model,
+            scorer=OracleScorer(end_ordinal=end_ordinal, eol_ordinal=eol_ordinal),
+        )
+    parts = []
+    if args.rerank > 0.0:
+        parts.append(CompensatedBarrierScorer(weight=args.rerank))
+    if args.rerank_folds is not None:
+        other = joblib.load(args.rerank_folds)
+        if args.rerank_volatility is not None:
+            for fold_model in other["by_building"].values():
+                fold_model.volatility_scale = args.rerank_volatility
+        parts.append(
+            SecondModelScorer(
+                other=OofHazardModel(
+                    by_building=other["by_building"],
+                    building_of=_BUILDING_OF,
+                    climatology=other["climatology"],
+                ),
+                weight=args.rerank_second,
+            )
+        )
+    if not parts:
+        return model
+    # Each part already contributes centred_rank(own level); summing them would
+    # count the incumbent order twice, so only the first keeps it.
+    scorer = parts[0] if len(parts) == 1 else SumScorer(parts=parts)
+    return RankRemapModel(base=model, scorer=scorer)
 
 
 def main() -> None:
@@ -137,6 +198,25 @@ def main() -> None:
     )
     parser.add_argument("--blocks", type=int, default=6, help="non-overlapping blocks")
     parser.add_argument(
+        "--rerank",
+        type=float,
+        default=0.0,
+        help="weight on the temperature-compensated barrier ordering in the "
+             "order-only remap; 0 is the incumbent exactly, 1 is the "
+             "equal-weight rank average",
+    )
+    parser.add_argument("--rerank-folds", type=Path, default=None,
+                        help="a second fold bundle whose ORDER (never its level) "
+                             "joins the remap")
+    parser.add_argument("--rerank-second", type=float, default=1.0)
+    parser.add_argument("--rerank-volatility", type=float, default=None)
+    parser.add_argument(
+        "--rerank-oracle",
+        action="store_true",
+        help="diagnostic: remap V8's own curves in perfect order. Bounds what "
+             "any order-only reranker can win through the real planner",
+    )
+    parser.add_argument(
         "--served-out",
         type=Path,
         default=None,
@@ -146,6 +226,8 @@ def main() -> None:
 
     devices = load_devices(args.dataset / "devices.csv")
     building_of = dict(zip(devices["device_id"], devices["building_id"]))
+    global _BUILDING_OF
+    _BUILDING_OF = building_of
 
     forecaster = build_forecaster(args, building_of)
     if args.per_battery:
