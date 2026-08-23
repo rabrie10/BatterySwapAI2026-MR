@@ -47,3 +47,5 @@ outputs/fj_tmpl_det.log
 outputs/fj_template_scores.npz
 outputs/fj_process.log
 outputs/fj_calib.log
+outputs/fj_frailty.log
+outputs/fj_frailty.npz
