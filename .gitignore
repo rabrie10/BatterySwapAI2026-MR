@@ -49,3 +49,4 @@ outputs/fj_process.log
 outputs/fj_calib.log
 outputs/fj_frailty.log
 outputs/fj_frailty.npz
+outputs/fj_tcn_smoke.json
