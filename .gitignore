@@ -33,3 +33,5 @@ outputs/*.log
 outputs/fj_*_served.json
 outputs/fj_lab_c*.json
 outputs/fj_candA_smoke.json
+outputs/fj_lab.json
+outputs/fj_signals.json
