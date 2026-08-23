@@ -49,6 +49,11 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
 INCUMBENT_MODEL_VERSION = "bsai-wiener/v1"
 
+# The sequence reranker. V8's own CDF multiset is handed out in the sequence
+# model's order, so per-scenario risk mass is unchanged and only *which* battery
+# carries which curve changes. Set BATTERYSWAP_SEQUENCE_PATH="" to ship plain V8.
+DEFAULT_SEQUENCE_PATH = Path("models/sequence_tcn.json")
+
 
 def _float_env(name: str, default: float) -> float:
     return float(os.environ.get(name, default))
@@ -142,7 +147,45 @@ def load_forecaster() -> HazardForecaster | None:
             version,
             INCUMBENT_MODEL_VERSION,
         )
-    return HazardForecaster(model)
+    return _maybe_sequence(model)
+
+
+def _maybe_sequence(model) -> HazardForecaster:
+    """Wrap V8 in the order-only sequence remap, or say why it did not.
+
+    Every failure here is logged at ERROR and falls back to plain V8 rather than
+    to something worse -- but silence is the actual danger, because a fallback
+    that scores 2126 instead of 2055 looks like a normal run. The artifact is
+    plain JSON precisely so there is no Git-LFS pointer to resolve; the check
+    below exists because `models/v7_wiener.joblib` taught this project that an
+    unresolved pointer degrades a submission without a word.
+    """
+    raw = os.environ.get("BATTERYSWAP_SEQUENCE_PATH", str(DEFAULT_SEQUENCE_PATH))
+    if not raw:
+        LOGGER.info("sequence remap disabled by BATTERYSWAP_SEQUENCE_PATH=''")
+        return HazardForecaster(model)
+    path = Path(raw)
+    if not path.exists():
+        LOGGER.error(
+            "sequence artifact missing at %s; shipping plain V8 ordering, which "
+            "measured 2126.53 against the remap's 2055.58 out of fold", path)
+        return HazardForecaster(model)
+    try:
+        from bsai.sequence import build_forecaster
+
+        weight = _float_env("BATTERYSWAP_SEQUENCE_WEIGHT", 1.0)
+        forecaster = build_forecaster(model, path, weight=weight)
+    except Exception:
+        LOGGER.exception("Could not build the sequence remap from %s; plain V8", path)
+        return HazardForecaster(model)
+    LOGGER.info(
+        "task1 remap=bsai-sequence/v1 path=%s folds=%d parameters_per_fold=%d "
+        "weight=%.2f order_only=True",
+        path, len(forecaster.sequence_scorer.model.folds),
+        sum(t.size for t in forecaster.sequence_scorer.model.folds[0].tensors.values()),
+        weight,
+    )
+    return forecaster
 
 
 def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> PlannerConfig:
@@ -153,18 +196,16 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         ),
         local_search_evaluations=local,
         uncertain_local_search_evaluations=uncertain,
-        # Deterministic expected cost: one replay per evaluation instead of an
-        # average over four stratified emergency samples. It is a variance
-        # reduction with no fitted parameter -- the exact expectation replacing
-        # a four-sample estimate of it -- so unlike a tuned selection rule there
-        # is no mechanism by which it can overfit the 24 training buildings.
-        # Measured out of fold by building at the shipped 80/35 search it is
-        # worth -35.30 on its own (t = -3.02, 31 wins / 10 losses); with the
-        # 120/120 search below, -52.76 (t = -4.57, 38/9). The public A/B that
-        # first shipped it credits the same mechanics with -111 on the
-        # operational components while charging V10's *forecast* +179
-        # separately -- see docs/FINAL_TERMINALITY.md section 4.
-        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 0),
+        # Four stratified emergency samples, not the deterministic expectation.
+        # On V8's own ordering the deterministic path (0) is worth -35.30 and is
+        # what this file shipped before. It is *not* used with the sequence
+        # remap: measured through this entry point the two combine to 16.48
+        # s/scenario, projecting 28.6 minutes for the official 96 against a
+        # 30-minute cap and past bsai/runtime.py's 27.5-minute hard deadline.
+        # The remap plus this planner measured 12.40 s/scenario, 22.1 minutes
+        # projected, and 2126.53 -> 2055.58 out of fold by building. Runtime
+        # headroom decides this one; see docs/SUBMISSION_TCN.md section 4.
+        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 4),
         candidate_margin_hours=_float_env("BATTERYSWAP_CANDIDATE_MARGIN", 12.0),
         optimizer=OptimizationConfig(solver_seconds=solver_seconds),
     )
