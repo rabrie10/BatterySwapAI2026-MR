@@ -45,3 +45,5 @@ outputs/fj_templates.log
 outputs/fj_tmpl_smoke.json
 outputs/fj_tmpl_det.log
 outputs/fj_template_scores.npz
+outputs/fj_process.log
+outputs/fj_calib.log
