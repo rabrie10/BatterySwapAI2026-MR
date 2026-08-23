@@ -1,50 +1,66 @@
-# V8 hybrid failure model
+# V8 boosted-hazard/Wiener implementation
 
-V8 combines three complementary survival signals:
+This document describes the model and planner configuration loaded by
+`script.py` on this branch.
+
+## Active prediction path
+
+The production artifact `models/v8_ensemble.joblib` contains:
 
 - a histogram gradient-boosted discrete-hazard model trained at official
   scenario landmarks;
-- a direct 42-day gradient-boosted ranking head;
-- a censored Weibull AFT tail.
+- a direct gradient-boosted 42-day ranking head;
+- a V7 Wiener first-passage model with volatility scale `1.4`;
+- a Weibull AFT component inside the serialized hybrid model.
 
-The hybrid is blended in log-odds space with the V7 Wiener first-passage model.
-The Wiener component supplies the conditional tail beyond day 42.  A smooth
-scenario-phase correction changes only total probability mass, preserving the
-battery ranking and conditional curve shape.
+The near-term hybrid and Wiener CDFs are blended in log-odds space. The hybrid
+weight is at most `0.25` and is multiplied by
+`clip(remaining_observation_days / 42, 0, 1)`, so the Wiener model receives more
+weight when a battery has less than 42 observable days remaining.
 
-Training calibration is grouped by building.  The full 48-scenario train
-backtest uses out-of-fold building models and therefore never scores a building
-with a model trained on that building.  The selected ensemble uses 25% hybrid,
-75% Wiener, and Wiener volatility scale 1.4.
+The production ensemble has `right_tail=True`. Consequently, values after day
+42 use the Wiener model's conditional tail anchored to the blended day-42
+probability. The Weibull AFT tail is trained, tested, and serialized as part of
+`HybridHazardAFTModel`, but it is bypassed in the final ensemble after day 42.
+It is therefore an available ablation component, not an active production-tail
+claim.
 
-## Results
+After prediction, `HazardForecaster` applies a scenario-date probability scale
+interpolated from the configured phase knots. This changes the probability
+level without explicitly re-ranking batteries, although clipping at one can
+create ties. The phase scale was fitted from building-grouped OOF forecasts on
+the train scenario timeline and may not transfer if another split has a
+different time/incidence relationship.
 
-| Validation | Mean total cost |
+## Planner path
+
+`CompetitionPlanner` consumes the daily CDF and tail contract. Its CP-SAT model
+jointly chooses service/defer and service day, followed by routing, exact replay,
+and local search. The production configuration also caps proactive swaps at:
+
+```text
+ceil(2 * sum(full-fleet 42-day event probabilities) + 5)
+```
+
+This is an upper bound, not a target: the optimizer may schedule fewer swaps.
+The budget is based on the calibrated full-fleet event mass before candidate
+selection.
+
+## Validation results
+
+The model comparison uses building-grouped out-of-fold models over all 48 train
+scenarios. The values below are train backtests, not public/private scores.
+
+| Validation configuration | Mean total cost |
 |---|---:|
-| Shipped V7 local baseline | 2,293 |
-| V8 ensemble, before phase correction | 2,240 |
-| V8 ensemble, selected phase correction | 1,999 |
-| **V8 + expected-incidence service budget** | **1,962** |
+| Standalone V7 local baseline | 2,293.2 |
+| V8 ensemble before phase scaling | 2,240.3 |
+| V8 ensemble with phase scaling | 1,999.3 |
+| V8 plus expected-incidence service budget | 1,962.2 |
 
-This is a 12.8% reduction against the shipped local V7 baseline.  It is not a
-claim of beating the 1,160.67 public leader: only a public submission can
-establish that, and train-to-public shift may be material.
-
-### Early-swap precision repair
-
-The final planner limits proactive service to
-`ceil(2 * expected_due + 5)` batteries per scenario.  Unlike the old
-percentage cap, this is computed from the calibrated full-fleet 42-day event
-mass and is therefore stable when candidate filtering changes size.  The
-headroom protects dense scenarios; the constraint activates mainly in quiet
-closing scenarios where the uncapped planner serviced 29--43 batteries for
-only 2--6 observed failures.
-
-On all 48 building-grouped OOF scenarios this changed mean total cost
-1999.33 -> **1962.22**, early cost 778.85 -> **749.03**, and planned service
-17.81 -> **16.15** batteries per scenario.  Recall moved only 0.634 -> 0.626.
-Heavier hazard blends from 30% through 50% were rejected: 50% reduced early
-cost to 709.10 but increased late cost to 1010.62 and total cost to 2043.95.
+The selected local configuration is 14.4% lower than the standalone V7 local
+baseline. This does not establish a public score or a win over the 1,160.67
+leaderboard result; only an official evaluation can do that.
 
 ## Reproduce
 
@@ -56,7 +72,10 @@ python tools/validate_v6.py --dataset data/raw/train `
   --folds outputs/v8_hybrid_folds.joblib `
   --blend-folds outputs/v7_wiener_folds.joblib `
   --blend-weight .25 --blend-volatility-scale 1.4 `
-  --report outputs/v8_ensemble_phase_full.json --audit
+  --expected-due-multiplier 2 --expected-due-buffer 5 `
+  --report outputs/v8_expected_incidence_oof.json --audit
 ```
 
-The submission entry point now defaults to `models/v8_ensemble.joblib`.
+The validation command uses fold artifacts generated by the two preceding
+training commands. Submission inference loads `models/v8_ensemble.joblib` by
+default; `BATTERYSWAP_MODEL_PATH` can override that path.

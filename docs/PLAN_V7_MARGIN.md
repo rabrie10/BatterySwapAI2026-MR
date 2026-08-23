@@ -1,5 +1,8 @@
 # V7: close the gap to first place
 
+> Historical proposal for the standalone V7 model. V8 supersedes this as the
+> current submission model.
+
 Written 2026-08-21 against the first real leaderboard signal.
 
 ## 1. What the leaderboard actually says

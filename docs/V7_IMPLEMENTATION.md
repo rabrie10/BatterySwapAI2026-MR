@@ -1,5 +1,9 @@
 # V7: Wiener first passage on within-day features
 
+> Historical implementation record for the standalone V7 candidate. The Wiener
+> model remains one component of V8, but this document does not describe the
+> current ensemble or planner configuration.
+
 Written 2026-08-21 after the first real leaderboard signal put us 17th of 19 at
 2915.68 against first place's 1160.67.
 

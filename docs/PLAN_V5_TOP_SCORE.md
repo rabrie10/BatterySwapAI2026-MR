@@ -1,5 +1,8 @@
 # Plan V5 — Rebuild for the top of the leaderboard
 
+> Historical proposal, retained for rationale only. It does not describe the
+> current implementation and was superseded by later measured versions.
+
 Status: proposal for review. Written 2026-08-20. Deadline 2026-08-23.
 
 All numbers below were measured in this repo today against

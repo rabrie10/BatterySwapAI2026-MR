@@ -157,7 +157,7 @@ Snapshot observed 2026-08-18:
 | 3 | 1964.29 | 1532.61 | 431.68 | 11.71 |
 | 4 | 2167.11 | 1295.34 | 871.76 | 20.62 |
 
-Rank 2 currently has lower timing cost than rank 1 but loses more than that gain
+In that 2026-08-18 snapshot, rank 2 had lower timing cost than rank 1 but lost more than that gain
 to logistics and capacity. Rank 1 also still averages about one daily-limit hit
 and half a weekly-limit hit per scenario. This makes exact batching, routing,
 and threshold repair a first-order opportunity, while the 84% timing share of

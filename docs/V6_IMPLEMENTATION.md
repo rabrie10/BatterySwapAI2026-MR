@@ -1,5 +1,8 @@
 # V6 implementation notes
 
+> Historical implementation record. V6 is not loaded by the current submission;
+> see `V8_HYBRID_IMPLEMENTATION.md`.
+
 What was built, what it measures, and what did not work. Written 2026-08-21
 against `claude/v6-forecast-rebuild`.
 

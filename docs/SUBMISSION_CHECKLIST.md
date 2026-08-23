@@ -14,6 +14,10 @@ so each official attempt should already have passed local checks.
 - The planner implements the official `Planner.plan()` interface.
 - All trained model files, pickles, configs, lookup tables, and other artifacts
   used during submission are committed.
+- `script.py` loads the intended artifact (currently
+  `models/v8_ensemble.joblib`) and a contract test exercises that exact file.
+- Every LFS-tracked artifact has a local object (`git lfs fsck`) and has been
+  uploaded to the destination remote (`git lfs push --all <remote> <ref>`).
 - The submitted code does not require network access during evaluation.
 - The submitted code does not require GPU.
 - Runtime fits under 30 minutes on CPU.
@@ -80,6 +84,7 @@ before spending an official submission.
 - All code and artifacts needed for the submitted version are committed.
 - The submitted commit SHA is known.
 - The commit has been pushed to the Hugging Face model repository.
+- A clean clone from the Hugging Face repository can resolve every LFS pointer.
 - Do not rewrite, delete, squash away, or force-push over submitted commits.
 - New improvements should be submitted as new commits.
 - The repository is in `owner/repository-name` format on Hugging Face.

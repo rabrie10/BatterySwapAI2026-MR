@@ -1,5 +1,8 @@
 # Plan V6 — the maximum-result plan
 
+> Historical proposal, retained for rationale only. It does not describe the
+> current V8 implementation.
+
 Supersedes `PLAN_V5_TOP_SCORE.md`. Incorporates the V5.1 review, corrects two
 errors in V5 that measurement disproved, and adds the findings from a further
 round of experiments. Written 2026-08-21.
