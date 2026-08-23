@@ -1,0 +1,278 @@
+{
+ "served_per_scenario": 17.458,
+ "tp_per_scenario": 5.458,
+ "fp_per_scenario": 12.0,
+ "miss_per_scenario": 4.0,
+ "profile": [
+  {
+   "signal": "margin",
+   "TP_med": 0.0427,
+   "FP_med": 0.0496,
+   "miss_med": 0.1348,
+   "missVIS_med": 0.0989,
+   "V9add_med": 0.0692,
+   "auc_TPvsFP": 0.4775
+  },
+  {
+   "signal": "p42",
+   "TP_med": 0.5007,
+   "FP_med": 0.3587,
+   "miss_med": 0.0087,
+   "missVIS_med": 0.0957,
+   "V9add_med": 0.0715,
+   "auc_TPvsFP": 0.6073
+  },
+  {
+   "signal": "dwell_2.45",
+   "TP_med": 7.0,
+   "FP_med": 10.0,
+   "miss_med": -1.0,
+   "missVIS_med": -1.0,
+   "V9add_med": -1.0,
+   "auc_TPvsFP": 0.4808
+  },
+  {
+   "signal": "dwell_2.50",
+   "TP_med": 32.0,
+   "FP_med": 44.0,
+   "miss_med": 1.0,
+   "missVIS_med": 12.0,
+   "V9add_med": 51.0,
+   "auc_TPvsFP": 0.4536
+  },
+  {
+   "signal": "dwell_2.60",
+   "TP_med": 106.0,
+   "FP_med": 106.0,
+   "miss_med": 90.5,
+   "missVIS_med": 63.0,
+   "V9add_med": 129.5,
+   "auc_TPvsFP": 0.4768
+  },
+  {
+   "signal": "p07_over_p42",
+   "TP_med": 0.5597,
+   "FP_med": 0.79,
+   "miss_med": 0.0257,
+   "missVIS_med": 0.0782,
+   "V9add_med": 0.2224,
+   "auc_TPvsFP": 0.3649
+  },
+  {
+   "signal": "p28_over_p42",
+   "TP_med": 0.812,
+   "FP_med": 0.9375,
+   "miss_med": 0.2694,
+   "missVIS_med": 0.3986,
+   "V9add_med": 0.4804,
+   "auc_TPvsFP": 0.3741
+  },
+  {
+   "signal": "cdf_front_mass",
+   "TP_med": 0.7281,
+   "FP_med": 0.8856,
+   "miss_med": 0.2827,
+   "missVIS_med": 0.3801,
+   "V9add_med": 0.4642,
+   "auc_TPvsFP": 0.3632
+  },
+  {
+   "signal": "p_late_tail",
+   "TP_med": 0.2004,
+   "FP_med": 0.0142,
+   "miss_med": 0.3296,
+   "missVIS_med": 0.5378,
+   "V9add_med": 0.2731,
+   "auc_TPvsFP": 0.6213
+  },
+  {
+   "signal": "rel_margin_room",
+   "TP_med": -0.2516,
+   "FP_med": -0.128,
+   "miss_med": -0.1743,
+   "missVIS_med": -0.2102,
+   "V9add_med": -0.1941,
+   "auc_TPvsFP": 0.336
+  },
+  {
+   "signal": "rel_slope30_room",
+   "TP_med": -0.0012,
+   "FP_med": -0.0007,
+   "miss_med": -0.0008,
+   "missVIS_med": -0.0013,
+   "V9add_med": -0.0003,
+   "auc_TPvsFP": 0.3596
+  },
+  {
+   "signal": "rel_temp_room",
+   "TP_med": -1.6716,
+   "FP_med": -0.5637,
+   "miss_med": -0.1473,
+   "missVIS_med": -1.0,
+   "V9add_med": -0.379,
+   "auc_TPvsFP": 0.442
+  },
+  {
+   "signal": "staleness",
+   "TP_med": 0.0,
+   "FP_med": 0.0,
+   "miss_med": 0.0,
+   "missVIS_med": 0.0,
+   "V9add_med": 0.0,
+   "auc_TPvsFP": 0.5151
+  },
+  {
+   "signal": "gap_fraction_90",
+   "TP_med": 0.0,
+   "FP_med": 0.0,
+   "miss_med": 0.0,
+   "missVIS_med": 0.0,
+   "V9add_med": 0.0,
+   "auc_TPvsFP": 0.5377
+  },
+  {
+   "signal": "voltage",
+   "TP_med": 2.4427,
+   "FP_med": 2.4496,
+   "miss_med": 2.5348,
+   "missVIS_med": 2.4989,
+   "V9add_med": 2.4692,
+   "auc_TPvsFP": 0.4775
+  },
+  {
+   "signal": "voltage_compensated",
+   "TP_med": 2.4536,
+   "FP_med": 2.4534,
+   "miss_med": 2.535,
+   "missVIS_med": 2.5063,
+   "V9add_med": 2.4842,
+   "auc_TPvsFP": 0.5117
+  },
+  {
+   "signal": "slope_30",
+   "TP_med": -0.002,
+   "FP_med": -0.0014,
+   "miss_med": -0.0014,
+   "missVIS_med": -0.002,
+   "V9add_med": -0.0009,
+   "auc_TPvsFP": 0.3457
+  },
+  {
+   "signal": "slope_90",
+   "TP_med": -0.0018,
+   "FP_med": -0.0017,
+   "miss_med": -0.0012,
+   "missVIS_med": -0.0015,
+   "V9add_med": -0.001,
+   "auc_TPvsFP": 0.4155
+  },
+  {
+   "signal": "slope_ratio_14_90",
+   "TP_med": 1.2116,
+   "FP_med": 0.9076,
+   "miss_med": 1.2217,
+   "missVIS_med": 1.444,
+   "V9add_med": 0.8328,
+   "auc_TPvsFP": 0.5479
+  },
+  {
+   "signal": "curvature_30_120",
+   "TP_med": -0.0004,
+   "FP_med": 0.0,
+   "miss_med": -0.0002,
+   "missVIS_med": -0.0005,
+   "V9add_med": 0.0001,
+   "auc_TPvsFP": 0.3778
+  },
+  {
+   "signal": "beta_30",
+   "TP_med": 0.0126,
+   "FP_med": 0.0103,
+   "miss_med": 0.0123,
+   "missVIS_med": 0.0137,
+   "V9add_med": 0.0113,
+   "auc_TPvsFP": 0.6244
+  },
+  {
+   "signal": "beta_rise",
+   "TP_med": 1.0805,
+   "FP_med": 0.9726,
+   "miss_med": 1.1027,
+   "missVIS_med": 1.1091,
+   "V9add_med": 1.0657,
+   "auc_TPvsFP": 0.648
+  },
+  {
+   "signal": "v_std_30",
+   "TP_med": 0.0279,
+   "FP_med": 0.0238,
+   "miss_med": 0.0262,
+   "missVIS_med": 0.0317,
+   "V9add_med": 0.0251,
+   "auc_TPvsFP": 0.5676
+  },
+  {
+   "signal": "temp_now",
+   "TP_med": 18.6383,
+   "FP_med": 21.0,
+   "miss_med": 19.1044,
+   "missVIS_med": 18.2808,
+   "V9add_med": 18.7064,
+   "auc_TPvsFP": 0.3924
+  },
+  {
+   "signal": "age_days",
+   "TP_med": 786.0,
+   "FP_med": 859.0,
+   "miss_med": 769.0,
+   "missVIS_med": 758.0,
+   "V9add_med": 775.5,
+   "auc_TPvsFP": 0.3315
+  },
+  {
+   "signal": "observations",
+   "TP_med": 674.5,
+   "FP_med": 829.0,
+   "miss_med": 623.0,
+   "missVIS_med": 632.0,
+   "V9add_med": 651.5,
+   "auc_TPvsFP": 0.2741
+  },
+  {
+   "signal": "knee_slope_vs_history",
+   "TP_med": 2.6371,
+   "FP_med": 1.8086,
+   "miss_med": 1.7014,
+   "missVIS_med": 2.2664,
+   "V9add_med": 1.1342,
+   "auc_TPvsFP": 0.6439
+  },
+  {
+   "signal": "knee_trend_residual",
+   "TP_med": -0.0185,
+   "FP_med": -0.0113,
+   "miss_med": -0.003,
+   "missVIS_med": -0.028,
+   "V9add_med": 0.0061,
+   "auc_TPvsFP": 0.3874
+  },
+  {
+   "signal": "crossing_30",
+   "TP_med": 20.995,
+   "FP_med": 26.5489,
+   "miss_med": 91.8692,
+   "missVIS_med": 55.3414,
+   "V9add_med": 87.3683,
+   "auc_TPvsFP": 0.3977
+  },
+  {
+   "signal": "season_sin",
+   "TP_med": -0.4668,
+   "FP_med": -0.3573,
+   "miss_med": -0.1414,
+   "missVIS_med": -0.4972,
+   "V9add_med": 0.3953,
+   "auc_TPvsFP": 0.4201
+  }
+ ]
+}

@@ -43,11 +43,22 @@ from batteryswap_solution.optimizer import OptimizationConfig
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 
 from bsai.forecaster import HazardForecaster
+from bsai.rerank import (
+    CompensatedBarrierScorer,
+    OracleScorer,
+    RankRemapModel,
+    SecondModelScorer,
+    SumScorer,
+)
+from bsai.residual import OofResidualScorer
+from bsai.templates import TemplateScorer, build_templates
+from bsai.terminality import NearThresholdScorer
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
 
 ALL_DEFER_ANCHOR = 3324.7
 NAIVE_ORACLE_ANCHOR = 205.2
+_BUILDING_OF: dict[str, str] = {}
 
 
 class FallbackCounter(logging.Handler):
@@ -72,7 +83,8 @@ class FallbackCounter(logging.Handler):
 def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
     if args.production:
         model = joblib.load(args.model)
-        return HazardForecaster(model, probability_scale=args.probability_scale)
+        return HazardForecaster(_maybe_rerank(model, args),
+                                probability_scale=args.probability_scale)
     bundle = joblib.load(args.folds)
     if args.volatility_scale is not None:
         for fold_model in bundle["by_building"].values():
@@ -82,7 +94,146 @@ def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
         building_of=building_of,
         climatology=bundle["climatology"],
     )
-    return HazardForecaster(model, probability_scale=args.probability_scale)
+    return HazardForecaster(_maybe_rerank(model, args),
+                            probability_scale=args.probability_scale)
+
+
+def _maybe_rerank(model, args):
+    """Wrap the model in the order-only remap, outside the fold dispatcher.
+
+    The remap has to see the whole scenario at once -- a rank inside one
+    building is not a rank inside a scenario -- and ``OofHazardModel`` is what
+    the forecaster hands every row to, so the wrapper goes on the outside.
+    """
+    if args.rerank_oracle:
+        devices = load_devices(args.dataset / "devices.csv")
+        end = pd.to_datetime(devices["end_time"], utc=True).dt.tz_localize(None)
+        epoch = pd.Timestamp("1970-01-01")
+        end_ordinal = {
+            str(d): float((t.normalize() - epoch) / pd.Timedelta(days=1))
+            for d, t in zip(devices["device_id"], end)
+        }
+        table = pd.read_csv(args.dataset / "eol_times.csv")
+        recorded = table[table["end_time"].notna()]
+        eol_ordinal = {
+            str(d): float((pd.Timestamp(t).normalize() - epoch) / pd.Timedelta(days=1))
+            for d, t in zip(recorded["device_id"], recorded["end_time"])
+        }
+        return RankRemapModel(
+            base=model,
+            scorer=OracleScorer(end_ordinal=end_ordinal, eol_ordinal=eol_ordinal),
+        )
+    if args.rerank_template > 0.0:
+        import pandas as _pd
+
+        from tools.fj_templates import crossing_index
+        from tools.fj_residual import v8_folds
+        from tools.fj_terminality import load_series
+
+        raw = load_series(Path("outputs/fj_series.npz"))
+        crossing = crossing_index(raw, args.dataset)
+        table = _pd.read_csv(args.dataset / "devices.csv")
+        ends = _pd.to_datetime(
+            table["end_time"], format="ISO8601", utc=True
+        ).dt.tz_localize(None).dt.normalize()
+        epoch = _pd.Timestamp("1970-01-01")
+        fold_of = v8_folds(args.folds)
+        held_of: dict[int, set] = {}
+        for building, fold in fold_of.items():
+            held_of.setdefault(fold, set()).add(building)
+        banks = {}
+        for fold, buildings in held_of.items():
+            allowed = {
+                d for d in crossing if _BUILDING_OF.get(d, "") not in buildings
+            }
+            banks[fold] = build_templates(
+                raw, crossing, allowed,
+                width=args.template_width, channel="voltage", mode="anchored",
+            )
+        return RankRemapModel(
+            base=model,
+            scorer=TemplateScorer(
+                series=raw,
+                end_ordinal={
+                    str(d): float((e - epoch) / _pd.Timedelta(days=1))
+                    for d, e in zip(table["device_id"], ends)
+                },
+                banks=banks,
+                fold_of=fold_of,
+                building_of=_BUILDING_OF,
+                width=args.template_width,
+                weight=args.rerank_template,
+            ),
+        )
+    if args.rerank_nearthreshold > 0.0:
+        import pandas as _pd
+
+        from tools.fj_terminality import load_series
+
+        raw = load_series(Path("outputs/fj_series.npz"))
+        devices = _pd.read_csv(args.dataset / "devices.csv")
+        ends = _pd.to_datetime(
+            devices["end_time"], format="ISO8601", utc=True
+        ).dt.tz_localize(None).dt.normalize()
+        epoch = _pd.Timestamp("1970-01-01")
+        return RankRemapModel(
+            base=model,
+            scorer=NearThresholdScorer(
+                series={d: (v, o) for d, (v, _t, o) in raw.items()},
+                end_ordinal={
+                    str(d): float((e - epoch) / _pd.Timedelta(days=1))
+                    for d, e in zip(devices["device_id"], ends)
+                },
+                weight=args.rerank_nearthreshold,
+            ),
+        )
+    if args.rerank_residual is not None:
+        bundle = joblib.load(args.rerank_residual)
+        return RankRemapModel(
+            base=model,
+            scorer=OofResidualScorer(
+                by_building=bundle["by_building"],
+                building_of=_BUILDING_OF,
+                room_of=bundle["room_of"],
+                names=tuple(bundle["names"]),
+                objective=bundle.get("objective", ""),
+            ),
+        )
+    parts = []
+    if args.rerank_tcn is not None:
+        import json as _json
+
+        from bsai.rerank import SequenceScorer
+
+        raw = _json.loads(Path(args.rerank_tcn).read_text())
+        table = {}
+        for key, value in raw.items():
+            device, remaining = key.rsplit("|", 1)
+            table[(device, int(remaining))] = float(value)
+        parts.append(SequenceScorer(table=table, weight=args.rerank_tcn_weight))
+    if args.rerank > 0.0:
+        parts.append(CompensatedBarrierScorer(weight=args.rerank))
+    if args.rerank_folds is not None:
+        other = joblib.load(args.rerank_folds)
+        if args.rerank_volatility is not None:
+            for fold_model in other["by_building"].values():
+                fold_model.volatility_scale = args.rerank_volatility
+        parts.append(
+            SecondModelScorer(
+                other=OofHazardModel(
+                    by_building=other["by_building"],
+                    building_of=_BUILDING_OF,
+                    climatology=other["climatology"],
+                ),
+                weight=args.rerank_second,
+            )
+        )
+    if not parts:
+        return model
+    # Each part already contributes centred_rank(own level); summing them would
+    # count the incumbent order twice, so only the first keeps it.
+    scorer = parts[0] if len(parts) == 1 else SumScorer(parts=parts)
+    return RankRemapModel(base=model, scorer=scorer)
 
 
 def main() -> None:
@@ -135,11 +286,65 @@ def main() -> None:
         action="store_true",
         help="record the predicted probability of every genuinely due battery",
     )
+    parser.add_argument(
+        "--robust-samples",
+        type=int,
+        default=4,
+        help="stratified emergency samples in the search objective. 0 is the "
+             "V10 deterministic expected-cost path: one replay per evaluation "
+             "instead of five, which is what pays for a larger search budget. "
+             "The public A/B credits that plus the 240-evaluation search with "
+             "-111 on the operational components (docs/V11_TRANSFER_FINDINGS.md)",
+    )
     parser.add_argument("--blocks", type=int, default=6, help="non-overlapping blocks")
+    parser.add_argument("--rerank-tcn", type=Path, default=None,
+                        help="path to the sequence model's per-row score table "
+                             "(tools/fj_tcn.py --export); order-only, the "
+                             "incumbent's own CDF multiset is handed out in the "
+                             "blended rank order")
+    parser.add_argument("--rerank-tcn-weight", type=float, default=1.0)
+    parser.add_argument(
+        "--rerank",
+        type=float,
+        default=0.0,
+        help="weight on the temperature-compensated barrier ordering in the "
+             "order-only remap; 0 is the incumbent exactly, 1 is the "
+             "equal-weight rank average",
+    )
+    parser.add_argument("--rerank-template", type=float, default=0.0,
+                        help="weight on the EOL-aligned template lead time inside "
+                             "the 0-0.10 V band, reordering only within margin bins")
+    parser.add_argument("--template-width", type=int, default=60)
+    parser.add_argument("--rerank-nearthreshold", type=float, default=0.0,
+                        help="weight on the 30/180 trajectory-volatility ratio "
+                             "inside the 0-0.10 V band, reordering only within "
+                             "0.01 V margin bins")
+    parser.add_argument("--rerank-residual", type=Path, default=None,
+                        help="a fitted bsai.residual scorer bundle; its score "
+                             "reorders V8's curves and nothing else")
+    parser.add_argument("--rerank-folds", type=Path, default=None,
+                        help="a second fold bundle whose ORDER (never its level) "
+                             "joins the remap")
+    parser.add_argument("--rerank-second", type=float, default=1.0)
+    parser.add_argument("--rerank-volatility", type=float, default=None)
+    parser.add_argument(
+        "--rerank-oracle",
+        action="store_true",
+        help="diagnostic: remap V8's own curves in perfect order. Bounds what "
+             "any order-only reranker can win through the real planner",
+    )
+    parser.add_argument(
+        "--served-out",
+        type=Path,
+        default=None,
+        help="write the planned-swap and due sets per scenario to this JSON",
+    )
     args = parser.parse_args()
 
     devices = load_devices(args.dataset / "devices.csv")
     building_of = dict(zip(devices["device_id"], devices["building_id"]))
+    global _BUILDING_OF
+    _BUILDING_OF = building_of
 
     forecaster = build_forecaster(args, building_of)
     if args.per_battery:
@@ -159,6 +364,7 @@ def main() -> None:
                 late_risk_multiplier=args.late_multiplier,
                 local_search_evaluations=args.local_search,
                 uncertain_local_search_evaluations=args.uncertain_search,
+                robust_emergency_samples=args.robust_samples,
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
                 move_order=args.move_order,
@@ -180,6 +386,7 @@ def main() -> None:
     locations, timeseries, eol_times, scenarios = load_dataset(args.dataset)
     rows: list[dict] = []
     audit: list[dict] = []
+    served_rows: list[dict] = []
     started = time.time()
 
     for index, (scenario, locs, cut, not_dead) in enumerate(
@@ -220,6 +427,18 @@ def main() -> None:
                         "served": battery in served,
                     }
                 )
+        if args.served_out is not None:
+            # The identity of every planned swap, so the false positives can be
+            # profiled without paying for a second planner run. Population A of
+            # docs/FINAL_FP_ANALYSIS.md is exactly (served - due).
+            served_rows.append(
+                {
+                    "scenario": scenario["name"],
+                    "scenario_index": index,
+                    "served": sorted(served),
+                    "due": sorted(due),
+                }
+            )
         entry = {component: float(scores[component]) for component in cost_components}
         entry.update(
             scenario=scenario["name"],
@@ -258,6 +477,10 @@ def main() -> None:
         f"planner oracle 77.8 (scenarios 0-11 only)"
     )
     print(f"total wall time {time.time() - started:.0f}s")
+
+    if args.served_out is not None:
+        args.served_out.parent.mkdir(parents=True, exist_ok=True)
+        args.served_out.write_text(json.dumps(served_rows, indent=1))
 
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(

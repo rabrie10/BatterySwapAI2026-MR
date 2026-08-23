@@ -1,0 +1,23 @@
+{
+ "v8_concordance": 0.728,
+ "landmarks": 1705,
+ "k": 25,
+ "alone": {
+  "anchored_voltage_30": 0.5963,
+  "anchored_voltage_60": 0.59,
+  "anchored_voltage_90": 0.5668,
+  "anchored_voltage_180": 0.5582,
+  "anchored_adjusted_30": 0.5799,
+  "anchored_adjusted_60": 0.5659,
+  "anchored_adjusted_90": 0.5555,
+  "anchored_adjusted_180": 0.553,
+  "level_voltage_30": 0.653,
+  "level_voltage_60": 0.6291,
+  "level_voltage_90": 0.6217,
+  "level_voltage_180": 0.5568,
+  "level_adjusted_30": 0.6594,
+  "level_adjusted_60": 0.6415,
+  "level_adjusted_90": 0.6255,
+  "level_adjusted_180": 0.5685
+ }
+}

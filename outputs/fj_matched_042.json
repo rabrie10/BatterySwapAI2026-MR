@@ -1,0 +1,700 @@
+{
+ "band": 0.1,
+ "bin": 0.01,
+ "control_horizon": 42.0,
+ "cases": 305,
+ "controls": 916,
+ "case_devices": 71,
+ "control_devices": 88,
+ "pairs": 514,
+ "signals": [
+  {
+   "signal": "slope_14",
+   "concordance": 0.3226,
+   "edge": 0.1774,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_comp_14",
+   "concordance": 0.3243,
+   "edge": 0.1757,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "std_ratio_30_180",
+   "concordance": 0.6703,
+   "edge": 0.1703,
+   "direction": "higher",
+   "pairs": 427,
+   "coverage": 0.944
+  },
+  {
+   "signal": "crossing_14",
+   "concordance": 0.3494,
+   "edge": 0.1506,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "knee_trend_residual",
+   "concordance": 0.35,
+   "edge": 0.15,
+   "direction": "lower",
+   "pairs": 507,
+   "coverage": 0.998
+  },
+  {
+   "signal": "median_minus_min_90",
+   "concordance": 0.6468,
+   "edge": 0.1468,
+   "direction": "higher",
+   "pairs": 479,
+   "coverage": 0.992
+  },
+  {
+   "signal": "slope_comp_30",
+   "concordance": 0.3557,
+   "edge": 0.1443,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "curvature_30_120",
+   "concordance": 0.36,
+   "edge": 0.14,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "knee_slope_vs_history",
+   "concordance": 0.6394,
+   "edge": 0.1394,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_comp_60",
+   "concordance": 0.3644,
+   "edge": 0.1356,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_30",
+   "concordance": 0.3699,
+   "edge": 0.1301,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "crossing_60",
+   "concordance": 0.3704,
+   "edge": 0.1296,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_60",
+   "concordance": 0.3741,
+   "edge": 0.1259,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "crossing_30",
+   "concordance": 0.3754,
+   "edge": 0.1246,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "days_below_2.65",
+   "concordance": 0.3835,
+   "edge": 0.1165,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "temp_std",
+   "concordance": 0.5973,
+   "edge": 0.0973,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "v_range_30",
+   "concordance": 0.5957,
+   "edge": 0.0957,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 0.999
+  },
+  {
+   "signal": "crossing_comp_30",
+   "concordance": 0.405,
+   "edge": 0.095,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "beta_30",
+   "concordance": 0.5889,
+   "edge": 0.0889,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 0.999
+  },
+  {
+   "signal": "slope_comp_90",
+   "concordance": 0.4114,
+   "edge": 0.0886,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_comp_7",
+   "concordance": 0.4123,
+   "edge": 0.0877,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_90",
+   "concordance": 0.4156,
+   "edge": 0.0844,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "v_std_30",
+   "concordance": 0.5821,
+   "edge": 0.0821,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 0.999
+  },
+  {
+   "signal": "beta_7",
+   "concordance": 0.5794,
+   "edge": 0.0794,
+   "direction": "higher",
+   "pairs": 506,
+   "coverage": 0.982
+  },
+  {
+   "signal": "slope_7",
+   "concordance": 0.4207,
+   "edge": 0.0793,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_ratio_14_90",
+   "concordance": 0.5791,
+   "edge": 0.0791,
+   "direction": "higher",
+   "pairs": 508,
+   "coverage": 0.999
+  },
+  {
+   "signal": "days_below_2.70",
+   "concordance": 0.4212,
+   "edge": 0.0788,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_comp_180",
+   "concordance": 0.4218,
+   "edge": 0.0782,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "plateau_drop_rate",
+   "concordance": 0.5774,
+   "edge": 0.0774,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "season_sin",
+   "concordance": 0.5771,
+   "edge": 0.0771,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "season_cos",
+   "concordance": 0.4245,
+   "edge": 0.0755,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "days_below_2.45",
+   "concordance": 0.4254,
+   "edge": 0.0746,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "p_v8",
+   "concordance": 0.5743,
+   "edge": 0.0743,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "days_below_2.55",
+   "concordance": 0.4258,
+   "edge": 0.0742,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "range_90",
+   "concordance": 0.5737,
+   "edge": 0.0737,
+   "direction": "higher",
+   "pairs": 508,
+   "coverage": 0.999
+  },
+  {
+   "signal": "rebound_max_90",
+   "concordance": 0.5724,
+   "edge": 0.0724,
+   "direction": "higher",
+   "pairs": 478,
+   "coverage": 0.989
+  },
+  {
+   "signal": "plateau_drop",
+   "concordance": 0.43,
+   "edge": 0.07,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "knee_worst_14d_drop",
+   "concordance": 0.4305,
+   "edge": 0.0695,
+   "direction": "lower",
+   "pairs": 506,
+   "coverage": 0.995
+  },
+  {
+   "signal": "knee_recent_vs_baseline",
+   "concordance": 0.4338,
+   "edge": 0.0662,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "days_below_2.42",
+   "concordance": 0.4348,
+   "edge": 0.0652,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_comp_120",
+   "concordance": 0.4352,
+   "edge": 0.0648,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "current_run_below_245",
+   "concordance": 0.4363,
+   "edge": 0.0637,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "v_range_7",
+   "concordance": 0.5623,
+   "edge": 0.0623,
+   "direction": "higher",
+   "pairs": 506,
+   "coverage": 0.984
+  },
+  {
+   "signal": "slope_120",
+   "concordance": 0.4426,
+   "edge": 0.0574,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "rebound_mean_90",
+   "concordance": 0.5538,
+   "edge": 0.0538,
+   "direction": "higher",
+   "pairs": 478,
+   "coverage": 0.989
+  },
+  {
+   "signal": "longest_run_below_245_180",
+   "concordance": 0.4477,
+   "edge": 0.0523,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "v_std_rise",
+   "concordance": 0.4486,
+   "edge": 0.0514,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 0.999
+  },
+  {
+   "signal": "temp_lifetime",
+   "concordance": 0.449,
+   "edge": 0.051,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "temp_outlook_42",
+   "concordance": 0.5479,
+   "edge": 0.0479,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "voltage_outlook_shift_42",
+   "concordance": 0.5479,
+   "edge": 0.0479,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "voltage_max",
+   "concordance": 0.4526,
+   "edge": 0.0474,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "observations",
+   "concordance": 0.4539,
+   "edge": 0.0461,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "age_days",
+   "concordance": 0.4544,
+   "edge": 0.0456,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_180",
+   "concordance": 0.4547,
+   "edge": 0.0453,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "voltage_compensated",
+   "concordance": 0.4549,
+   "edge": 0.0451,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "voltage",
+   "concordance": 0.4571,
+   "edge": 0.0429,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "margin",
+   "concordance": 0.4571,
+   "edge": 0.0429,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "days_below_2.50",
+   "concordance": 0.4608,
+   "edge": 0.0392,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "frac_below_250_180",
+   "concordance": 0.462,
+   "edge": 0.038,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "drawdown",
+   "concordance": 0.4622,
+   "edge": 0.0378,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "v_std_7",
+   "concordance": 0.5355,
+   "edge": 0.0355,
+   "direction": "higher",
+   "pairs": 506,
+   "coverage": 0.984
+  },
+  {
+   "signal": "days_below_2.60",
+   "concordance": 0.4647,
+   "edge": 0.0353,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "beta_rise",
+   "concordance": 0.5346,
+   "edge": 0.0346,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 0.999
+  },
+  {
+   "signal": "temp_now",
+   "concordance": 0.5337,
+   "edge": 0.0337,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "temp_recent",
+   "concordance": 0.5329,
+   "edge": 0.0329,
+   "direction": "higher",
+   "pairs": 484,
+   "coverage": 0.985
+  },
+  {
+   "signal": "temp_outlook_21",
+   "concordance": 0.5312,
+   "edge": 0.0312,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "voltage_outlook_shift_21",
+   "concordance": 0.5312,
+   "edge": 0.0312,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "frac_below_245_180",
+   "concordance": 0.4708,
+   "edge": 0.0292,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "days_since_new_low",
+   "concordance": 0.4746,
+   "edge": 0.0254,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "floor_gap",
+   "concordance": 0.4781,
+   "edge": 0.0219,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "new_lows_90",
+   "concordance": 0.4781,
+   "edge": 0.0219,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "curvature_7_60",
+   "concordance": 0.4795,
+   "edge": 0.0205,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "v_range_rise",
+   "concordance": 0.48,
+   "edge": 0.02,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 0.999
+  },
+  {
+   "signal": "residual_new_low_90",
+   "concordance": 0.5198,
+   "edge": 0.0198,
+   "direction": "higher",
+   "pairs": 486,
+   "coverage": 0.992
+  },
+  {
+   "signal": "t_range_30",
+   "concordance": 0.4805,
+   "edge": 0.0195,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "staleness",
+   "concordance": 0.5168,
+   "edge": 0.0168,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "floor_age",
+   "concordance": 0.4872,
+   "edge": 0.0128,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "detrended_slope_180",
+   "concordance": 0.4883,
+   "edge": 0.0117,
+   "direction": "lower",
+   "pairs": 486,
+   "coverage": 0.992
+  },
+  {
+   "signal": "voltage_min",
+   "concordance": 0.4896,
+   "edge": 0.0104,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "gap_fraction_90",
+   "concordance": 0.4907,
+   "edge": 0.0093,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "slope_sign_consistency_90",
+   "concordance": 0.491,
+   "edge": 0.009,
+   "direction": "lower",
+   "pairs": 473,
+   "coverage": 0.981
+  },
+  {
+   "signal": "days_below_2.90",
+   "concordance": 0.493,
+   "edge": 0.007,
+   "direction": "lower",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "rebound_count_90",
+   "concordance": 0.5066,
+   "edge": 0.0066,
+   "direction": "higher",
+   "pairs": 478,
+   "coverage": 0.989
+  },
+  {
+   "signal": "thermal_share_90",
+   "concordance": 0.5024,
+   "edge": 0.0024,
+   "direction": "higher",
+   "pairs": 486,
+   "coverage": 0.992
+  },
+  {
+   "signal": "days_below_2.80",
+   "concordance": 0.5012,
+   "edge": 0.0012,
+   "direction": "higher",
+   "pairs": 514,
+   "coverage": 1.0
+  },
+  {
+   "signal": "frac_up_days_90",
+   "concordance": 0.5,
+   "edge": 0.0,
+   "direction": "higher",
+   "pairs": 478,
+   "coverage": 0.989
+  }
+ ]
+}

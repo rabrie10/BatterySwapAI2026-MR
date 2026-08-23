@@ -1,0 +1,32 @@
+{
+ "names": [
+  "H_surv",
+  "H_surv_log1p",
+  "weeks_over_10",
+  "weeks_over_20",
+  "weeks_over_30",
+  "max_prior_p7",
+  "consecutive_high_weeks",
+  "H_last_4",
+  "H_last_8",
+  "H_last_12",
+  "H_last_26",
+  "weeks_since_first_high",
+  "weeks_observed"
+ ],
+ "coverage": {
+  "H_surv": 0.9999,
+  "H_surv_log1p": 0.9999,
+  "weeks_over_10": 0.9999,
+  "weeks_over_20": 0.9999,
+  "weeks_over_30": 0.9999,
+  "max_prior_p7": 0.9999,
+  "consecutive_high_weeks": 0.9999,
+  "H_last_4": 0.9999,
+  "H_last_8": 0.9999,
+  "H_last_12": 0.9999,
+  "H_last_26": 0.9999,
+  "weeks_since_first_high": 0.9999,
+  "weeks_observed": 0.9999
+ }
+}

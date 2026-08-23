@@ -1,0 +1,161 @@
+{
+ "sigma": [
+  {
+   "band": "0.0-0.03",
+   "n": 84,
+   "devices": 47,
+   "v8_sigma": 0.03492,
+   "empirical_sd": 0.05184,
+   "ratio": 0.674,
+   "v8_drop": 0.0,
+   "empirical_drop": 0.01754
+  },
+  {
+   "band": "0.03-0.05",
+   "n": 103,
+   "devices": 53,
+   "v8_sigma": 0.03338,
+   "empirical_sd": 0.11822,
+   "ratio": 0.282,
+   "v8_drop": 0.0,
+   "empirical_drop": 0.01875
+  },
+  {
+   "band": "0.05-0.1",
+   "n": 410,
+   "devices": 105,
+   "v8_sigma": 0.03655,
+   "empirical_sd": 0.0868,
+   "ratio": 0.421,
+   "v8_drop": 0.0,
+   "empirical_drop": 0.02519
+  },
+  {
+   "band": "0.1-0.2",
+   "n": 1464,
+   "devices": 189,
+   "v8_sigma": 0.03663,
+   "empirical_sd": 0.09769,
+   "ratio": 0.375,
+   "v8_drop": 0.00584,
+   "empirical_drop": 0.02899
+  },
+  {
+   "band": "0.2-9.0",
+   "n": 32840,
+   "devices": 461,
+   "v8_sigma": 0.02183,
+   "empirical_sd": 0.04665,
+   "ratio": 0.468,
+   "v8_drop": 0.01471,
+   "empirical_drop": 0.00967
+  }
+ ],
+ "zombies": {
+  "n": 702,
+  "v8_sigma": 0.02503,
+  "empirical_sd": 0.03567,
+  "v8_drop": 0.01458,
+  "empirical_drop": 0.01515
+ },
+ "passage": [
+  {
+   "band": "0.0-0.03",
+   "n": 133,
+   "devices": 63,
+   "predicted": 0.682,
+   "realised": 0.6842,
+   "ratio": 1.0
+  },
+  {
+   "band": "0.03-0.05",
+   "n": 140,
+   "devices": 65,
+   "predicted": 0.3601,
+   "realised": 0.4929,
+   "ratio": 0.73
+  },
+  {
+   "band": "0.05-0.1",
+   "n": 536,
+   "devices": 118,
+   "predicted": 0.1217,
+   "realised": 0.25,
+   "ratio": 0.49
+  },
+  {
+   "band": "0.1-0.2",
+   "n": 1795,
+   "devices": 200,
+   "predicted": 0.0145,
+   "realised": 0.0585,
+   "ratio": 0.25
+  },
+  {
+   "band": "0.2-9.0",
+   "n": 39536,
+   "devices": 461,
+   "predicted": 0.0,
+   "realised": 0.0009,
+   "ratio": 0.02
+  }
+ ],
+ "reliability": [
+  {
+   "bucket": "0.0-0.02",
+   "n": 41209,
+   "devices": 461,
+   "predicted": 0.0001,
+   "realised": 0.0026,
+   "ratio": 0.04
+  },
+  {
+   "bucket": "0.02-0.05",
+   "n": 218,
+   "devices": 95,
+   "predicted": 0.0323,
+   "realised": 0.1284,
+   "ratio": 0.25
+  },
+  {
+   "bucket": "0.05-0.1",
+   "n": 164,
+   "devices": 79,
+   "predicted": 0.0728,
+   "realised": 0.1524,
+   "ratio": 0.48
+  },
+  {
+   "bucket": "0.1-0.2",
+   "n": 162,
+   "devices": 82,
+   "predicted": 0.1464,
+   "realised": 0.3519,
+   "ratio": 0.42
+  },
+  {
+   "bucket": "0.2-0.4",
+   "n": 170,
+   "devices": 72,
+   "predicted": 0.2854,
+   "realised": 0.4706,
+   "ratio": 0.61
+  },
+  {
+   "bucket": "0.4-0.7",
+   "n": 145,
+   "devices": 68,
+   "predicted": 0.5288,
+   "realised": 0.531,
+   "ratio": 1.0
+  },
+  {
+   "bucket": "0.7-1.01",
+   "n": 72,
+   "devices": 41,
+   "predicted": 0.8459,
+   "realised": 0.8194,
+   "ratio": 1.03
+  }
+ ]
+}

@@ -1,0 +1,84 @@
+{
+ "landmarks": 1705,
+ "positives": 373,
+ "excluded_censored": 215,
+ "pairs": 3902,
+ "concordance_v8": 0.728,
+ "objectives": {
+  "cost": {
+   "mean_weights": {
+    "voltage_compensated": 0.57,
+    "voltage_min": 0.572,
+    "crossing_30": 0.211,
+    "slope_comp_30": 0.276,
+    "beta_rise": 0.27,
+    "p07_over_p42": -0.501,
+    "rel_margin_room": 0.531,
+    "dwell_45_log": -0.034
+   },
+   "fold_sd": {
+    "voltage_compensated": 0.146,
+    "voltage_min": 0.144,
+    "crossing_30": 0.078,
+    "slope_comp_30": 0.095,
+    "beta_rise": 0.128,
+    "p07_over_p42": 0.139,
+    "rel_margin_room": 0.184,
+    "dwell_45_log": 0.055
+   },
+   "concordance": 0.7198
+  },
+  "focal": {
+   "mean_weights": {
+    "voltage_compensated": 0.725,
+    "voltage_min": 0.721,
+    "crossing_30": 0.194,
+    "slope_comp_30": 0.222,
+    "beta_rise": 0.175,
+    "p07_over_p42": -0.676,
+    "rel_margin_room": 0.564,
+    "dwell_45_log": -0.331
+   },
+   "fold_sd": {
+    "voltage_compensated": 0.099,
+    "voltage_min": 0.099,
+    "crossing_30": 0.049,
+    "slope_comp_30": 0.05,
+    "beta_rise": 0.093,
+    "p07_over_p42": 0.086,
+    "rel_margin_room": 0.141,
+    "dwell_45_log": 0.079
+   },
+   "concordance": 0.7247
+  },
+  "pair": {
+   "mean_weights": {
+    "voltage_compensated": 0.035,
+    "voltage_min": 0.077,
+    "crossing_30": -0.047,
+    "slope_comp_30": 0.211,
+    "beta_rise": 0.305,
+    "p07_over_p42": -0.042,
+    "rel_margin_room": 0.099,
+    "dwell_45_log": 0.273
+   },
+   "fold_sd": {
+    "voltage_compensated": 0.03,
+    "voltage_min": 0.024,
+    "crossing_30": 0.118,
+    "slope_comp_30": 0.149,
+    "beta_rise": 0.157,
+    "p07_over_p42": 0.021,
+    "rel_margin_room": 0.222,
+    "dwell_45_log": 0.119
+   },
+   "concordance": 0.7246
+  }
+ },
+ "settings": {
+  "candidates": 40,
+  "delta": 2.0,
+  "gamma": 2.0,
+  "l2": 0.02
+ }
+}

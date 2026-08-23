@@ -1,0 +1,105 @@
+{
+ "base": "outputs\\fj_v8_baseline.json",
+ "candidate": "outputs\\fj_tcn_plan_ensemble.json",
+ "n": 48,
+ "base_mean": 2126.53,
+ "candidate_mean": 1967.1,
+ "delta": -159.43,
+ "t": -3.209,
+ "wins": 31,
+ "losses": 17,
+ "blocks": [
+  -76.2,
+  81.1,
+  -406.6,
+  -376.7,
+  -115.9,
+  -62.3
+ ],
+ "components": {
+  "early_swap": {
+   "base": 764.18,
+   "candidate": 729.3,
+   "delta": -34.88
+  },
+  "late_swap": {
+   "base": 1045.83,
+   "candidate": 921.88,
+   "delta": -123.96
+  },
+  "battery_swap": {
+   "base": 5.36,
+   "candidate": 5.25,
+   "delta": -0.11
+  },
+  "travel": {
+   "base": 40.32,
+   "candidate": 39.06,
+   "delta": -1.26
+  },
+  "overtime": {
+   "base": 70.59,
+   "candidate": 71.15,
+   "delta": 0.56
+  },
+  "daily_limit": {
+   "base": 83.33,
+   "candidate": 79.17,
+   "delta": -4.17
+  },
+  "weekly_limit": {
+   "base": 95.83,
+   "candidate": 100.0,
+   "delta": 4.17
+  },
+  "building_change": {
+   "base": 12.85,
+   "candidate": 13.06,
+   "delta": 0.21
+  },
+  "room_change": {
+   "base": 8.23,
+   "candidate": 8.24,
+   "delta": 0.01
+  }
+ },
+ "decisions": {
+  "served": {
+   "base": 17.458,
+   "candidate": 17.438,
+   "delta": -0.021
+  },
+  "due": {
+   "base": 9.458,
+   "candidate": 9.458,
+   "delta": 0.0
+  },
+  "hit": {
+   "base": 5.458,
+   "candidate": 5.896,
+   "delta": 0.438
+  },
+  "missed": {
+   "base": 4.0,
+   "candidate": 3.562,
+   "delta": -0.438
+  }
+ },
+ "precision": [
+  0.3126,
+  0.3381
+ ],
+ "recall": [
+  0.5771,
+  0.6233
+ ],
+ "wasted_swaps": [
+  12.0,
+  11.542
+ ],
+ "runtime_seconds_per_scenario": [
+  9.57,
+  10.92
+ ],
+ "projected_minutes_for_96": 19.7
+}

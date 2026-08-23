@@ -1,0 +1,164 @@
+[
+  {
+    "label": "wiener (shipped)",
+    "k": 10,
+    "precision": 0.35,
+    "recall": 0.37,
+    "early": 513.3,
+    "late": 1419.8,
+    "timing": 1933.1
+  },
+  {
+    "label": "wiener (shipped)",
+    "k": 12,
+    "precision": 0.3628,
+    "recall": 0.4604,
+    "early": 598.2,
+    "late": 1204.0,
+    "timing": 1802.2
+  },
+  {
+    "label": "wiener (shipped)",
+    "k": 15,
+    "precision": 0.3472,
+    "recall": 0.5507,
+    "early": 733.9,
+    "late": 974.8,
+    "timing": 1708.7
+  },
+  {
+    "label": "wiener (shipped)",
+    "k": 18,
+    "precision": 0.3218,
+    "recall": 0.6123,
+    "early": 906.1,
+    "late": 832.1,
+    "timing": 1738.2
+  },
+  {
+    "label": "wiener (shipped)",
+    "k": 21,
+    "precision": 0.3016,
+    "recall": 0.6696,
+    "early": 1067.6,
+    "late": 702.9,
+    "timing": 1770.5
+  },
+  {
+    "label": "wiener (shipped)",
+    "k": 25,
+    "precision": 0.2767,
+    "recall": 0.7313,
+    "early": 1296.0,
+    "late": 574.8,
+    "timing": 1870.8
+  },
+  {
+    "label": "margin only",
+    "k": 10,
+    "precision": 0.3667,
+    "recall": 0.3877,
+    "early": 487.3,
+    "late": 1336.2,
+    "timing": 1823.6
+  },
+  {
+    "label": "margin only",
+    "k": 12,
+    "precision": 0.3698,
+    "recall": 0.4692,
+    "early": 574.2,
+    "late": 1125.6,
+    "timing": 1699.8
+  },
+  {
+    "label": "margin only",
+    "k": 15,
+    "precision": 0.3444,
+    "recall": 0.5463,
+    "early": 736.2,
+    "late": 960.4,
+    "timing": 1696.6
+  },
+  {
+    "label": "margin only",
+    "k": 18,
+    "precision": 0.316,
+    "recall": 0.6013,
+    "early": 911.7,
+    "late": 844.8,
+    "timing": 1756.5
+  },
+  {
+    "label": "margin only",
+    "k": 21,
+    "precision": 0.2907,
+    "recall": 0.6454,
+    "early": 1090.5,
+    "late": 751.0,
+    "timing": 1841.5
+  },
+  {
+    "label": "margin only",
+    "k": 25,
+    "precision": 0.2658,
+    "recall": 0.7026,
+    "early": 1349.5,
+    "late": 644.0,
+    "timing": 1993.5
+  },
+  {
+    "label": "margin / -slope",
+    "k": 10,
+    "precision": 0.3542,
+    "recall": 0.3744,
+    "early": 523.9,
+    "late": 1401.2,
+    "timing": 1925.2
+  },
+  {
+    "label": "margin / -slope",
+    "k": 12,
+    "precision": 0.3316,
+    "recall": 0.4207,
+    "early": 639.9,
+    "late": 1272.1,
+    "timing": 1912.0
+  },
+  {
+    "label": "margin / -slope",
+    "k": 15,
+    "precision": 0.2958,
+    "recall": 0.4692,
+    "early": 819.9,
+    "late": 1155.2,
+    "timing": 1975.1
+  },
+  {
+    "label": "margin / -slope",
+    "k": 18,
+    "precision": 0.2731,
+    "recall": 0.5198,
+    "early": 1007.3,
+    "late": 1053.8,
+    "timing": 2061.1
+  },
+  {
+    "label": "margin / -slope",
+    "k": 21,
+    "precision": 0.25,
+    "recall": 0.5551,
+    "early": 1200.8,
+    "late": 977.3,
+    "timing": 2178.1
+  },
+  {
+    "label": "margin / -slope",
+    "k": 25,
+    "precision": 0.2358,
+    "recall": 0.6233,
+    "early": 1463.3,
+    "late": 831.5,
+    "timing": 2294.8
+  }
+]
