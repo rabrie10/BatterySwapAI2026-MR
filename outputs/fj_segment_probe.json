@@ -1,0 +1,93 @@
+{
+ "probe": {
+  "margin only": {
+   "logloss": 0.59146,
+   "all": 0.6703,
+   "cross": 0.6869,
+   "same": 0.368
+  },
+  "margin + 3 cohorts": {
+   "logloss": 0.59593,
+   "all": 0.672,
+   "cross": 0.6802,
+   "same": 0.5223
+  },
+  "margin + 3 cohorts x margin": {
+   "logloss": 0.59654,
+   "all": 0.6723,
+   "cross": 0.68,
+   "same": 0.5316
+  },
+  "margin + 4 cohorts": {
+   "logloss": 0.58026,
+   "all": 0.6794,
+   "cross": 0.6869,
+   "same": 0.5428
+  },
+  "margin + 4 cohorts x margin": {
+   "logloss": 0.5808,
+   "all": 0.679,
+   "cross": 0.6864,
+   "same": 0.5428
+  },
+  "margin + 5 cohorts": {
+   "logloss": 0.5821,
+   "all": 0.6884,
+   "cross": 0.6955,
+   "same": 0.5595
+  },
+  "margin + 5 cohorts x margin": {
+   "logloss": 0.58221,
+   "all": 0.6878,
+   "cross": 0.6947,
+   "same": 0.5613
+  },
+  "V8 reference": {
+   "all": 0.728,
+   "cross": 0.7359,
+   "same": 0.5846,
+   "f0": 0.9453,
+   "x0": 0.96,
+   "f1": 0.7989,
+   "x1": 0.7955,
+   "f2": 0.6164,
+   "x2": 0.6236,
+   "f3": 0.7757,
+   "x3": 0.7811,
+   "f4": 0.6921,
+   "x4": 0.7039
+  },
+  "anchored": {
+   "V8 only": {
+    "logloss": 0.91178,
+    "all": 0.728,
+    "cross": 0.7359,
+    "same": 0.5846
+   },
+   "V8 + 4 cohorts": {
+    "logloss": 0.83679,
+    "all": 0.7261,
+    "cross": 0.7322,
+    "same": 0.6143
+   },
+   "V8 + 4 cohorts x margin": {
+    "logloss": 0.83486,
+    "all": 0.7243,
+    "cross": 0.7303,
+    "same": 0.6152
+   },
+   "V8 + 5 cohorts": {
+    "logloss": 0.84974,
+    "all": 0.7298,
+    "cross": 0.7348,
+    "same": 0.6394
+   },
+   "V8 + 5 cohorts x margin": {
+    "logloss": 0.84762,
+    "all": 0.7284,
+    "cross": 0.733,
+    "same": 0.6431
+   }
+  }
+ }
+}
