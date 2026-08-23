@@ -1,0 +1,464 @@
+{
+  "delta": 1.5,
+  "floor": -8.0,
+  "block": "bldg",
+  "pairs": 360,
+  "control": 0.5833,
+  "signals": [
+    {
+      "signal": "days_below_2.90",
+      "accuracy": 0.6667,
+      "pairs": 360
+    },
+    {
+      "signal": "rel_margin_room",
+      "accuracy": 0.3371,
+      "pairs": 267
+    },
+    {
+      "signal": "voltage_compensated",
+      "accuracy": 0.3556,
+      "pairs": 360
+    },
+    {
+      "signal": "days_below_2.80",
+      "accuracy": 0.6403,
+      "pairs": 360
+    },
+    {
+      "signal": "rel_slope30_room",
+      "accuracy": 0.3633,
+      "pairs": 267
+    },
+    {
+      "signal": "voltage",
+      "accuracy": 0.3806,
+      "pairs": 360
+    },
+    {
+      "signal": "margin",
+      "accuracy": 0.3806,
+      "pairs": 360
+    },
+    {
+      "signal": "rel_margin_bldg",
+      "accuracy": 0.3806,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_comp_14",
+      "accuracy": 0.3833,
+      "pairs": 360
+    },
+    {
+      "signal": "crossing_comp_30",
+      "accuracy": 0.3861,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_14",
+      "accuracy": 0.3944,
+      "pairs": 360
+    },
+    {
+      "signal": "knee_trend_residual",
+      "accuracy": 0.3966,
+      "pairs": 353
+    },
+    {
+      "signal": "curvature_30_120",
+      "accuracy": 0.3972,
+      "pairs": 360
+    },
+    {
+      "signal": "temp_recent",
+      "accuracy": 0.6012,
+      "pairs": 336
+    },
+    {
+      "signal": "crossing_60",
+      "accuracy": 0.4028,
+      "pairs": 360
+    },
+    {
+      "signal": "knee_slope_vs_history",
+      "accuracy": 0.5944,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_comp_30",
+      "accuracy": 0.4083,
+      "pairs": 360
+    },
+    {
+      "signal": "p_late_tail",
+      "accuracy": 0.5917,
+      "pairs": 360
+    },
+    {
+      "signal": "days_below_2.60",
+      "accuracy": 0.5861,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_2.60",
+      "accuracy": 0.5861,
+      "pairs": 360
+    },
+    {
+      "signal": "p42",
+      "accuracy": 0.5833,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_30",
+      "accuracy": 0.4167,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_60",
+      "accuracy": 0.4167,
+      "pairs": 360
+    },
+    {
+      "signal": "crossing_14",
+      "accuracy": 0.4167,
+      "pairs": 360
+    },
+    {
+      "signal": "rel_slope30_bldg",
+      "accuracy": 0.4167,
+      "pairs": 360
+    },
+    {
+      "signal": "voltage_min",
+      "accuracy": 0.4194,
+      "pairs": 360
+    },
+    {
+      "signal": "season_sin",
+      "accuracy": 0.5778,
+      "pairs": 360
+    },
+    {
+      "signal": "peers_room",
+      "accuracy": 0.4236,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_comp_60",
+      "accuracy": 0.425,
+      "pairs": 360
+    },
+    {
+      "signal": "crossing_30",
+      "accuracy": 0.425,
+      "pairs": 360
+    },
+    {
+      "signal": "temp_now",
+      "accuracy": 0.5681,
+      "pairs": 360
+    },
+    {
+      "signal": "rel_temp_bldg",
+      "accuracy": 0.5681,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_ratio_14_90",
+      "accuracy": 0.567,
+      "pairs": 351
+    },
+    {
+      "signal": "dwell_2.50_present",
+      "accuracy": 0.5653,
+      "pairs": 360
+    },
+    {
+      "signal": "range_90",
+      "accuracy": 0.5641,
+      "pairs": 351
+    },
+    {
+      "signal": "knee_worst_14d_drop",
+      "accuracy": 0.4416,
+      "pairs": 351
+    },
+    {
+      "signal": "drawdown",
+      "accuracy": 0.5556,
+      "pairs": 360
+    },
+    {
+      "signal": "days_below_2.50",
+      "accuracy": 0.5542,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_2.50",
+      "accuracy": 0.5542,
+      "pairs": 360
+    },
+    {
+      "signal": "temp_std",
+      "accuracy": 0.5528,
+      "pairs": 360
+    },
+    {
+      "signal": "gap_fraction_90",
+      "accuracy": 0.5528,
+      "pairs": 360
+    },
+    {
+      "signal": "v_range_30",
+      "accuracy": 0.55,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_7",
+      "accuracy": 0.45,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_comp_7",
+      "accuracy": 0.45,
+      "pairs": 360
+    },
+    {
+      "signal": "staleness",
+      "accuracy": 0.5472,
+      "pairs": 360
+    },
+    {
+      "signal": "stale_x_margin",
+      "accuracy": 0.5472,
+      "pairs": 360
+    },
+    {
+      "signal": "temp_outlook_42",
+      "accuracy": 0.5458,
+      "pairs": 360
+    },
+    {
+      "signal": "voltage_outlook_shift_42",
+      "accuracy": 0.5458,
+      "pairs": 360
+    },
+    {
+      "signal": "temp_outlook_21",
+      "accuracy": 0.5444,
+      "pairs": 360
+    },
+    {
+      "signal": "voltage_outlook_shift_21",
+      "accuracy": 0.5444,
+      "pairs": 360
+    },
+    {
+      "signal": "v_std_30",
+      "accuracy": 0.5444,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_2.45_present",
+      "accuracy": 0.5444,
+      "pairs": 360
+    },
+    {
+      "signal": "observations",
+      "accuracy": 0.5403,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_120",
+      "accuracy": 0.4611,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_comp_180",
+      "accuracy": 0.4611,
+      "pairs": 360
+    },
+    {
+      "signal": "curvature_7_60",
+      "accuracy": 0.4611,
+      "pairs": 360
+    },
+    {
+      "signal": "v_range_7",
+      "accuracy": 0.5387,
+      "pairs": 349
+    },
+    {
+      "signal": "slope_180",
+      "accuracy": 0.4639,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_comp_120",
+      "accuracy": 0.4639,
+      "pairs": 360
+    },
+    {
+      "signal": "rel_temp_room",
+      "accuracy": 0.4644,
+      "pairs": 267
+    },
+    {
+      "signal": "p28_over_p42",
+      "accuracy": 0.5278,
+      "pairs": 360
+    },
+    {
+      "signal": "p35_over_p42",
+      "accuracy": 0.5278,
+      "pairs": 360
+    },
+    {
+      "signal": "p14_over_p42",
+      "accuracy": 0.5264,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_45_log",
+      "accuracy": 0.5264,
+      "pairs": 360
+    },
+    {
+      "signal": "days_below_2.55",
+      "accuracy": 0.525,
+      "pairs": 360
+    },
+    {
+      "signal": "age_days",
+      "accuracy": 0.525,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_2.55",
+      "accuracy": 0.525,
+      "pairs": 360
+    },
+    {
+      "signal": "v_std_7",
+      "accuracy": 0.5244,
+      "pairs": 349
+    },
+    {
+      "signal": "days_below_2.42",
+      "accuracy": 0.4778,
+      "pairs": 360
+    },
+    {
+      "signal": "season_cos",
+      "accuracy": 0.4778,
+      "pairs": 360
+    },
+    {
+      "signal": "days_below_2.45",
+      "accuracy": 0.5208,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_2.45",
+      "accuracy": 0.5208,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_90",
+      "accuracy": 0.4806,
+      "pairs": 360
+    },
+    {
+      "signal": "days_below_2.65",
+      "accuracy": 0.4806,
+      "pairs": 360
+    },
+    {
+      "signal": "knee_recent_vs_baseline",
+      "accuracy": 0.4806,
+      "pairs": 360
+    },
+    {
+      "signal": "t_range_30",
+      "accuracy": 0.5194,
+      "pairs": 360
+    },
+    {
+      "signal": "v_range_rise",
+      "accuracy": 0.4806,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_2.55_present",
+      "accuracy": 0.4819,
+      "pairs": 360
+    },
+    {
+      "signal": "p21_over_p42",
+      "accuracy": 0.5167,
+      "pairs": 360
+    },
+    {
+      "signal": "slope_comp_90",
+      "accuracy": 0.4833,
+      "pairs": 360
+    },
+    {
+      "signal": "v_std_rise",
+      "accuracy": 0.4833,
+      "pairs": 360
+    },
+    {
+      "signal": "beta_7",
+      "accuracy": 0.4842,
+      "pairs": 349
+    },
+    {
+      "signal": "beta_30",
+      "accuracy": 0.4861,
+      "pairs": 360
+    },
+    {
+      "signal": "cdf_front_mass",
+      "accuracy": 0.5125,
+      "pairs": 360
+    },
+    {
+      "signal": "beta_rise",
+      "accuracy": 0.4889,
+      "pairs": 360
+    },
+    {
+      "signal": "voltage_max",
+      "accuracy": 0.5083,
+      "pairs": 360
+    },
+    {
+      "signal": "dwell_2.60_present",
+      "accuracy": 0.5083,
+      "pairs": 360
+    },
+    {
+      "signal": "p07_over_p42",
+      "accuracy": 0.4972,
+      "pairs": 360
+    },
+    {
+      "signal": "days_below_2.70",
+      "accuracy": 0.4986,
+      "pairs": 360
+    },
+    {
+      "signal": "temp_lifetime",
+      "accuracy": 0.5,
+      "pairs": 360
+    },
+    {
+      "signal": "peers_bldg",
+      "accuracy": 0.5,
+      "pairs": 360
+    }
+  ]
+}

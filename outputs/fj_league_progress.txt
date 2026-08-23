@@ -1,0 +1,15 @@
+=== START old_cost 04:58:36 ===
+=== DONE  old_cost rc=0 05:07:11 ===
+=== START old_focal 05:07:11 ===
+=== DONE  old_focal rc=0 05:15:47 ===
+=== START old_pair 05:15:47 ===
+=== DONE  old_pair rc=0 05:24:16 ===
+=== START v10_v8 05:24:16 ===
+=== DONE  v10_v8 rc=0 05:37:32 ===
+=== START v10_cost 05:37:32 ===
+=== DONE  v10_cost rc=0 05:50:46 ===
+=== START v10_focal 05:50:46 ===
+=== DONE  v10_focal rc=0 06:04:05 ===
+=== START v10_pair 06:04:05 ===
+=== DONE  v10_pair rc=0 06:17:14 ===
+ALL DONE 06:17:14
