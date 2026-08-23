@@ -1,0 +1,4196 @@
+{
+  "mode": "out-of-fold",
+  "summary": {
+    "n_scenarios": 48,
+    "mean_total_cost": 2043.95,
+    "median_total_cost": 1908.2,
+    "p90_total_cost": 2952.42,
+    "max_total_cost": 5124.41,
+    "components": {
+      "battery_swap": 4.76,
+      "building_change": 14.06,
+      "room_change": 8.08,
+      "travel": 47.03,
+      "overtime": 73.21,
+      "daily_limit": 70.83,
+      "weekly_limit": 106.25,
+      "late_swap": 1010.62,
+      "early_swap": 709.1
+    },
+    "decisions": {
+      "served_per_scenario": 15.15,
+      "due_per_scenario": 9.46,
+      "missed_per_scenario": 3.9,
+      "cold_start_per_scenario": 0.0,
+      "expected_due_per_scenario": 8.97,
+      "recall": 0.588,
+      "precision": 0.367
+    },
+    "runtime": {
+      "mean_seconds_per_scenario": 6.93,
+      "max_seconds_per_scenario": 11.07,
+      "projected_minutes_for_96": 13.4
+    },
+    "block_means": [
+      1541.4,
+      1936.8,
+      3205.3,
+      2319.6,
+      2229.8,
+      1030.8
+    ],
+    "block_mean_sd": 741.6,
+    "due_battery_audit": {
+      "n_due": 454,
+      "n_missed": 187,
+      "median_probability_served": 0.5129,
+      "median_probability_missed": 0.0551,
+      "missed_with_probability_below_0.02": 61,
+      "missed_with_probability_below_0.05": 87,
+      "missed_with_probability_below_0.2": 182,
+      "missed_with_probability_below_0.5": 187
+    }
+  },
+  "scenarios": [
+    {
+      "battery_swap": 3.75,
+      "building_change": 11.0,
+      "room_change": 6.0,
+      "travel": 18.276500000000002,
+      "overtime": 27.857000000000006,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 820.0,
+      "early_swap": 536.0,
+      "scenario": "s_0",
+      "total_cost": 1522.8835,
+      "served": 12,
+      "due": 9,
+      "hit": 6,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 7.18,
+      "seconds": 11.07
+    },
+    {
+      "battery_swap": 4.75,
+      "building_change": 14.0,
+      "room_change": 9.0,
+      "travel": 36.04166666666667,
+      "overtime": 44.928000000000004,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1060.0,
+      "early_swap": 520.0,
+      "scenario": "s_1",
+      "total_cost": 1788.7196666666669,
+      "served": 14,
+      "due": 13,
+      "hit": 8,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 9.63,
+      "seconds": 6.46
+    },
+    {
+      "battery_swap": 5.5,
+      "building_change": 18.0,
+      "room_change": 9.5,
+      "travel": 21.239500000000003,
+      "overtime": 32.043000000000006,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 600.0,
+      "early_swap": 425.0,
+      "scenario": "s_2",
+      "total_cost": 1211.2824999999998,
+      "served": 19,
+      "due": 17,
+      "hit": 14,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 13.81,
+      "seconds": 7.36
+    },
+    {
+      "battery_swap": 6.25,
+      "building_change": 21.0,
+      "room_change": 10.5,
+      "travel": 37.92366666666667,
+      "overtime": 52.28866666666667,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 210.0,
+      "early_swap": 625.5,
+      "scenario": "s_3",
+      "total_cost": 1063.4623333333334,
+      "served": 24,
+      "due": 19,
+      "hit": 18,
+      "missed": 1,
+      "cold_start": 0,
+      "expected_due": 14.28,
+      "seconds": 6.94
+    },
+    {
+      "battery_swap": 4.25,
+      "building_change": 13.0,
+      "room_change": 7.5,
+      "travel": 144.19250000000002,
+      "overtime": 304.84599999999995,
+      "daily_limit": 700.0,
+      "weekly_limit": 400.0,
+      "late_swap": 700.0,
+      "early_swap": 425.0,
+      "scenario": "s_4",
+      "total_cost": 2698.7885,
+      "served": 14,
+      "due": 14,
+      "hit": 11,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 13.35,
+      "seconds": 7.66
+    },
+    {
+      "battery_swap": 5.75,
+      "building_change": 18.0,
+      "room_change": 10.0,
+      "travel": 21.474333333333334,
+      "overtime": 30.991666666666667,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 230.0,
+      "early_swap": 863.5,
+      "scenario": "s_5",
+      "total_cost": 1279.7160000000001,
+      "served": 22,
+      "due": 14,
+      "hit": 13,
+      "missed": 1,
+      "cold_start": 0,
+      "expected_due": 15.52,
+      "seconds": 6.91
+    },
+    {
+      "battery_swap": 6.0,
+      "building_change": 20.0,
+      "room_change": 10.5,
+      "travel": 51.43316666666667,
+      "overtime": 62.286,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 430.0,
+      "early_swap": 702.0,
+      "scenario": "s_6",
+      "total_cost": 1382.2191666666668,
+      "served": 22,
+      "due": 18,
+      "hit": 16,
+      "missed": 2,
+      "cold_start": 0,
+      "expected_due": 16.84,
+      "seconds": 6.88
+    },
+    {
+      "battery_swap": 6.0,
+      "building_change": 22.0,
+      "room_change": 12.0,
+      "travel": 42.57833333333333,
+      "overtime": 61.448,
+      "daily_limit": 0.0,
+      "weekly_limit": 200.0,
+      "late_swap": 200.0,
+      "early_swap": 840.5,
+      "scenario": "s_7",
+      "total_cost": 1384.5263333333332,
+      "served": 23,
+      "due": 14,
+      "hit": 13,
+      "missed": 1,
+      "cold_start": 0,
+      "expected_due": 15.45,
+      "seconds": 7.01
+    },
+    {
+      "battery_swap": 6.25,
+      "building_change": 24.0,
+      "room_change": 11.5,
+      "travel": 71.05266666666668,
+      "overtime": 99.954,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 110.0,
+      "early_swap": 1049.5,
+      "scenario": "s_8",
+      "total_cost": 1472.2566666666667,
+      "served": 24,
+      "due": 14,
+      "hit": 13,
+      "missed": 1,
+      "cold_start": 0,
+      "expected_due": 16.09,
+      "seconds": 7.29
+    },
+    {
+      "battery_swap": 4.5,
+      "building_change": 14.0,
+      "room_change": 8.5,
+      "travel": 23.469333333333335,
+      "overtime": 34.443999999999996,
+      "daily_limit": 100.0,
+      "weekly_limit": 100.0,
+      "late_swap": 80.0,
+      "early_swap": 726.0,
+      "scenario": "s_9",
+      "total_cost": 1090.9133333333334,
+      "served": 17,
+      "due": 10,
+      "hit": 9,
+      "missed": 1,
+      "cold_start": 0,
+      "expected_due": 12.51,
+      "seconds": 7.71
+    },
+    {
+      "battery_swap": 4.25,
+      "building_change": 13.0,
+      "room_change": 6.5,
+      "travel": 29.985833333333336,
+      "overtime": 26.748666666666665,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 780.0,
+      "early_swap": 764.0,
+      "scenario": "s_10",
+      "total_cost": 1624.4845,
+      "served": 14,
+      "due": 10,
+      "hit": 7,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 10.78,
+      "seconds": 6.64
+    },
+    {
+      "battery_swap": 4.25,
+      "building_change": 14.0,
+      "room_change": 7.5,
+      "travel": 29.320999999999998,
+      "overtime": 32.902666666666676,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 400.0,
+      "early_swap": 591.5,
+      "scenario": "s_11",
+      "total_cost": 1179.4736666666668,
+      "served": 15,
+      "due": 10,
+      "hit": 8,
+      "missed": 2,
+      "cold_start": 0,
+      "expected_due": 11.92,
+      "seconds": 6.66
+    },
+    {
+      "battery_swap": 4.75,
+      "building_change": 17.0,
+      "room_change": 9.5,
+      "travel": 40.67350000000001,
+      "overtime": 56.298,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 690.0,
+      "early_swap": 770.5,
+      "scenario": "s_12",
+      "total_cost": 1688.7215,
+      "served": 15,
+      "due": 11,
+      "hit": 7,
+      "missed": 4,
+      "cold_start": 0,
+      "expected_due": 10.56,
+      "seconds": 6.6
+    },
+    {
+      "battery_swap": 6.25,
+      "building_change": 22.0,
+      "room_change": 12.5,
+      "travel": 53.5325,
+      "overtime": 56.287333333333336,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1480.0,
+      "early_swap": 1157.0,
+      "scenario": "s_13",
+      "total_cost": 2887.569833333333,
+      "served": 19,
+      "due": 14,
+      "hit": 8,
+      "missed": 6,
+      "cold_start": 0,
+      "expected_due": 12.53,
+      "seconds": 7.09
+    },
+    {
+      "battery_swap": 6.0,
+      "building_change": 16.0,
+      "room_change": 10.0,
+      "travel": 29.84383333333333,
+      "overtime": 28.45033333333333,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1260.0,
+      "early_swap": 1349.0,
+      "scenario": "s_14",
+      "total_cost": 2799.2941666666666,
+      "served": 19,
+      "due": 12,
+      "hit": 7,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 11.54,
+      "seconds": 6.82
+    },
+    {
+      "battery_swap": 5.25,
+      "building_change": 16.0,
+      "room_change": 9.0,
+      "travel": 22.738666666666667,
+      "overtime": 25.181,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 1790.0,
+      "early_swap": 883.5,
+      "scenario": "s_15",
+      "total_cost": 2751.6696666666667,
+      "served": 14,
+      "due": 13,
+      "hit": 6,
+      "missed": 7,
+      "cold_start": 0,
+      "expected_due": 9.65,
+      "seconds": 6.83
+    },
+    {
+      "battery_swap": 5.75,
+      "building_change": 15.0,
+      "room_change": 9.5,
+      "travel": 38.323166666666665,
+      "overtime": 45.99033333333334,
+      "daily_limit": 0.0,
+      "weekly_limit": 200.0,
+      "late_swap": 2690.0,
+      "early_swap": 916.5,
+      "scenario": "s_16",
+      "total_cost": 3921.0635,
+      "served": 14,
+      "due": 15,
+      "hit": 6,
+      "missed": 9,
+      "cold_start": 0,
+      "expected_due": 9.57,
+      "seconds": 6.66
+    },
+    {
+      "battery_swap": 6.25,
+      "building_change": 15.0,
+      "room_change": 10.0,
+      "travel": 39.911500000000004,
+      "overtime": 56.033,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1460.0,
+      "early_swap": 937.0,
+      "scenario": "s_17",
+      "total_cost": 2624.1944999999996,
+      "served": 19,
+      "due": 15,
+      "hit": 9,
+      "missed": 6,
+      "cold_start": 0,
+      "expected_due": 13.64,
+      "seconds": 7.43
+    },
+    {
+      "battery_swap": 5.25,
+      "building_change": 16.0,
+      "room_change": 9.0,
+      "travel": 40.95066666666667,
+      "overtime": 58.379999999999995,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1600.0,
+      "early_swap": 925.5,
+      "scenario": "s_18",
+      "total_cost": 2755.0806666666667,
+      "served": 15,
+      "due": 11,
+      "hit": 5,
+      "missed": 6,
+      "cold_start": 0,
+      "expected_due": 10.21,
+      "seconds": 7.04
+    },
+    {
+      "battery_swap": 5.0,
+      "building_change": 16.0,
+      "room_change": 8.5,
+      "travel": 25.210000000000004,
+      "overtime": 26.22333333333334,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 660.0,
+      "early_swap": 1129.0,
+      "scenario": "s_19",
+      "total_cost": 1969.9333333333332,
+      "served": 17,
+      "due": 8,
+      "hit": 5,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 9.32,
+      "seconds": 6.61
+    },
+    {
+      "battery_swap": 5.0,
+      "building_change": 14.0,
+      "room_change": 8.5,
+      "travel": 27.2515,
+      "overtime": 26.455666666666666,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 1140.0,
+      "early_swap": 1137.0,
+      "scenario": "s_20",
+      "total_cost": 2358.2071666666666,
+      "served": 15,
+      "due": 8,
+      "hit": 3,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 9.22,
+      "seconds": 6.42
+    },
+    {
+      "battery_swap": 5.75,
+      "building_change": 16.0,
+      "room_change": 9.0,
+      "travel": 177.32566666666662,
+      "overtime": 386.0643333333333,
+      "daily_limit": 600.0,
+      "weekly_limit": 300.0,
+      "late_swap": 2010.0,
+      "early_swap": 1311.0,
+      "scenario": "s_21",
+      "total_cost": 4815.14,
+      "served": 15,
+      "due": 9,
+      "hit": 1,
+      "missed": 8,
+      "cold_start": 0,
+      "expected_due": 8.71,
+      "seconds": 7.36
+    },
+    {
+      "battery_swap": 4.75,
+      "building_change": 11.0,
+      "room_change": 8.0,
+      "travel": 36.86333333333334,
+      "overtime": 45.97866666666666,
+      "daily_limit": 100.0,
+      "weekly_limit": 100.0,
+      "late_swap": 700.0,
+      "early_swap": 1068.0,
+      "scenario": "s_22",
+      "total_cost": 2074.592,
+      "served": 15,
+      "due": 8,
+      "hit": 4,
+      "missed": 4,
+      "cold_start": 0,
+      "expected_due": 8.75,
+      "seconds": 6.38
+    },
+    {
+      "battery_swap": 5.75,
+      "building_change": 15.0,
+      "room_change": 9.5,
+      "travel": 226.698,
+      "overtime": 526.9626666666667,
+      "daily_limit": 1000.0,
+      "weekly_limit": 300.0,
+      "late_swap": 1820.0,
+      "early_swap": 1220.5,
+      "scenario": "s_23",
+      "total_cost": 5124.410666666667,
+      "served": 16,
+      "due": 9,
+      "hit": 2,
+      "missed": 7,
+      "cold_start": 0,
+      "expected_due": 8.36,
+      "seconds": 7.32
+    },
+    {
+      "battery_swap": 4.75,
+      "building_change": 15.0,
+      "room_change": 8.5,
+      "travel": 48.254333333333335,
+      "overtime": 42.02333333333334,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1310.0,
+      "early_swap": 964.5,
+      "scenario": "s_24",
+      "total_cost": 2493.0276666666664,
+      "served": 14,
+      "due": 9,
+      "hit": 4,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 8.47,
+      "seconds": 6.46
+    },
+    {
+      "battery_swap": 5.0,
+      "building_change": 12.0,
+      "room_change": 7.5,
+      "travel": 41.429166666666674,
+      "overtime": 47.65166666666667,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1660.0,
+      "early_swap": 1049.0,
+      "scenario": "s_25",
+      "total_cost": 2922.5808333333334,
+      "served": 15,
+      "due": 9,
+      "hit": 4,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 9.03,
+      "seconds": 6.77
+    },
+    {
+      "battery_swap": 3.75,
+      "building_change": 10.0,
+      "room_change": 5.0,
+      "travel": 31.209333333333333,
+      "overtime": 37.590666666666664,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 2100.0,
+      "early_swap": 734.5,
+      "scenario": "s_26",
+      "total_cost": 3022.05,
+      "served": 10,
+      "due": 7,
+      "hit": 2,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 7.92,
+      "seconds": 6.19
+    },
+    {
+      "battery_swap": 3.5,
+      "building_change": 8.0,
+      "room_change": 4.0,
+      "travel": 7.716166666666666,
+      "overtime": 0.0,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 1550.0,
+      "early_swap": 645.5,
+      "scenario": "s_27",
+      "total_cost": 2218.7161666666666,
+      "served": 9,
+      "due": 6,
+      "hit": 1,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 7.47,
+      "seconds": 5.95
+    },
+    {
+      "battery_swap": 4.0,
+      "building_change": 10.0,
+      "room_change": 5.0,
+      "travel": 24.44466666666667,
+      "overtime": 28.88133333333333,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1480.0,
+      "early_swap": 780.5,
+      "scenario": "s_28",
+      "total_cost": 2432.826,
+      "served": 11,
+      "due": 6,
+      "hit": 1,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 7.72,
+      "seconds": 6.36
+    },
+    {
+      "battery_swap": 3.75,
+      "building_change": 9.0,
+      "room_change": 5.0,
+      "travel": 25.154833333333332,
+      "overtime": 28.677999999999997,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 710.0,
+      "early_swap": 762.5,
+      "scenario": "s_29",
+      "total_cost": 1644.0828333333334,
+      "served": 12,
+      "due": 4,
+      "hit": 1,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 7.05,
+      "seconds": 6.28
+    },
+    {
+      "battery_swap": 3.5,
+      "building_change": 9.0,
+      "room_change": 5.0,
+      "travel": 31.273666666666664,
+      "overtime": 30.560333333333332,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 920.0,
+      "early_swap": 694.0,
+      "scenario": "s_30",
+      "total_cost": 1793.3340000000003,
+      "served": 11,
+      "due": 5,
+      "hit": 2,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 6.68,
+      "seconds": 6.28
+    },
+    {
+      "battery_swap": 4.5,
+      "building_change": 15.0,
+      "room_change": 8.0,
+      "travel": 54.3645,
+      "overtime": 52.754,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1110.0,
+      "early_swap": 685.5,
+      "scenario": "s_31",
+      "total_cost": 2030.1185,
+      "served": 13,
+      "due": 8,
+      "hit": 3,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 7.42,
+      "seconds": 6.43
+    },
+    {
+      "battery_swap": 5.0,
+      "building_change": 13.0,
+      "room_change": 8.5,
+      "travel": 57.98266666666667,
+      "overtime": 81.86266666666667,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1160.0,
+      "early_swap": 639.5,
+      "scenario": "s_32",
+      "total_cost": 2065.845333333333,
+      "served": 15,
+      "due": 10,
+      "hit": 5,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 8.13,
+      "seconds": 6.61
+    },
+    {
+      "battery_swap": 4.75,
+      "building_change": 13.0,
+      "room_change": 8.0,
+      "travel": 72.98866666666667,
+      "overtime": 122.78666666666669,
+      "daily_limit": 100.0,
+      "weekly_limit": 200.0,
+      "late_swap": 1030.0,
+      "early_swap": 640.5,
+      "scenario": "s_33",
+      "total_cost": 2192.0253333333335,
+      "served": 14,
+      "due": 9,
+      "hit": 4,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 7.17,
+      "seconds": 6.4
+    },
+    {
+      "battery_swap": 4.0,
+      "building_change": 11.0,
+      "room_change": 6.5,
+      "travel": 71.97283333333333,
+      "overtime": 124.197,
+      "daily_limit": 200.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1500.0,
+      "early_swap": 443.5,
+      "scenario": "s_34",
+      "total_cost": 2461.1698333333334,
+      "served": 10,
+      "due": 9,
+      "hit": 3,
+      "missed": 6,
+      "cold_start": 0,
+      "expected_due": 5.57,
+      "seconds": 6.51
+    },
+    {
+      "battery_swap": 4.25,
+      "building_change": 13.0,
+      "room_change": 7.0,
+      "travel": 73.64733333333334,
+      "overtime": 133.7253333333333,
+      "daily_limit": 100.0,
+      "weekly_limit": 200.0,
+      "late_swap": 1710.0,
+      "early_swap": 412.0,
+      "scenario": "s_35",
+      "total_cost": 2653.6226666666666,
+      "served": 11,
+      "due": 10,
+      "hit": 4,
+      "missed": 6,
+      "cold_start": 0,
+      "expected_due": 5.69,
+      "seconds": 6.57
+    },
+    {
+      "battery_swap": 4.75,
+      "building_change": 13.0,
+      "room_change": 8.0,
+      "travel": 72.97216666666667,
+      "overtime": 130.13533333333334,
+      "daily_limit": 200.0,
+      "weekly_limit": 100.0,
+      "late_swap": 2580.0,
+      "early_swap": 519.5,
+      "scenario": "s_36",
+      "total_cost": 3628.3575,
+      "served": 12,
+      "due": 8,
+      "hit": 1,
+      "missed": 7,
+      "cold_start": 0,
+      "expected_due": 5.45,
+      "seconds": 6.53
+    },
+    {
+      "battery_swap": 4.5,
+      "building_change": 13.0,
+      "room_change": 8.5,
+      "travel": 50.718666666666664,
+      "overtime": 82.894,
+      "daily_limit": 100.0,
+      "weekly_limit": 100.0,
+      "late_swap": 680.0,
+      "early_swap": 607.0,
+      "scenario": "s_37",
+      "total_cost": 1646.6126666666669,
+      "served": 16,
+      "due": 6,
+      "hit": 4,
+      "missed": 2,
+      "cold_start": 0,
+      "expected_due": 6.51,
+      "seconds": 7.24
+    },
+    {
+      "battery_swap": 3.25,
+      "building_change": 12.0,
+      "room_change": 5.5,
+      "travel": 51.25816666666667,
+      "overtime": 66.307,
+      "daily_limit": 100.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1420.0,
+      "early_swap": 373.0,
+      "scenario": "s_38",
+      "total_cost": 2131.3151666666663,
+      "served": 8,
+      "due": 5,
+      "hit": 0,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 4.6,
+      "seconds": 6.73
+    },
+    {
+      "battery_swap": 3.75,
+      "building_change": 13.0,
+      "room_change": 7.5,
+      "travel": 31.456,
+      "overtime": 42.38166666666666,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 500.0,
+      "early_swap": 361.0,
+      "scenario": "s_39",
+      "total_cost": 1059.0876666666668,
+      "served": 11,
+      "due": 7,
+      "hit": 3,
+      "missed": 4,
+      "cold_start": 0,
+      "expected_due": 5.0,
+      "seconds": 6.82
+    },
+    {
+      "battery_swap": 4.5,
+      "building_change": 17.0,
+      "room_change": 9.0,
+      "travel": 15.367333333333335,
+      "overtime": 0.0,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 1010.0,
+      "early_swap": 438.0,
+      "scenario": "s_40",
+      "total_cost": 1493.8673333333331,
+      "served": 13,
+      "due": 7,
+      "hit": 2,
+      "missed": 5,
+      "cold_start": 0,
+      "expected_due": 5.46,
+      "seconds": 7.21
+    },
+    {
+      "battery_swap": 5.25,
+      "building_change": 18.0,
+      "room_change": 9.5,
+      "travel": 44.782333333333334,
+      "overtime": 51.934999999999995,
+      "daily_limit": 100.0,
+      "weekly_limit": 100.0,
+      "late_swap": 940.0,
+      "early_swap": 577.0,
+      "scenario": "s_41",
+      "total_cost": 1846.4673333333333,
+      "served": 18,
+      "due": 6,
+      "hit": 3,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 6.28,
+      "seconds": 7.73
+    },
+    {
+      "battery_swap": 5.0,
+      "building_change": 13.0,
+      "room_change": 9.0,
+      "travel": 32.3655,
+      "overtime": 37.227000000000004,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 770.0,
+      "early_swap": 427.5,
+      "scenario": "s_42",
+      "total_cost": 1394.0925,
+      "served": 17,
+      "due": 8,
+      "hit": 5,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 5.91,
+      "seconds": 7.22
+    },
+    {
+      "battery_swap": 4.25,
+      "building_change": 10.0,
+      "room_change": 6.5,
+      "travel": 29.436833333333333,
+      "overtime": 44.245666666666665,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 1030.0,
+      "early_swap": 329.0,
+      "scenario": "s_43",
+      "total_cost": 1553.4325000000001,
+      "served": 14,
+      "due": 7,
+      "hit": 4,
+      "missed": 3,
+      "cold_start": 0,
+      "expected_due": 4.47,
+      "seconds": 7.5
+    },
+    {
+      "battery_swap": 4.5,
+      "building_change": 12.0,
+      "room_change": 7.5,
+      "travel": 28.489333333333335,
+      "overtime": 62.06933333333333,
+      "daily_limit": 0.0,
+      "weekly_limit": 100.0,
+      "late_swap": 420.0,
+      "early_swap": 347.0,
+      "scenario": "s_44",
+      "total_cost": 981.5586666666668,
+      "served": 17,
+      "due": 6,
+      "hit": 5,
+      "missed": 1,
+      "cold_start": 0,
+      "expected_due": 5.52,
+      "seconds": 6.61
+    },
+    {
+      "battery_swap": 3.5,
+      "building_change": 8.0,
+      "room_change": 6.0,
+      "travel": 24.916,
+      "overtime": 36.635999999999996,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 0.0,
+      "early_swap": 273.0,
+      "scenario": "s_45",
+      "total_cost": 352.052,
+      "served": 14,
+      "due": 3,
+      "hit": 3,
+      "missed": 0,
+      "cold_start": 0,
+      "expected_due": 4.47,
+      "seconds": 6.9
+    },
+    {
+      "battery_swap": 3.25,
+      "building_change": 8.0,
+      "room_change": 5.0,
+      "travel": 24.538666666666668,
+      "overtime": 44.55333333333333,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 0.0,
+      "early_swap": 227.5,
+      "scenario": "s_46",
+      "total_cost": 312.842,
+      "served": 13,
+      "due": 2,
+      "hit": 2,
+      "missed": 0,
+      "cold_start": 0,
+      "expected_due": 3.6,
+      "seconds": 7.28
+    },
+    {
+      "battery_swap": 4.0,
+      "building_change": 9.0,
+      "room_change": 6.0,
+      "travel": 24.236,
+      "overtime": 35.839,
+      "daily_limit": 0.0,
+      "weekly_limit": 0.0,
+      "late_swap": 0.0,
+      "early_swap": 233.0,
+      "scenario": "s_47",
+      "total_cost": 312.07500000000005,
+      "served": 16,
+      "due": 2,
+      "hit": 2,
+      "missed": 0,
+      "cold_start": 0,
+      "expected_due": 5.33,
+      "seconds": 6.87
+    }
+  ],
+  "audit": [
+    {
+      "scenario": "s_0",
+      "battery": "d_3703f0819960",
+      "probability": 0.6182,
+      "days_to_eol": 24,
+      "served": true
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_500e0082592c",
+      "probability": 0.729,
+      "days_to_eol": 24,
+      "served": true
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_575bd0b46798",
+      "probability": 0.7054,
+      "days_to_eol": 24,
+      "served": true
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_9b73308fafc4",
+      "probability": 0.0427,
+      "days_to_eol": 34,
+      "served": false
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_d38a9bd56419",
+      "probability": 0.8289,
+      "days_to_eol": 28,
+      "served": true
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_d678d9f27b31",
+      "probability": 0.3796,
+      "days_to_eol": 19,
+      "served": true
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_d993db63a0c7",
+      "probability": 0.1437,
+      "days_to_eol": 15,
+      "served": false
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_eb7b60348254",
+      "probability": 0.0124,
+      "days_to_eol": 19,
+      "served": false
+    },
+    {
+      "scenario": "s_0",
+      "battery": "d_fa3b18f14362",
+      "probability": 0.0161,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_1d0190865d91",
+      "probability": 0.2212,
+      "days_to_eol": 41,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_3703f0819960",
+      "probability": 0.9577,
+      "days_to_eol": 17,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_500e0082592c",
+      "probability": 0.766,
+      "days_to_eol": 17,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_575bd0b46798",
+      "probability": 0.8643,
+      "days_to_eol": 17,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_84bde2e0b708",
+      "probability": 0.0151,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_871279fba467",
+      "probability": 0.0873,
+      "days_to_eol": 40,
+      "served": false
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_9b73308fafc4",
+      "probability": 0.0552,
+      "days_to_eol": 27,
+      "served": false
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_a5ffa7db0b8f",
+      "probability": 0.038,
+      "days_to_eol": 42,
+      "served": false
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_d38a9bd56419",
+      "probability": 0.7817,
+      "days_to_eol": 21,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_d678d9f27b31",
+      "probability": 0.8015,
+      "days_to_eol": 12,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_d993db63a0c7",
+      "probability": 0.2365,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_eb7b60348254",
+      "probability": 1.0,
+      "days_to_eol": 12,
+      "served": true
+    },
+    {
+      "scenario": "s_1",
+      "battery": "d_fa3b18f14362",
+      "probability": 0.0328,
+      "days_to_eol": 18,
+      "served": false
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_172fcf48ec9e",
+      "probability": 0.4646,
+      "days_to_eol": 42,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_1d0190865d91",
+      "probability": 0.5869,
+      "days_to_eol": 34,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_3703f0819960",
+      "probability": 1.0,
+      "days_to_eol": 10,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_500e0082592c",
+      "probability": 1.0,
+      "days_to_eol": 10,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_575bd0b46798",
+      "probability": 1.0,
+      "days_to_eol": 10,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_719d519dcc91",
+      "probability": 0.0597,
+      "days_to_eol": 39,
+      "served": false
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_773cab150c55",
+      "probability": 0.8991,
+      "days_to_eol": 38,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_834971e10647",
+      "probability": 0.0055,
+      "days_to_eol": 41,
+      "served": false
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_84bde2e0b708",
+      "probability": 0.2235,
+      "days_to_eol": 30,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_871279fba467",
+      "probability": 0.3514,
+      "days_to_eol": 33,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_9b73308fafc4",
+      "probability": 0.0875,
+      "days_to_eol": 20,
+      "served": false
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_a5ffa7db0b8f",
+      "probability": 0.3026,
+      "days_to_eol": 35,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_d38a9bd56419",
+      "probability": 0.7796,
+      "days_to_eol": 14,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_d678d9f27b31",
+      "probability": 1.0,
+      "days_to_eol": 5,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_d993db63a0c7",
+      "probability": 1.0,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_eb7b60348254",
+      "probability": 1.0,
+      "days_to_eol": 5,
+      "served": true
+    },
+    {
+      "scenario": "s_2",
+      "battery": "d_fa3b18f14362",
+      "probability": 0.0975,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_05d8311854b1",
+      "probability": 0.2238,
+      "days_to_eol": 42,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_172fcf48ec9e",
+      "probability": 0.7974,
+      "days_to_eol": 35,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_1d0190865d91",
+      "probability": 0.6793,
+      "days_to_eol": 27,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_3703f0819960",
+      "probability": 1.0,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_37142ede415b",
+      "probability": 0.0028,
+      "days_to_eol": 39,
+      "served": false
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_4a83f49a6956",
+      "probability": 0.7863,
+      "days_to_eol": 37,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_500e0082592c",
+      "probability": 1.0,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_575bd0b46798",
+      "probability": 1.0,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_719d519dcc91",
+      "probability": 0.5993,
+      "days_to_eol": 32,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_773cab150c55",
+      "probability": 0.3166,
+      "days_to_eol": 31,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_834971e10647",
+      "probability": 0.2765,
+      "days_to_eol": 34,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_84bde2e0b708",
+      "probability": 0.5447,
+      "days_to_eol": 23,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_871279fba467",
+      "probability": 0.7679,
+      "days_to_eol": 26,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_90995329584e",
+      "probability": 0.3227,
+      "days_to_eol": 39,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_9b73308fafc4",
+      "probability": 0.3161,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_a5ffa7db0b8f",
+      "probability": 0.3725,
+      "days_to_eol": 28,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_b56846e1ecf6",
+      "probability": 0.2442,
+      "days_to_eol": 39,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_d38a9bd56419",
+      "probability": 0.8758,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_3",
+      "battery": "d_fa3b18f14362",
+      "probability": 0.6823,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_05d8311854b1",
+      "probability": 0.4129,
+      "days_to_eol": 35,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_172fcf48ec9e",
+      "probability": 0.7413,
+      "days_to_eol": 28,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_1d0190865d91",
+      "probability": 1.0,
+      "days_to_eol": 20,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_37142ede415b",
+      "probability": 0.1091,
+      "days_to_eol": 32,
+      "served": false
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_4a83f49a6956",
+      "probability": 0.9,
+      "days_to_eol": 30,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_719d519dcc91",
+      "probability": 0.8281,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_773cab150c55",
+      "probability": 0.3311,
+      "days_to_eol": 24,
+      "served": false
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_834971e10647",
+      "probability": 0.2934,
+      "days_to_eol": 27,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_84bde2e0b708",
+      "probability": 1.0,
+      "days_to_eol": 16,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_871279fba467",
+      "probability": 1.0,
+      "days_to_eol": 19,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_90995329584e",
+      "probability": 0.3828,
+      "days_to_eol": 32,
+      "served": false
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_9b73308fafc4",
+      "probability": 0.8357,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_a5ffa7db0b8f",
+      "probability": 0.5875,
+      "days_to_eol": 21,
+      "served": true
+    },
+    {
+      "scenario": "s_4",
+      "battery": "d_b56846e1ecf6",
+      "probability": 0.64,
+      "days_to_eol": 32,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_05d8311854b1",
+      "probability": 0.4239,
+      "days_to_eol": 28,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_172fcf48ec9e",
+      "probability": 0.7182,
+      "days_to_eol": 21,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_1d0190865d91",
+      "probability": 1.0,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_37142ede415b",
+      "probability": 0.1112,
+      "days_to_eol": 25,
+      "served": false
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_4a83f49a6956",
+      "probability": 0.656,
+      "days_to_eol": 23,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_719d519dcc91",
+      "probability": 1.0,
+      "days_to_eol": 18,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_773cab150c55",
+      "probability": 1.0,
+      "days_to_eol": 17,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_834971e10647",
+      "probability": 0.9156,
+      "days_to_eol": 20,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_84bde2e0b708",
+      "probability": 1.0,
+      "days_to_eol": 9,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_871279fba467",
+      "probability": 1.0,
+      "days_to_eol": 12,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_90995329584e",
+      "probability": 0.3056,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_a5ffa7db0b8f",
+      "probability": 0.8367,
+      "days_to_eol": 14,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_b56846e1ecf6",
+      "probability": 0.7553,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_5",
+      "battery": "d_ed28ebb86070",
+      "probability": 0.2555,
+      "days_to_eol": 37,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_05d8311854b1",
+      "probability": 0.4245,
+      "days_to_eol": 21,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_172fcf48ec9e",
+      "probability": 0.7842,
+      "days_to_eol": 14,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_1d0190865d91",
+      "probability": 1.0,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_37142ede415b",
+      "probability": 0.0966,
+      "days_to_eol": 18,
+      "served": false
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_4a83f49a6956",
+      "probability": 0.5854,
+      "days_to_eol": 16,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_4b83491730b1",
+      "probability": 0.1517,
+      "days_to_eol": 39,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_5039a842fbdd",
+      "probability": 0.4541,
+      "days_to_eol": 38,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_719d519dcc91",
+      "probability": 1.0,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_773cab150c55",
+      "probability": 0.6467,
+      "days_to_eol": 10,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_834971e10647",
+      "probability": 0.9161,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_84bde2e0b708",
+      "probability": 1.0,
+      "days_to_eol": 2,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_871279fba467",
+      "probability": 1.0,
+      "days_to_eol": 5,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_90995329584e",
+      "probability": 0.4635,
+      "days_to_eol": 18,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_9ab87ed4625d",
+      "probability": 0.4661,
+      "days_to_eol": 39,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_a5ffa7db0b8f",
+      "probability": 0.9153,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_b56846e1ecf6",
+      "probability": 0.8319,
+      "days_to_eol": 18,
+      "served": true
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_c1672e150e5b",
+      "probability": 0.0508,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_6",
+      "battery": "d_ed28ebb86070",
+      "probability": 0.4854,
+      "days_to_eol": 30,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_05d8311854b1",
+      "probability": 1.0,
+      "days_to_eol": 14,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_172fcf48ec9e",
+      "probability": 0.8762,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_37142ede415b",
+      "probability": 0.3487,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_4a83f49a6956",
+      "probability": 0.9667,
+      "days_to_eol": 9,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_4b83491730b1",
+      "probability": 0.2631,
+      "days_to_eol": 32,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_5039a842fbdd",
+      "probability": 0.6022,
+      "days_to_eol": 31,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_719d519dcc91",
+      "probability": 1.0,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_773cab150c55",
+      "probability": 1.0,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_834971e10647",
+      "probability": 1.0,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_90995329584e",
+      "probability": 0.7592,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_9ab87ed4625d",
+      "probability": 0.2418,
+      "days_to_eol": 32,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_b56846e1ecf6",
+      "probability": 1.0,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_c1672e150e5b",
+      "probability": 0.0376,
+      "days_to_eol": 29,
+      "served": false
+    },
+    {
+      "scenario": "s_7",
+      "battery": "d_ed28ebb86070",
+      "probability": 0.2957,
+      "days_to_eol": 23,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_05d8311854b1",
+      "probability": 1.0,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_184be698fc36",
+      "probability": 0.5544,
+      "days_to_eol": 36,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_1a1ecc949d00",
+      "probability": 0.211,
+      "days_to_eol": 37,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_37142ede415b",
+      "probability": 0.4601,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_3e0292ad88b6",
+      "probability": 0.2113,
+      "days_to_eol": 42,
+      "served": false
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_3f59e13bbfaf",
+      "probability": 0.4656,
+      "days_to_eol": 36,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_4a83f49a6956",
+      "probability": 1.0,
+      "days_to_eol": 2,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_4b83491730b1",
+      "probability": 0.4975,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_5039a842fbdd",
+      "probability": 1.0,
+      "days_to_eol": 24,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_90995329584e",
+      "probability": 0.9148,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_9ab87ed4625d",
+      "probability": 0.5595,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_b56846e1ecf6",
+      "probability": 1.0,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_c1672e150e5b",
+      "probability": 0.3037,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_8",
+      "battery": "d_ed28ebb86070",
+      "probability": 0.3961,
+      "days_to_eol": 16,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_184be698fc36",
+      "probability": 0.8878,
+      "days_to_eol": 29,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_1a1ecc949d00",
+      "probability": 0.2988,
+      "days_to_eol": 30,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_3e0292ad88b6",
+      "probability": 0.7863,
+      "days_to_eol": 35,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_3f59e13bbfaf",
+      "probability": 0.7539,
+      "days_to_eol": 29,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_4b83491730b1",
+      "probability": 0.7551,
+      "days_to_eol": 18,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_5039a842fbdd",
+      "probability": 1.0,
+      "days_to_eol": 17,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_7792551fb838",
+      "probability": 0.1485,
+      "days_to_eol": 40,
+      "served": false
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_9ab87ed4625d",
+      "probability": 0.4569,
+      "days_to_eol": 18,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_c1672e150e5b",
+      "probability": 0.596,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_9",
+      "battery": "d_ed28ebb86070",
+      "probability": 0.7727,
+      "days_to_eol": 9,
+      "served": true
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_184be698fc36",
+      "probability": 0.5847,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_1a1ecc949d00",
+      "probability": 0.2036,
+      "days_to_eol": 23,
+      "served": true
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_3e0292ad88b6",
+      "probability": 0.1752,
+      "days_to_eol": 28,
+      "served": false
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_3f59e13bbfaf",
+      "probability": 0.5287,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_4b83491730b1",
+      "probability": 0.8328,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_5039a842fbdd",
+      "probability": 0.6679,
+      "days_to_eol": 10,
+      "served": true
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_7792551fb838",
+      "probability": 0.1946,
+      "days_to_eol": 33,
+      "served": false
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_9ab87ed4625d",
+      "probability": 0.699,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_c1672e150e5b",
+      "probability": 0.1934,
+      "days_to_eol": 8,
+      "served": false
+    },
+    {
+      "scenario": "s_10",
+      "battery": "d_ed28ebb86070",
+      "probability": 0.6408,
+      "days_to_eol": 2,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_184be698fc36",
+      "probability": 0.7189,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_1a1ecc949d00",
+      "probability": 0.1709,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_1b79ece9f065",
+      "probability": 0.177,
+      "days_to_eol": 41,
+      "served": false
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_3e0292ad88b6",
+      "probability": 0.5448,
+      "days_to_eol": 21,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_3f59e13bbfaf",
+      "probability": 0.5098,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_4b83491730b1",
+      "probability": 0.9965,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_5039a842fbdd",
+      "probability": 0.966,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_7792551fb838",
+      "probability": 0.4801,
+      "days_to_eol": 26,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_9ab87ed4625d",
+      "probability": 0.8441,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_11",
+      "battery": "d_c1672e150e5b",
+      "probability": 0.5491,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_184be698fc36",
+      "probability": 0.6948,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_1a1ecc949d00",
+      "probability": 0.1654,
+      "days_to_eol": 9,
+      "served": false
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_1b79ece9f065",
+      "probability": 0.78,
+      "days_to_eol": 34,
+      "served": true
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_3e0292ad88b6",
+      "probability": 0.7231,
+      "days_to_eol": 14,
+      "served": true
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_3f59e13bbfaf",
+      "probability": 0.3814,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_5aa382f54871",
+      "probability": 0.0671,
+      "days_to_eol": 42,
+      "served": false
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_7792551fb838",
+      "probability": 0.3619,
+      "days_to_eol": 19,
+      "served": true
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_934319e8a338",
+      "probability": 0.5775,
+      "days_to_eol": 39,
+      "served": true
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_b94797370f49",
+      "probability": 0.1227,
+      "days_to_eol": 42,
+      "served": false
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_de8ae6808bd5",
+      "probability": 0.1802,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_12",
+      "battery": "d_f95f29911228",
+      "probability": 0.2753,
+      "days_to_eol": 41,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_184be698fc36",
+      "probability": 0.9665,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_1a1ecc949d00",
+      "probability": 0.1159,
+      "days_to_eol": 2,
+      "served": false
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_1b79ece9f065",
+      "probability": 0.5918,
+      "days_to_eol": 27,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_35724f3a1f80",
+      "probability": 0.2273,
+      "days_to_eol": 41,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_3e0292ad88b6",
+      "probability": 0.8347,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_3f59e13bbfaf",
+      "probability": 0.7608,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_5aa382f54871",
+      "probability": 0.0174,
+      "days_to_eol": 35,
+      "served": false
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_7792551fb838",
+      "probability": 0.1459,
+      "days_to_eol": 12,
+      "served": false
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_934319e8a338",
+      "probability": 0.6083,
+      "days_to_eol": 32,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_b94797370f49",
+      "probability": 0.1737,
+      "days_to_eol": 35,
+      "served": false
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_bd045b2e32a2",
+      "probability": 0.0122,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_ccd3a65228a9",
+      "probability": 0.738,
+      "days_to_eol": 41,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_de8ae6808bd5",
+      "probability": 0.3608,
+      "days_to_eol": 29,
+      "served": true
+    },
+    {
+      "scenario": "s_13",
+      "battery": "d_f95f29911228",
+      "probability": 0.03,
+      "days_to_eol": 34,
+      "served": false
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_1b79ece9f065",
+      "probability": 0.5072,
+      "days_to_eol": 20,
+      "served": true
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_35724f3a1f80",
+      "probability": 0.18,
+      "days_to_eol": 34,
+      "served": false
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_3b189e96404c",
+      "probability": 0.3702,
+      "days_to_eol": 39,
+      "served": true
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_5aa382f54871",
+      "probability": 0.0017,
+      "days_to_eol": 28,
+      "served": false
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_7792551fb838",
+      "probability": 0.1095,
+      "days_to_eol": 5,
+      "served": false
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_934319e8a338",
+      "probability": 0.6877,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_b94797370f49",
+      "probability": 0.4025,
+      "days_to_eol": 28,
+      "served": true
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_bd045b2e32a2",
+      "probability": 0.0119,
+      "days_to_eol": 30,
+      "served": false
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_ccd3a65228a9",
+      "probability": 0.6765,
+      "days_to_eol": 34,
+      "served": true
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_d70bb89bb900",
+      "probability": 0.4112,
+      "days_to_eol": 39,
+      "served": true
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_de8ae6808bd5",
+      "probability": 0.2471,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_14",
+      "battery": "d_f95f29911228",
+      "probability": 0.0036,
+      "days_to_eol": 27,
+      "served": false
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_0641d7913b47",
+      "probability": 0.4949,
+      "days_to_eol": 36,
+      "served": true
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_1b79ece9f065",
+      "probability": 0.4232,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_35724f3a1f80",
+      "probability": 0.1368,
+      "days_to_eol": 27,
+      "served": false
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_3b189e96404c",
+      "probability": 0.143,
+      "days_to_eol": 32,
+      "served": false
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_5aa382f54871",
+      "probability": 0.014,
+      "days_to_eol": 21,
+      "served": false
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_934319e8a338",
+      "probability": 0.7748,
+      "days_to_eol": 18,
+      "served": true
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_b94797370f49",
+      "probability": 0.4454,
+      "days_to_eol": 21,
+      "served": true
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_bd045b2e32a2",
+      "probability": 0.0139,
+      "days_to_eol": 23,
+      "served": false
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_c6e9d12f54f4",
+      "probability": 0.0102,
+      "days_to_eol": 40,
+      "served": false
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_ccd3a65228a9",
+      "probability": 0.6609,
+      "days_to_eol": 27,
+      "served": true
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_d70bb89bb900",
+      "probability": 0.2108,
+      "days_to_eol": 32,
+      "served": true
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_de8ae6808bd5",
+      "probability": 0.1387,
+      "days_to_eol": 15,
+      "served": false
+    },
+    {
+      "scenario": "s_15",
+      "battery": "d_f95f29911228",
+      "probability": 0.0175,
+      "days_to_eol": 20,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_0641d7913b47",
+      "probability": 0.7804,
+      "days_to_eol": 29,
+      "served": true
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_1b79ece9f065",
+      "probability": 0.1664,
+      "days_to_eol": 6,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_20b07bbc3e8f",
+      "probability": 0.1185,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_35724f3a1f80",
+      "probability": 0.5448,
+      "days_to_eol": 20,
+      "served": true
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_3b189e96404c",
+      "probability": 0.1269,
+      "days_to_eol": 25,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_57e99ff00802",
+      "probability": 0.0837,
+      "days_to_eol": 42,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_5aa382f54871",
+      "probability": 0.0044,
+      "days_to_eol": 14,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_934319e8a338",
+      "probability": 0.3628,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_b94797370f49",
+      "probability": 0.1382,
+      "days_to_eol": 14,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_bd045b2e32a2",
+      "probability": 0.0136,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_c6e9d12f54f4",
+      "probability": 0.0114,
+      "days_to_eol": 33,
+      "served": false
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_ccd3a65228a9",
+      "probability": 0.6453,
+      "days_to_eol": 20,
+      "served": true
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_d70bb89bb900",
+      "probability": 0.227,
+      "days_to_eol": 25,
+      "served": true
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_de8ae6808bd5",
+      "probability": 0.5129,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_16",
+      "battery": "d_f95f29911228",
+      "probability": 0.0038,
+      "days_to_eol": 13,
+      "served": false
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_0641d7913b47",
+      "probability": 0.7745,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_20b07bbc3e8f",
+      "probability": 0.1694,
+      "days_to_eol": 29,
+      "served": false
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_30e86d81563a",
+      "probability": 0.0004,
+      "days_to_eol": 40,
+      "served": false
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_35724f3a1f80",
+      "probability": 0.5512,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_3b189e96404c",
+      "probability": 0.6246,
+      "days_to_eol": 18,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_57e99ff00802",
+      "probability": 0.1978,
+      "days_to_eol": 35,
+      "served": false
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_5aa382f54871",
+      "probability": 0.3674,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_934319e8a338",
+      "probability": 0.8981,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_b94797370f49",
+      "probability": 0.7259,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_bd045b2e32a2",
+      "probability": 0.0133,
+      "days_to_eol": 9,
+      "served": false
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_c6e9d12f54f4",
+      "probability": 0.0137,
+      "days_to_eol": 26,
+      "served": false
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_ccd3a65228a9",
+      "probability": 0.6297,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_d70bb89bb900",
+      "probability": 0.166,
+      "days_to_eol": 18,
+      "served": false
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_de8ae6808bd5",
+      "probability": 0.9198,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_17",
+      "battery": "d_f95f29911228",
+      "probability": 0.523,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_0641d7913b47",
+      "probability": 0.7529,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_20b07bbc3e8f",
+      "probability": 0.2045,
+      "days_to_eol": 22,
+      "served": false
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_30e86d81563a",
+      "probability": 0.0037,
+      "days_to_eol": 33,
+      "served": false
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_35724f3a1f80",
+      "probability": 0.6528,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_3b189e96404c",
+      "probability": 0.6013,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_57e99ff00802",
+      "probability": 0.1425,
+      "days_to_eol": 28,
+      "served": false
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_9bda8de77e4f",
+      "probability": 0.0105,
+      "days_to_eol": 41,
+      "served": false
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_bd045b2e32a2",
+      "probability": 0.0058,
+      "days_to_eol": 2,
+      "served": false
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_c6e9d12f54f4",
+      "probability": 0.0759,
+      "days_to_eol": 19,
+      "served": false
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_ccd3a65228a9",
+      "probability": 0.6142,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_18",
+      "battery": "d_d70bb89bb900",
+      "probability": 0.3002,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_0641d7913b47",
+      "probability": 0.7338,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_20b07bbc3e8f",
+      "probability": 0.4353,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_30e86d81563a",
+      "probability": 0.0001,
+      "days_to_eol": 26,
+      "served": false
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_3b189e96404c",
+      "probability": 0.586,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_57e99ff00802",
+      "probability": 0.0609,
+      "days_to_eol": 21,
+      "served": false
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_9bda8de77e4f",
+      "probability": 0.002,
+      "days_to_eol": 34,
+      "served": false
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_c6e9d12f54f4",
+      "probability": 0.2585,
+      "days_to_eol": 12,
+      "served": true
+    },
+    {
+      "scenario": "s_19",
+      "battery": "d_d70bb89bb900",
+      "probability": 0.2925,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_0641d7913b47",
+      "probability": 0.8525,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_102b0defe0cc",
+      "probability": 0.1284,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_20b07bbc3e8f",
+      "probability": 0.3722,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_30e86d81563a",
+      "probability": 0.0002,
+      "days_to_eol": 19,
+      "served": false
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_57e99ff00802",
+      "probability": 0.049,
+      "days_to_eol": 14,
+      "served": false
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_9bda8de77e4f",
+      "probability": 0.0135,
+      "days_to_eol": 27,
+      "served": false
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_c6e9d12f54f4",
+      "probability": 0.4405,
+      "days_to_eol": 5,
+      "served": true
+    },
+    {
+      "scenario": "s_20",
+      "battery": "d_cbf684280da2",
+      "probability": 0.0028,
+      "days_to_eol": 42,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_102b0defe0cc",
+      "probability": 0.17,
+      "days_to_eol": 30,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_20b07bbc3e8f",
+      "probability": 0.5852,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_30e86d81563a",
+      "probability": 0.0399,
+      "days_to_eol": 12,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_4643496a7525",
+      "probability": 0.1901,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_57e99ff00802",
+      "probability": 0.1615,
+      "days_to_eol": 7,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_8ba95cfeaaa6",
+      "probability": 0.0554,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_9bda8de77e4f",
+      "probability": 0.0864,
+      "days_to_eol": 20,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_cbf684280da2",
+      "probability": 0.0093,
+      "days_to_eol": 35,
+      "served": false
+    },
+    {
+      "scenario": "s_21",
+      "battery": "d_f11c15757bf1",
+      "probability": 0.0002,
+      "days_to_eol": 41,
+      "served": false
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_102b0defe0cc",
+      "probability": 0.2847,
+      "days_to_eol": 23,
+      "served": true
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_30e86d81563a",
+      "probability": 0.4213,
+      "days_to_eol": 5,
+      "served": true
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_4643496a7525",
+      "probability": 0.186,
+      "days_to_eol": 29,
+      "served": true
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_497cf69db25f",
+      "probability": 0.0199,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_8ba95cfeaaa6",
+      "probability": 0.0402,
+      "days_to_eol": 30,
+      "served": false
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_9bda8de77e4f",
+      "probability": 0.3154,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_cbf684280da2",
+      "probability": 0.1142,
+      "days_to_eol": 28,
+      "served": false
+    },
+    {
+      "scenario": "s_22",
+      "battery": "d_f11c15757bf1",
+      "probability": 0.0002,
+      "days_to_eol": 34,
+      "served": false
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_102b0defe0cc",
+      "probability": 0.1427,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_4643496a7525",
+      "probability": 0.1827,
+      "days_to_eol": 22,
+      "served": false
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_497cf69db25f",
+      "probability": 0.0192,
+      "days_to_eol": 29,
+      "served": false
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_5a32d5bc2799",
+      "probability": 0.1334,
+      "days_to_eol": 38,
+      "served": false
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_8ba95cfeaaa6",
+      "probability": 0.0237,
+      "days_to_eol": 23,
+      "served": false
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_9bda8de77e4f",
+      "probability": 0.2824,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_be0fde6cb60d",
+      "probability": 0.0503,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_cbf684280da2",
+      "probability": 0.2503,
+      "days_to_eol": 21,
+      "served": true
+    },
+    {
+      "scenario": "s_23",
+      "battery": "d_f11c15757bf1",
+      "probability": 0.0002,
+      "days_to_eol": 27,
+      "served": false
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_102b0defe0cc",
+      "probability": 0.4593,
+      "days_to_eol": 9,
+      "served": true
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_4643496a7525",
+      "probability": 0.176,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_497cf69db25f",
+      "probability": 0.0186,
+      "days_to_eol": 22,
+      "served": false
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_5a32d5bc2799",
+      "probability": 0.0664,
+      "days_to_eol": 31,
+      "served": false
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_8ba95cfeaaa6",
+      "probability": 0.0228,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_b48711795e0f",
+      "probability": 0.3979,
+      "days_to_eol": 41,
+      "served": true
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_be0fde6cb60d",
+      "probability": 0.0486,
+      "days_to_eol": 30,
+      "served": false
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_cbf684280da2",
+      "probability": 0.3429,
+      "days_to_eol": 14,
+      "served": true
+    },
+    {
+      "scenario": "s_24",
+      "battery": "d_f11c15757bf1",
+      "probability": 0.0002,
+      "days_to_eol": 20,
+      "served": false
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_102b0defe0cc",
+      "probability": 0.3476,
+      "days_to_eol": 2,
+      "served": true
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_4643496a7525",
+      "probability": 0.1698,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_497cf69db25f",
+      "probability": 0.0194,
+      "days_to_eol": 15,
+      "served": false
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_5a32d5bc2799",
+      "probability": 0.0883,
+      "days_to_eol": 24,
+      "served": false
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_8ba95cfeaaa6",
+      "probability": 0.022,
+      "days_to_eol": 9,
+      "served": false
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_b48711795e0f",
+      "probability": 0.4189,
+      "days_to_eol": 34,
+      "served": true
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_be0fde6cb60d",
+      "probability": 0.0468,
+      "days_to_eol": 23,
+      "served": false
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_cbf684280da2",
+      "probability": 0.633,
+      "days_to_eol": 7,
+      "served": true
+    },
+    {
+      "scenario": "s_25",
+      "battery": "d_f11c15757bf1",
+      "probability": 0.0002,
+      "days_to_eol": 13,
+      "served": false
+    },
+    {
+      "scenario": "s_26",
+      "battery": "d_4643496a7525",
+      "probability": 0.2471,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_26",
+      "battery": "d_497cf69db25f",
+      "probability": 0.0187,
+      "days_to_eol": 8,
+      "served": false
+    },
+    {
+      "scenario": "s_26",
+      "battery": "d_5a32d5bc2799",
+      "probability": 0.0585,
+      "days_to_eol": 17,
+      "served": false
+    },
+    {
+      "scenario": "s_26",
+      "battery": "d_8ba95cfeaaa6",
+      "probability": 0.0342,
+      "days_to_eol": 2,
+      "served": false
+    },
+    {
+      "scenario": "s_26",
+      "battery": "d_b48711795e0f",
+      "probability": 0.4805,
+      "days_to_eol": 27,
+      "served": true
+    },
+    {
+      "scenario": "s_26",
+      "battery": "d_be0fde6cb60d",
+      "probability": 0.0451,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_26",
+      "battery": "d_f11c15757bf1",
+      "probability": 0.0002,
+      "days_to_eol": 6,
+      "served": false
+    },
+    {
+      "scenario": "s_27",
+      "battery": "d_124f1e85339f",
+      "probability": 0.0154,
+      "days_to_eol": 38,
+      "served": false
+    },
+    {
+      "scenario": "s_27",
+      "battery": "d_497cf69db25f",
+      "probability": 0.0391,
+      "days_to_eol": 1,
+      "served": false
+    },
+    {
+      "scenario": "s_27",
+      "battery": "d_5a32d5bc2799",
+      "probability": 0.1791,
+      "days_to_eol": 10,
+      "served": false
+    },
+    {
+      "scenario": "s_27",
+      "battery": "d_87604c88656b",
+      "probability": 0.1247,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_27",
+      "battery": "d_b48711795e0f",
+      "probability": 0.5144,
+      "days_to_eol": 20,
+      "served": true
+    },
+    {
+      "scenario": "s_27",
+      "battery": "d_be0fde6cb60d",
+      "probability": 0.0434,
+      "days_to_eol": 9,
+      "served": false
+    },
+    {
+      "scenario": "s_28",
+      "battery": "d_124f1e85339f",
+      "probability": 0.0148,
+      "days_to_eol": 31,
+      "served": false
+    },
+    {
+      "scenario": "s_28",
+      "battery": "d_5a32d5bc2799",
+      "probability": 0.1494,
+      "days_to_eol": 3,
+      "served": false
+    },
+    {
+      "scenario": "s_28",
+      "battery": "d_87604c88656b",
+      "probability": 0.0788,
+      "days_to_eol": 30,
+      "served": false
+    },
+    {
+      "scenario": "s_28",
+      "battery": "d_b48711795e0f",
+      "probability": 0.5314,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_28",
+      "battery": "d_be0fde6cb60d",
+      "probability": 0.0417,
+      "days_to_eol": 2,
+      "served": false
+    },
+    {
+      "scenario": "s_28",
+      "battery": "d_f57c1450927f",
+      "probability": 0.0096,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_29",
+      "battery": "d_124f1e85339f",
+      "probability": 0.0142,
+      "days_to_eol": 24,
+      "served": false
+    },
+    {
+      "scenario": "s_29",
+      "battery": "d_87604c88656b",
+      "probability": 0.0551,
+      "days_to_eol": 23,
+      "served": false
+    },
+    {
+      "scenario": "s_29",
+      "battery": "d_b48711795e0f",
+      "probability": 0.5329,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_29",
+      "battery": "d_f57c1450927f",
+      "probability": 0.0082,
+      "days_to_eol": 29,
+      "served": false
+    },
+    {
+      "scenario": "s_30",
+      "battery": "d_124f1e85339f",
+      "probability": 0.0136,
+      "days_to_eol": 17,
+      "served": false
+    },
+    {
+      "scenario": "s_30",
+      "battery": "d_7139cdf34e3f",
+      "probability": 0.213,
+      "days_to_eol": 38,
+      "served": true
+    },
+    {
+      "scenario": "s_30",
+      "battery": "d_7aa40cb4e3a2",
+      "probability": 0.4879,
+      "days_to_eol": 38,
+      "served": true
+    },
+    {
+      "scenario": "s_30",
+      "battery": "d_87604c88656b",
+      "probability": 0.0869,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_30",
+      "battery": "d_f57c1450927f",
+      "probability": 0.1194,
+      "days_to_eol": 22,
+      "served": false
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_124f1e85339f",
+      "probability": 0.013,
+      "days_to_eol": 10,
+      "served": false
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_6a6b1b21a680",
+      "probability": 0.0559,
+      "days_to_eol": 40,
+      "served": false
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_7139cdf34e3f",
+      "probability": 0.3917,
+      "days_to_eol": 31,
+      "served": true
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_7aa40cb4e3a2",
+      "probability": 0.3441,
+      "days_to_eol": 31,
+      "served": true
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_87604c88656b",
+      "probability": 0.2706,
+      "days_to_eol": 9,
+      "served": true
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_9ba303a913ad",
+      "probability": 0.011,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_db6b21a2bcd5",
+      "probability": 0.1018,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_31",
+      "battery": "d_f57c1450927f",
+      "probability": 0.2789,
+      "days_to_eol": 15,
+      "served": false
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_124f1e85339f",
+      "probability": 0.0515,
+      "days_to_eol": 3,
+      "served": false
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_6a6b1b21a680",
+      "probability": 0.1098,
+      "days_to_eol": 33,
+      "served": false
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_7139cdf34e3f",
+      "probability": 0.4563,
+      "days_to_eol": 24,
+      "served": true
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_7aa40cb4e3a2",
+      "probability": 0.4849,
+      "days_to_eol": 24,
+      "served": true
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_80fdf8e269cf",
+      "probability": 0.0941,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_87604c88656b",
+      "probability": 0.2018,
+      "days_to_eol": 2,
+      "served": true
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_9ba303a913ad",
+      "probability": 0.5606,
+      "days_to_eol": 30,
+      "served": true
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_db6b21a2bcd5",
+      "probability": 0.0979,
+      "days_to_eol": 30,
+      "served": false
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_e76cf26c8d1c",
+      "probability": 0.0504,
+      "days_to_eol": 37,
+      "served": false
+    },
+    {
+      "scenario": "s_32",
+      "battery": "d_f57c1450927f",
+      "probability": 0.4126,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_451150680718",
+      "probability": 0.0,
+      "days_to_eol": 40,
+      "served": false
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_6a6b1b21a680",
+      "probability": 0.0134,
+      "days_to_eol": 26,
+      "served": false
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_7139cdf34e3f",
+      "probability": 0.4067,
+      "days_to_eol": 17,
+      "served": true
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_7aa40cb4e3a2",
+      "probability": 0.4424,
+      "days_to_eol": 17,
+      "served": true
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_80fdf8e269cf",
+      "probability": 0.1131,
+      "days_to_eol": 29,
+      "served": false
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_9ba303a913ad",
+      "probability": 0.5431,
+      "days_to_eol": 23,
+      "served": true
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_db6b21a2bcd5",
+      "probability": 0.0459,
+      "days_to_eol": 23,
+      "served": false
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_e76cf26c8d1c",
+      "probability": 0.05,
+      "days_to_eol": 30,
+      "served": false
+    },
+    {
+      "scenario": "s_33",
+      "battery": "d_f57c1450927f",
+      "probability": 0.3948,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_3b9d4c40eb81",
+      "probability": 0.0641,
+      "days_to_eol": 40,
+      "served": false
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_451150680718",
+      "probability": 0.0,
+      "days_to_eol": 33,
+      "served": false
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_6a6b1b21a680",
+      "probability": 0.1248,
+      "days_to_eol": 19,
+      "served": false
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_7139cdf34e3f",
+      "probability": 0.3412,
+      "days_to_eol": 10,
+      "served": true
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_7aa40cb4e3a2",
+      "probability": 0.3535,
+      "days_to_eol": 10,
+      "served": true
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_80fdf8e269cf",
+      "probability": 0.1413,
+      "days_to_eol": 22,
+      "served": false
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_9ba303a913ad",
+      "probability": 0.188,
+      "days_to_eol": 16,
+      "served": true
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_db6b21a2bcd5",
+      "probability": 0.0443,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_34",
+      "battery": "d_e76cf26c8d1c",
+      "probability": 0.0663,
+      "days_to_eol": 23,
+      "served": false
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_3b9d4c40eb81",
+      "probability": 0.0486,
+      "days_to_eol": 33,
+      "served": false
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_451150680718",
+      "probability": 0.0,
+      "days_to_eol": 26,
+      "served": false
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_6a6b1b21a680",
+      "probability": 0.2787,
+      "days_to_eol": 12,
+      "served": true
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_7139cdf34e3f",
+      "probability": 0.3914,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_766f6b91ee47",
+      "probability": 0.0044,
+      "days_to_eol": 39,
+      "served": false
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_7aa40cb4e3a2",
+      "probability": 0.4334,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_80fdf8e269cf",
+      "probability": 0.1066,
+      "days_to_eol": 15,
+      "served": false
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_9ba303a913ad",
+      "probability": 0.1985,
+      "days_to_eol": 9,
+      "served": true
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_db6b21a2bcd5",
+      "probability": 0.0429,
+      "days_to_eol": 9,
+      "served": false
+    },
+    {
+      "scenario": "s_35",
+      "battery": "d_e76cf26c8d1c",
+      "probability": 0.0858,
+      "days_to_eol": 16,
+      "served": false
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_3b9d4c40eb81",
+      "probability": 0.0749,
+      "days_to_eol": 26,
+      "served": false
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_451150680718",
+      "probability": 0.0,
+      "days_to_eol": 19,
+      "served": false
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_6a6b1b21a680",
+      "probability": 0.1797,
+      "days_to_eol": 5,
+      "served": false
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_766f6b91ee47",
+      "probability": 0.0148,
+      "days_to_eol": 32,
+      "served": false
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_80fdf8e269cf",
+      "probability": 0.1246,
+      "days_to_eol": 8,
+      "served": false
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_9ba303a913ad",
+      "probability": 0.1578,
+      "days_to_eol": 2,
+      "served": true
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_db6b21a2bcd5",
+      "probability": 0.0414,
+      "days_to_eol": 2,
+      "served": false
+    },
+    {
+      "scenario": "s_36",
+      "battery": "d_e76cf26c8d1c",
+      "probability": 0.0852,
+      "days_to_eol": 9,
+      "served": false
+    },
+    {
+      "scenario": "s_37",
+      "battery": "d_3b9d4c40eb81",
+      "probability": 0.2092,
+      "days_to_eol": 19,
+      "served": true
+    },
+    {
+      "scenario": "s_37",
+      "battery": "d_451150680718",
+      "probability": 0.0003,
+      "days_to_eol": 12,
+      "served": false
+    },
+    {
+      "scenario": "s_37",
+      "battery": "d_766f6b91ee47",
+      "probability": 0.0614,
+      "days_to_eol": 25,
+      "served": false
+    },
+    {
+      "scenario": "s_37",
+      "battery": "d_7fb0c50f956d",
+      "probability": 0.2178,
+      "days_to_eol": 38,
+      "served": true
+    },
+    {
+      "scenario": "s_37",
+      "battery": "d_80fdf8e269cf",
+      "probability": 0.2855,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_37",
+      "battery": "d_e76cf26c8d1c",
+      "probability": 0.2411,
+      "days_to_eol": 2,
+      "served": true
+    },
+    {
+      "scenario": "s_38",
+      "battery": "d_3b9d4c40eb81",
+      "probability": 0.1384,
+      "days_to_eol": 12,
+      "served": false
+    },
+    {
+      "scenario": "s_38",
+      "battery": "d_451150680718",
+      "probability": 0.0509,
+      "days_to_eol": 5,
+      "served": false
+    },
+    {
+      "scenario": "s_38",
+      "battery": "d_766f6b91ee47",
+      "probability": 0.034,
+      "days_to_eol": 18,
+      "served": false
+    },
+    {
+      "scenario": "s_38",
+      "battery": "d_7fb0c50f956d",
+      "probability": 0.0742,
+      "days_to_eol": 31,
+      "served": false
+    },
+    {
+      "scenario": "s_38",
+      "battery": "d_9f1eb55e773d",
+      "probability": 0.0,
+      "days_to_eol": 42,
+      "served": false
+    },
+    {
+      "scenario": "s_39",
+      "battery": "d_3b9d4c40eb81",
+      "probability": 0.1832,
+      "days_to_eol": 5,
+      "served": true
+    },
+    {
+      "scenario": "s_39",
+      "battery": "d_6e78c63aeb1e",
+      "probability": 0.0706,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_39",
+      "battery": "d_766f6b91ee47",
+      "probability": 0.2187,
+      "days_to_eol": 11,
+      "served": true
+    },
+    {
+      "scenario": "s_39",
+      "battery": "d_7a18144dbc8c",
+      "probability": 0.0557,
+      "days_to_eol": 41,
+      "served": false
+    },
+    {
+      "scenario": "s_39",
+      "battery": "d_7fb0c50f956d",
+      "probability": 0.1615,
+      "days_to_eol": 24,
+      "served": true
+    },
+    {
+      "scenario": "s_39",
+      "battery": "d_9f1eb55e773d",
+      "probability": 0.0,
+      "days_to_eol": 35,
+      "served": false
+    },
+    {
+      "scenario": "s_39",
+      "battery": "d_cfdd8b69ddd4",
+      "probability": 0.0616,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_40",
+      "battery": "d_6e78c63aeb1e",
+      "probability": 0.0937,
+      "days_to_eol": 29,
+      "served": false
+    },
+    {
+      "scenario": "s_40",
+      "battery": "d_766f6b91ee47",
+      "probability": 0.2415,
+      "days_to_eol": 4,
+      "served": true
+    },
+    {
+      "scenario": "s_40",
+      "battery": "d_7a18144dbc8c",
+      "probability": 0.0794,
+      "days_to_eol": 34,
+      "served": false
+    },
+    {
+      "scenario": "s_40",
+      "battery": "d_7fb0c50f956d",
+      "probability": 0.0752,
+      "days_to_eol": 17,
+      "served": false
+    },
+    {
+      "scenario": "s_40",
+      "battery": "d_9f1eb55e773d",
+      "probability": 0.0,
+      "days_to_eol": 28,
+      "served": false
+    },
+    {
+      "scenario": "s_40",
+      "battery": "d_c2ff015918a9",
+      "probability": 0.0844,
+      "days_to_eol": 41,
+      "served": false
+    },
+    {
+      "scenario": "s_40",
+      "battery": "d_cfdd8b69ddd4",
+      "probability": 0.1332,
+      "days_to_eol": 29,
+      "served": true
+    },
+    {
+      "scenario": "s_41",
+      "battery": "d_6e78c63aeb1e",
+      "probability": 0.1067,
+      "days_to_eol": 22,
+      "served": false
+    },
+    {
+      "scenario": "s_41",
+      "battery": "d_7a18144dbc8c",
+      "probability": 0.1378,
+      "days_to_eol": 27,
+      "served": true
+    },
+    {
+      "scenario": "s_41",
+      "battery": "d_7fb0c50f956d",
+      "probability": 0.0913,
+      "days_to_eol": 10,
+      "served": false
+    },
+    {
+      "scenario": "s_41",
+      "battery": "d_9f1eb55e773d",
+      "probability": 0.0016,
+      "days_to_eol": 21,
+      "served": false
+    },
+    {
+      "scenario": "s_41",
+      "battery": "d_c2ff015918a9",
+      "probability": 0.1474,
+      "days_to_eol": 34,
+      "served": true
+    },
+    {
+      "scenario": "s_41",
+      "battery": "d_cfdd8b69ddd4",
+      "probability": 0.1722,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_6e78c63aeb1e",
+      "probability": 0.154,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_7a18144dbc8c",
+      "probability": 0.1249,
+      "days_to_eol": 20,
+      "served": false
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_7fb0c50f956d",
+      "probability": 0.2462,
+      "days_to_eol": 3,
+      "served": true
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_9f1eb55e773d",
+      "probability": 0.0635,
+      "days_to_eol": 14,
+      "served": false
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_acc762a9c9d3",
+      "probability": 0.1645,
+      "days_to_eol": 36,
+      "served": true
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_c2ff015918a9",
+      "probability": 0.1323,
+      "days_to_eol": 27,
+      "served": true
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_cf89420c1953",
+      "probability": 0.0263,
+      "days_to_eol": 36,
+      "served": false
+    },
+    {
+      "scenario": "s_42",
+      "battery": "d_cfdd8b69ddd4",
+      "probability": 0.1717,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_43",
+      "battery": "d_6e78c63aeb1e",
+      "probability": 0.2105,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_43",
+      "battery": "d_7a18144dbc8c",
+      "probability": 0.1763,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_43",
+      "battery": "d_9f1eb55e773d",
+      "probability": 0.0081,
+      "days_to_eol": 7,
+      "served": false
+    },
+    {
+      "scenario": "s_43",
+      "battery": "d_acc762a9c9d3",
+      "probability": 0.1791,
+      "days_to_eol": 29,
+      "served": true
+    },
+    {
+      "scenario": "s_43",
+      "battery": "d_c2ff015918a9",
+      "probability": 0.1283,
+      "days_to_eol": 20,
+      "served": true
+    },
+    {
+      "scenario": "s_43",
+      "battery": "d_cf89420c1953",
+      "probability": 0.0339,
+      "days_to_eol": 29,
+      "served": false
+    },
+    {
+      "scenario": "s_43",
+      "battery": "d_cfdd8b69ddd4",
+      "probability": 0.0857,
+      "days_to_eol": 8,
+      "served": false
+    },
+    {
+      "scenario": "s_44",
+      "battery": "d_6e78c63aeb1e",
+      "probability": 0.3277,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_44",
+      "battery": "d_7a18144dbc8c",
+      "probability": 0.0783,
+      "days_to_eol": 6,
+      "served": false
+    },
+    {
+      "scenario": "s_44",
+      "battery": "d_acc762a9c9d3",
+      "probability": 0.2826,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_44",
+      "battery": "d_c2ff015918a9",
+      "probability": 0.1885,
+      "days_to_eol": 13,
+      "served": true
+    },
+    {
+      "scenario": "s_44",
+      "battery": "d_cf89420c1953",
+      "probability": 0.2236,
+      "days_to_eol": 22,
+      "served": true
+    },
+    {
+      "scenario": "s_44",
+      "battery": "d_cfdd8b69ddd4",
+      "probability": 0.2535,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_45",
+      "battery": "d_acc762a9c9d3",
+      "probability": 0.2654,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_45",
+      "battery": "d_c2ff015918a9",
+      "probability": 0.1897,
+      "days_to_eol": 6,
+      "served": true
+    },
+    {
+      "scenario": "s_45",
+      "battery": "d_cf89420c1953",
+      "probability": 0.177,
+      "days_to_eol": 15,
+      "served": true
+    },
+    {
+      "scenario": "s_46",
+      "battery": "d_acc762a9c9d3",
+      "probability": 0.1467,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_46",
+      "battery": "d_cf89420c1953",
+      "probability": 0.1877,
+      "days_to_eol": 8,
+      "served": true
+    },
+    {
+      "scenario": "s_47",
+      "battery": "d_acc762a9c9d3",
+      "probability": 0.3465,
+      "days_to_eol": 1,
+      "served": true
+    },
+    {
+      "scenario": "s_47",
+      "battery": "d_cf89420c1953",
+      "probability": 0.3436,
+      "days_to_eol": 1,
+      "served": true
+    }
+  ]
+}
