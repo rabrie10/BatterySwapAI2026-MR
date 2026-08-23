@@ -35,6 +35,13 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
 
+# Uniform multiplier on the Task 1 CDF. After the stale-transmission veto every
+# serviced margin band clears the ~15% break-even (worst 0.273) and service runs
+# at 13.62/scenario against 12.29 due, so the marginal swap is now worth making.
+# 1.5 was the best single-axis result in the 25-configuration production sweep
+# (-151.8, served 18.36, lowest capacity penalty of any configuration tested).
+PROBABILITY_SCALE = 1.5
+
 
 def _float_env(name: str, default: float) -> float:
     return float(os.environ.get(name, default))
@@ -65,7 +72,14 @@ def load_forecaster() -> HazardForecaster | None:
         # value that produced the shipped result, so state it here explicitly.
         if hasattr(model, "volatility_scale"):
             model.volatility_scale = 1.0
-        return HazardForecaster(model)
+        # Set here rather than under tools/validate_v6.py so the scale is active
+        # on the submission path: --volatility-scale was silently a no-op in
+        # production mode once already, because validate_v6.build_forecaster
+        # applied it only in the out-of-fold branch. Not read from the
+        # environment, so it cannot depend on a variable being set at evaluation
+        # time. The veto is applied after scaling (bsai/forecaster.py:227), so
+        # vetoed batteries are not resurrected by it.
+        return HazardForecaster(model, probability_scale=PROBABILITY_SCALE)
     except Exception:
         LOGGER.exception("Could not load %s; falling back to voltage trend", path)
         return None
