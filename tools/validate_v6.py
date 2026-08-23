@@ -51,6 +51,7 @@ from bsai.rerank import (
     SumScorer,
 )
 from bsai.residual import OofResidualScorer
+from bsai.templates import TemplateScorer, build_templates
 from bsai.terminality import NearThresholdScorer
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
@@ -121,6 +122,48 @@ def _maybe_rerank(model, args):
         return RankRemapModel(
             base=model,
             scorer=OracleScorer(end_ordinal=end_ordinal, eol_ordinal=eol_ordinal),
+        )
+    if args.rerank_template > 0.0:
+        import pandas as _pd
+
+        from tools.fj_templates import crossing_index
+        from tools.fj_residual import v8_folds
+        from tools.fj_terminality import load_series
+
+        raw = load_series(Path("outputs/fj_series.npz"))
+        crossing = crossing_index(raw, args.dataset)
+        table = _pd.read_csv(args.dataset / "devices.csv")
+        ends = _pd.to_datetime(
+            table["end_time"], format="ISO8601", utc=True
+        ).dt.tz_localize(None).dt.normalize()
+        epoch = _pd.Timestamp("1970-01-01")
+        fold_of = v8_folds(args.folds)
+        held_of: dict[int, set] = {}
+        for building, fold in fold_of.items():
+            held_of.setdefault(fold, set()).add(building)
+        banks = {}
+        for fold, buildings in held_of.items():
+            allowed = {
+                d for d in crossing if _BUILDING_OF.get(d, "") not in buildings
+            }
+            banks[fold] = build_templates(
+                raw, crossing, allowed,
+                width=args.template_width, channel="voltage", mode="anchored",
+            )
+        return RankRemapModel(
+            base=model,
+            scorer=TemplateScorer(
+                series=raw,
+                end_ordinal={
+                    str(d): float((e - epoch) / _pd.Timedelta(days=1))
+                    for d, e in zip(table["device_id"], ends)
+                },
+                banks=banks,
+                fold_of=fold_of,
+                building_of=_BUILDING_OF,
+                width=args.template_width,
+                weight=args.rerank_template,
+            ),
         )
     if args.rerank_nearthreshold > 0.0:
         import pandas as _pd
@@ -251,6 +294,10 @@ def main() -> None:
              "order-only remap; 0 is the incumbent exactly, 1 is the "
              "equal-weight rank average",
     )
+    parser.add_argument("--rerank-template", type=float, default=0.0,
+                        help="weight on the EOL-aligned template lead time inside "
+                             "the 0-0.10 V band, reordering only within margin bins")
+    parser.add_argument("--template-width", type=int, default=60)
     parser.add_argument("--rerank-nearthreshold", type=float, default=0.0,
                         help="weight on the 30/180 trajectory-volatility ratio "
                              "inside the 0-0.10 V band, reordering only within "

@@ -41,3 +41,7 @@ outputs/fj_terminality.npz
 outputs/fj_nt_smoke.json
 outputs/fj_v10sweep_*.log
 outputs/fj_increments*.log
+outputs/fj_templates.log
+outputs/fj_tmpl_smoke.json
+outputs/fj_tmpl_det.log
+outputs/fj_template_scores.npz
