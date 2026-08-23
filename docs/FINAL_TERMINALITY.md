@@ -197,7 +197,8 @@ move the plan.**
 ## 6. Verdict
 
 ```
-The misspecification is real. The observable that resolves it is narrow.
+The misspecification is real. The observable that resolves it is narrow, and it
+is not a state variable of the process either (section 7).
 ```
 
 `m -> 0 implies P -> 1` is a genuine defect, and at matched margin V8 really does
@@ -211,3 +212,101 @@ What this does *not* say is that Task 1 is closed. It says the second structural
 attempt has also failed, on a specific and measured mechanism, and that anything
 further has to separate batteries at **different** margins, which is where V8's
 remaining ordering error actually lives.
+
+---
+
+## 7. The dynamic-Wiener gate: does the ratio predict the *increments*?
+
+The natural follow-up, and the right one: rather than spending the volatility
+ratio as an external reranker, put it inside the process. V8's whole advantage
+over every classifier this project has tried is sample efficiency -- drift and
+scatter are learned from hundreds of thousands of observed voltage windows
+rather than from 82 EOL events -- so if `std_ratio_30_180` is real health-state
+information it should appear in the quantity those regressors actually predict.
+And `docs/task1_investigation_findings.md` measures within-device 42-day
+volatility at about 0.041 V against roughly 0.021 V of drift: **crossing is a
+noise-driven event**, so sigma dominates the passage formula and the scatter
+model is precisely where a dynamics signal would pay.
+
+The gate, before building any variant: does adding one column to the increment
+design improve out-of-building prediction of
+
+    drop(h) = margin(t) - margin(t + h)      and      |drop - E[drop]|
+
+`tools/fj_increments.py`, stride 8 / max_iter 150 (the `transfer_stress.py`
+fidelity convention), 5 building folds, base against base-plus-one-column on
+identical rows.
+
+### It fails, on both targets
+
+**V8's own target** (windows must end before the crossing), 273,682 windows:
+
+| target | mean relative MAE gain | folds improved | per fold |
+|---|---:|---:|---|
+| drift | +0.55 % | 4/5 | −0.33 / **+2.40** / +0.19 / +0.14 / +0.35 |
+| scatter | +0.57 % | 3/5 | −0.40 / **+2.50** / +0.38 / −0.10 / +0.47 |
+
+A mean carried entirely by one fold, with the other four inside ±0.5 %.
+
+**And that much is an artefact of survivor conditioning.** V8's target excludes
+any window that ends past the crossing, so near the barrier the training
+population is *the batteries that did not cross* -- exactly the censoring V10
+identified ("excluding those windows censors the steepest observed drops...
+biases the drift shallow at the knee"). Asking about near-barrier dynamics on
+that population conditions on survival. Repeating the gate with V10's
+censor-aware target (`--censor-aware`, 275,951 windows):
+
+| target | mean relative MAE gain | folds improved | per fold |
+|---|---:|---:|---|
+| drift | **+0.05 %** | **1/5** | −0.50 / +1.20 / −0.34 / −0.01 / −0.08 |
+| scatter | **−0.05 %** | 3/5 | −0.77 / +0.59 / +0.10 / +0.16 / −0.31 |
+
+Once the conditioning is removed the gain evaporates. By margin band the sign is
+the wrong way round for the hypothesis -- the ratio *hurts* drift prediction
+exactly where the decision is:
+
+| margin band | mean drift-MAE gain | folds improved |
+|---|---:|---:|
+| 0.00 - 0.05 V | **−7.5e-4** | 3/5 |
+| 0.05 - 0.10 V | **−1.2e-3** | 3/5 |
+| 0.10 - 0.20 V | +2.7e-4 | 3/5 |
+| 0.20 V and above | +2.7e-5 | 1/5 |
+
+### What the ratio actually is, empirically
+
+Realised 42-day behaviour by volatility-ratio quintile, censor-free windows:
+
+| margin band | n | mean drop, q1 -> q5 | sd of drop, q1 -> q5 |
+|---|---:|---|---|
+| 0.20 V and above | 32,641 | +0.0071 -> **+0.0277** | 0.039 -> 0.052 |
+| 0.10 - 0.20 V | 1,382 | −0.0120 -> +0.0205 | 0.105 -> 0.103 |
+| **0.00 - 0.10 V** | **396** | −0.012 / −0.034 / +0.003 / −0.015 / −0.012 | no order |
+
+In the healthy population the relationship is strong, monotone and physically
+sensible: the top volatility quintile falls about four times as fast as the
+bottom. **Near the barrier there is no relationship at all.** And in the healthy
+population the drift regressor already sees it -- `v_std_30`, `v_std_rise` and
+seven slope windows are in the design -- which is why the explicit column buys
++0.05 %.
+
+### Verdict
+
+```
+GATE FAILED. No dynamic-Wiener variant built, no planner run spent.
+```
+
+The pre-registered rule was "if the new feature does not improve the increment
+model out of fold, stop before planner experimentation". It does not.
+
+This resolves the apparent tension in §4-5 rather than deepening it. The ratio
+separates EOL cases from matched-margin survivors in 5 of 5 building folds --
+that is a statement about the *tail*, whether a path touches the barrier. It does
+not improve prediction of the *central* dynamics, drift or dispersion, near the
+barrier. Both can be true, and together they say the ratio is not a state
+variable of the process there; it is a weak correlate of crossing that the
+process representation cannot absorb.
+
+Independently, `docs/task1_investigation_findings.md` reaches the same place from
+twelve other channels: *voltage is the integral of everything that has happened
+to the cell, and by the time it matters for a 42-day forecast the state is
+effectively one-dimensional.*

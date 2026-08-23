@@ -711,3 +711,49 @@ near 1967 for V8 + V10-planner, and the components listed in that table
 the form "2078.28 − something" as an inference from a two-change A/B, not a
 measured row.** What is measured is the local paired delta above, and that only
 the deterministic half is being shipped.
+
+---
+
+## 13. Provenance of the 1985.43 row: not established
+
+A public row of **1985.43**, attributed to V8 Task 1 plus a V10 planner, was
+raised as evidence that should outrank the local measurement in §12. It was
+searched for and **cannot be sourced**. Recorded here so the next session does
+not repeat the search.
+
+**Where it is not.** Every commit message on every local and remote branch; every
+tracked file on every branch (`git grep` across all refs); the working trees and
+untracked outputs of all six worktrees; `git reflog --all`; dangling objects via
+`git fsck --lost-found`; and a full-text search of every other session
+transcript on this machine, archived included.
+
+**The one hit** is in the `π-hybrid isolation` session at 2026-08-23T12:32, and
+it is the same feedback text quoted verbatim -- "2078.28 -> 1985.43 ... Claude
+has now independently reproduced the V10 mechanics locally: 2126.53" -- pasted
+into that session too. It restates the claim; it does not corroborate it.
+
+**What the repository does record**, as our own public rows: v3 4252.33, V6
+2915.68, V7 2167.11, **V8 2078.28**, V10 2179.06, V19 2113.43, V9 2137.22.
+No 1985.43, and no submission whose Task 1 is V8 and whose planner is V10's.
+
+**Two nearby numbers that could be the source, offered as hypotheses only.**
+
+* `1986.7` is **V10's local out-of-fold mean**, from V10's own commit message
+  ("2145.1 -> 1997.5 / 1986.7 on two runs") and used again as the reference
+  total in `docs/task1_investigation_findings.md`. It is a local number, not a
+  leaderboard row, and V10's *public* row was 2179.06.
+* `1899.53` appears in `docs/SOLUTION_DESIGN_SPEC.md` but is a **competitor's**
+  rank-1 score from a 2026-08-18 leaderboard snapshot, in a table where our own
+  V7 sits at rank 4 with 2167.11.
+
+**Consequence for the decision.** Nothing was overwritten: §12 ships only
+`robust_emergency_samples = 0` and leaves the search budget where V8 had it, so
+if a stronger V10-planner configuration really did score 1985.43, this branch
+does not preclude reproducing it -- the knobs are all still env-controllable
+(`BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS`, `BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS`,
+`BATTERYSWAP_SOLVER_SECONDS`). But it also cannot be treated as evidence,
+because it cannot be traced to an artifact, a commit or a configuration.
+
+**If the row is real, one thing would settle it**: the leaderboard entry's
+timestamp against `git log --all --date=iso`, plus whichever `submission.csv`
+was uploaded. Neither exists in the repository.
