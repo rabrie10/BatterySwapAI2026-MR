@@ -175,6 +175,7 @@ result exactly (−35.30, t −3.02, 31 W / 10 L) before being pointed at anythi
 | | V8 | **TCN order-only** | Δ | paired t | W/L | median Δ | 10 % trimmed | sign test |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | **shipped planner** (robust 4, 80/35) | 2126.53 | **2055.58** | **−70.96** | −1.23 | 31/17 | **−91.16** | −91.18 | p = 0.059 |
+| _same, folds **averaged** as the container runs them_ | 2126.53 | **1967.10** | **−159.43** | **−3.21** | 31/17 | −105.22 | −161.27 | p = 0.0595 |
 | deterministic emergency (robust 0) | 2091.23 | **2038.94** | **−52.29** | −0.94 | 27/21 | −59.51 | −62.57 | p = 0.47 |
 
 The median and trimmed mean are both *stronger* than the mean on both planners:
@@ -224,7 +225,9 @@ window, and **the concordance metric predicts the split exactly**:
 | all | 9,810 | 0.7359 | 0.7802 | +0.0443 | −71.0 | 31/48 |
 
 Two thirds of the scenarios get **+0.09 of cross-margin concordance** and give
-back 120–315 points of cost. In the last third V8 is already at its best (0.7957)
+back 120–315 points of cost. (Under the fold-averaged ensemble the container
+actually runs, the third tercile stops being neutral: concordance +0.0231 and
+cost +2.5. See `docs/SUBMISSION_TCN.md` §8.) In the last third V8 is already at its best (0.7957)
 and the blend is exactly neutral — and a *concordance-neutral* reorder still
 costs +224, because those are the opening scenarios where the substitute end of
 life is far away and a wasted swap is worth roughly 182. Precision there moves

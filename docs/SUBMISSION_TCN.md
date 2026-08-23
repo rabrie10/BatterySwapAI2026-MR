@@ -32,20 +32,52 @@ commit. **It is not used here.** Measured through this entry point:
 The combination that scores best locally is the one that does not fit. Runtime
 headroom decides it.
 
+**Those are `validate_v6` numbers, and `validate_v6` understates the shipping
+path.** Measured end to end through `script.py` itself, which is the only figure
+that governs:
+
+| | 48 train scenarios | projected for 96 |
+|---|---:|---:|
+| wall clock | **759.2 s (12.65 min)** | **25.3 min** |
+| planner elapsed | 753 s | — |
+| scenarios degraded / deferred | **0 / 0** | — |
+| peak RSS | **1.76 GB** | — |
+
+**25.3 minutes against a 30-minute cap is 4.7 minutes of headroom, and it is just
+past `bsai/runtime.py`'s 25-minute soft deadline.** On a 96-scenario run the
+governor would therefore switch to the cheap search for roughly the final
+minute — a handful of scenarios — rather than degrading nothing. It stays
+comfortably inside the 27.5-minute hard deadline, so nothing gets deferred
+wholesale. This is the candidate's main residual risk and it is **not** fixed by
+re-deriving the deadlines here; raising them is a judgement call for whoever
+submits.
+
 ## 2. What the ordering is worth
 
 Out of fold by building, 48 train scenarios, order-only:
 
-| | V8 | candidate | Δ |
+| | V8 | **candidate (as shipped)** | Δ |
 |---|---:|---:|---:|
-| mean total cost | 2126.53 | **2055.58** | **−70.96** |
-| median scenario | — | — | **−91.16** |
-| paired t / wins | — | — | −1.23, 31 W / 17 L |
-| early swap | 764.18 | 743.48 | −20.70 |
-| late swap | 1045.83 | 984.79 | −61.04 |
-| precision | 0.313 | **0.329** | +0.017 |
-| recall | 0.577 | **0.606** | +0.029 |
-| swaps / scenario | 17.458 | 17.396 | −0.062 |
+| mean total cost | 2126.53 | **1967.10** | **−159.43** |
+| median scenario | — | — | −105.22 |
+| 10 % trimmed mean | — | — | **−161.27** |
+| paired t / wins | — | — | **−3.21**, 31 W / 17 L |
+| sign test | — | — | p = 0.0595 |
+| blocks of 8 improved | — | — | **5 / 6** |
+| early swap | 764.18 | 729.30 | **−34.88** |
+| late swap | 1045.83 | 921.88 | **−123.96** |
+| precision | 0.313 | **0.338** | +0.025 |
+| recall | 0.577 | **0.623** | +0.046 |
+| swaps / scenario | 17.458 | 17.438 | −0.021 |
+| wasted swaps / scenario | 12.000 | 11.542 | −0.458 |
+
+**These are the *ensemble* numbers, which is what the container runs.**
+`docs/FINAL_TCN_REPRESENTATION.md` reports 2055.58 / −70.96 / t −1.23 for the
+same model scored by *fold routing* — a configuration that cannot exist at
+inference, because a test building belongs to no fold. Averaging the folds is
+both what ships and, measured, substantially better. The routed figure is kept
+there as the record of the gate that was run; this one is the record of the
+candidate.
 
 Ranking quality, on the standard landmark population:
 
@@ -144,11 +176,24 @@ transcript rather than inferred from the score.
 
 * The planner delta is favourable in mean, median and trimmed mean but **is not
   statistically significant** (t = −1.23; sign test p = 0.059).
-* It is **not uniform across scenarios**. Split by the scenario's mean
-  remaining-observation window: concordance +0.0917 / +0.0925 / **−0.0002** and
-  planner −122 / −315 / **+224** across the low, mid and high terciles. One third
-  of scenarios is made worse. Gating the blend weight on that axis is the
-  obvious next move and is deliberately **not** fitted here.
+* The **planner delta is now significant** (t = −3.21, 5 of 6 non-overlapping
+  blocks improved), though the sign test is p = 0.0595 — the gain is carried by
+  the size of the wins rather than their count.
+* **The regime split that looked alarming under fold routing is gone under the
+  ensemble.** By scenario mean remaining window, the shipped configuration reads
+  concordance +0.0700 / +0.1051 / **+0.0231** and planner −89.1 / −391.7 /
+  **+2.5** across the low, mid and high terciles — all three improve on
+  concordance and the high tercile is cost-neutral rather than +224. A
+  remaining-axis gate was therefore selected on held-out concordance and
+  **abandoned**: the two temporal halves disagreed on the threshold (200 against
+  ungated) and ungated scored best at every setting
+  (`tools/fj_gate_select.py`, `outputs/fj_gate_select.json`).
 * Local rank has been a poor guide to public transfer three times on this project
   (V9, V10, V19). This candidate is offered as the next public measurement, not
   as a proven improvement.
+* **Runtime headroom is the real constraint.** 759 s for 48 train scenarios on an
+  idle machine (25.3 min projected for 96) and 825 s when another job was running
+  (27.5 min). Against a 30-minute cap that is 8-16 % headroom. The public and
+  private splits may not cost what train costs; if they are slower the governor
+  protects the cap by degrading the tail, at some cost in quality. `validate_v6`
+  projects 19.7 min for this configuration and is not the figure to trust.

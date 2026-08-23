@@ -168,7 +168,7 @@ def _maybe_sequence(model) -> HazardForecaster:
     if not path.exists():
         LOGGER.error(
             "sequence artifact missing at %s; shipping plain V8 ordering, which "
-            "measured 2126.53 against the remap's 2055.58 out of fold", path)
+            "measured 2126.53 against the remap's 1967.10 out of fold", path)
         return HazardForecaster(model)
     try:
         from bsai.sequence import build_forecaster
@@ -202,9 +202,11 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         # remap: measured through this entry point the two combine to 16.48
         # s/scenario, projecting 28.6 minutes for the official 96 against a
         # 30-minute cap and past bsai/runtime.py's 27.5-minute hard deadline.
-        # The remap plus this planner measured 12.40 s/scenario, 22.1 minutes
-        # projected, and 2126.53 -> 2055.58 out of fold by building. Runtime
-        # headroom decides this one; see docs/SUBMISSION_TCN.md section 4.
+        # The remap plus this planner measured 2126.53 -> 1967.10 out of fold by
+        # building (t = -3.21, 5 of 6 blocks), and 759 s for the 48 train
+        # scenarios end to end through this file -- 25.3 minutes projected for 96
+        # against a 30-minute cap, with 0 scenarios degraded and 1.76 GB peak.
+        # Runtime headroom decides this one; see docs/SUBMISSION_TCN.md 1 and 8.
         robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 4),
         candidate_margin_hours=_float_env("BATTERYSWAP_CANDIDATE_MARGIN", 12.0),
         optimizer=OptimizationConfig(solver_seconds=solver_seconds),
