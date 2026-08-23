@@ -58,7 +58,14 @@ def load_forecaster() -> HazardForecaster | None:
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)
         return None
     try:
-        return HazardForecaster(joblib.load(path))
+        model = joblib.load(path)
+        # Pin the volatility scale rather than inheriting whatever the artifact
+        # happens to carry. train_wiener.py selects 1.4 and writes it onto the
+        # model it dumps, while the shipped artifact carries 1.0; 1.0 is the
+        # value that produced the shipped result, so state it here explicitly.
+        if hasattr(model, "volatility_scale"):
+            model.volatility_scale = 1.0
+        return HazardForecaster(model)
     except Exception:
         LOGGER.exception("Could not load %s; falling back to voltage trend", path)
         return None
