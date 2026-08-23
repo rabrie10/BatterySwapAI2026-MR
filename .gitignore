@@ -36,3 +36,7 @@ outputs/fj_candA_smoke.json
 outputs/fj_lab.json
 outputs/fj_signals.json
 outputs/fj_v10probe.json
+outputs/fj_series.npz
+outputs/fj_terminality.npz
+outputs/fj_nt_smoke.json
+outputs/fj_v10sweep_*.log

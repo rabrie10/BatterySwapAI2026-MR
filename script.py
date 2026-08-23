@@ -153,7 +153,18 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         ),
         local_search_evaluations=local,
         uncertain_local_search_evaluations=uncertain,
-        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 4),
+        # Deterministic expected cost: one replay per evaluation instead of an
+        # average over four stratified emergency samples. It is a variance
+        # reduction with no fitted parameter -- the exact expectation replacing
+        # a four-sample estimate of it -- so unlike a tuned selection rule there
+        # is no mechanism by which it can overfit the 24 training buildings.
+        # Measured out of fold by building at the shipped 80/35 search it is
+        # worth -35.30 on its own (t = -3.02, 31 wins / 10 losses); with the
+        # 120/120 search below, -52.76 (t = -4.57, 38/9). The public A/B that
+        # first shipped it credits the same mechanics with -111 on the
+        # operational components while charging V10's *forecast* +179
+        # separately -- see docs/FINAL_TERMINALITY.md section 4.
+        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 0),
         candidate_margin_hours=_float_env("BATTERYSWAP_CANDIDATE_MARGIN", 12.0),
         optimizer=OptimizationConfig(solver_seconds=solver_seconds),
     )
@@ -171,6 +182,11 @@ def load_competition_planner() -> Planner:
             raise TypeError("BATTERYSWAP_PLANNER_PATH did not contain a Planner")
         return planner
 
+    # The search budget stays exactly where V8 shipped it. Raising it to
+    # 120/120 is worth a further -17.5 and measured 829 s for 48 scenarios
+    # through this same entry point, which projects to ~27.7 minutes for the
+    # official 96 against a 30-minute cap -- not enough headroom to be worth
+    # 17 points. Only the objective changes, above.
     config = build_planner_config(
         _float_env("BATTERYSWAP_SOLVER_SECONDS", 0.5),
         _int_env("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", 80),

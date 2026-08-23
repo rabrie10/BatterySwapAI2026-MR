@@ -6,6 +6,9 @@ code runs at all, and the previous solution's profile projected to 25.8-27.6
 minutes for 96 scenarios. That is not enough headroom -- if either split holds
 more devices than train's 461, the run overruns and scores nothing.
 
+The deadlines below are re-derived whenever the planner configuration changes,
+because a governor tuned for a 15-minute run will shred a 22-minute one.
+
 So the planner degrades on a clock rather than betting that it will fit:
 past the soft deadline it drops to a cheap search, and past the hard deadline it
 returns the all-defer plan, which is always valid and always cheap to produce.
@@ -24,8 +27,24 @@ from batteryswap_public.interfaces import Planner
 
 LOGGER = logging.getLogger(__name__)
 
-SOFT_DEADLINE_SECONDS = 17 * 60
-HARD_DEADLINE_SECONDS = 25 * 60
+# Both derived from a measurement of the actual entry point, not guessed. On the
+# shipped configuration `BATTERYSWAP_SPLITS=train python script.py` plans all 48
+# train scenarios in **673 s** with nothing degraded or deferred, so the official
+# 96 project to about **22.5 minutes** against the 30-minute cap.
+#
+# The soft deadline is therefore set above the expected total rather than below
+# it: at 17 minutes it would have fired around scenario 72 of 96 on a *healthy*
+# run and degraded a quarter of the submission for nothing. 25 minutes fires
+# only if the run is more than 11 % over expectation -- which is the case it
+# exists for, an evaluation machine slower than this one or a split with more
+# than train's 461 devices. On a machine 30 % slower the governor takes over at
+# roughly 82 % complete and the remainder finishes at the cheap search in a
+# minute or two.
+#
+# The hard deadline leaves 2.5 minutes for the all-defer tail, which needs no
+# planning at all, so it cannot itself cause an overrun.
+SOFT_DEADLINE_SECONDS = 25 * 60
+HARD_DEADLINE_SECONDS = 27 * 60 + 30
 
 
 class BudgetedPlanner(Planner):

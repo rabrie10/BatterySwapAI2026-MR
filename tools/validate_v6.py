@@ -51,6 +51,7 @@ from bsai.rerank import (
     SumScorer,
 )
 from bsai.residual import OofResidualScorer
+from bsai.terminality import NearThresholdScorer
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
 
@@ -120,6 +121,28 @@ def _maybe_rerank(model, args):
         return RankRemapModel(
             base=model,
             scorer=OracleScorer(end_ordinal=end_ordinal, eol_ordinal=eol_ordinal),
+        )
+    if args.rerank_nearthreshold > 0.0:
+        import pandas as _pd
+
+        from tools.fj_terminality import load_series
+
+        raw = load_series(Path("outputs/fj_series.npz"))
+        devices = _pd.read_csv(args.dataset / "devices.csv")
+        ends = _pd.to_datetime(
+            devices["end_time"], format="ISO8601", utc=True
+        ).dt.tz_localize(None).dt.normalize()
+        epoch = _pd.Timestamp("1970-01-01")
+        return RankRemapModel(
+            base=model,
+            scorer=NearThresholdScorer(
+                series={d: (v, o) for d, (v, _t, o) in raw.items()},
+                end_ordinal={
+                    str(d): float((e - epoch) / _pd.Timedelta(days=1))
+                    for d, e in zip(devices["device_id"], ends)
+                },
+                weight=args.rerank_nearthreshold,
+            ),
         )
     if args.rerank_residual is not None:
         bundle = joblib.load(args.rerank_residual)
@@ -228,6 +251,10 @@ def main() -> None:
              "order-only remap; 0 is the incumbent exactly, 1 is the "
              "equal-weight rank average",
     )
+    parser.add_argument("--rerank-nearthreshold", type=float, default=0.0,
+                        help="weight on the 30/180 trajectory-volatility ratio "
+                             "inside the 0-0.10 V band, reordering only within "
+                             "0.01 V margin bins")
     parser.add_argument("--rerank-residual", type=Path, default=None,
                         help="a fitted bsai.residual scorer bundle; its score "
                              "reorders V8's curves and nothing else")

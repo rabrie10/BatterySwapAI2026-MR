@@ -650,3 +650,64 @@ margins re-derived first, and this branch does not enable it.
 concordance 0.5567 against V8's 0.6152 -- the conclusion is not about model class
 or loss function. At 454 positives from about 82 devices, the within-scenario
 ordering at V8's decision boundary is not learnable.
+
+---
+
+## 12. The V10 planner mechanics, made submission-safe
+
+The one improvement on this branch with public evidence behind it, and the only
+change to what ships besides the V8 restore. Full derivation in
+[`docs/FINAL_TERMINALITY.md`](FINAL_TERMINALITY.md) §4-5; the decomposition:
+
+| configuration | total | Δ vs V8 | paired t | W/L | s/scen | worst scenario | projected 96 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **V8 shipped** (robust 4, 80/35, solver 0.5) | **2126.53** | — | — | — | 9.57 | 16.0 s | 17.6 min |
+| **deterministic only** (robust **0**, 80/35, solver 0.5) | **2091.23** | **−35.30** | **−3.02** | 31/10 | 12.23 | 23.9 s | 21.8 min |
+| deterministic + 120/120, solver 1.0 | 2073.77 | −52.76 | −4.57 | 38/9 | 14.13 | 20.9 s | 24.9 min |
+| deterministic + 120/120, solver 0.5 | 2077.80 | −48.73 | −3.52 | 35/10 | 15.45 | 25.4 s | 27.0 min |
+| deterministic + 160/160, solver 1.0 | 2067.92 | −58.61 | −4.83 | 39/8 | 15.54 | 27.7 s | 27.1 min |
+| V10 as submitted (robust 0, 240/240, solver 1.0) | 2070.28 | −56.25 | −4.47 | 39/8 | 15.11 | 26.8 s | 26.4 min |
+
+**What ships: `robust_emergency_samples = 0` and nothing else.** The search
+budget stays exactly where V8 had it.
+
+* **Why this piece.** It replaces a four-sample stratified Monte-Carlo estimate
+  of the emergency cost with its exact expectation -- one replay per evaluation
+  instead of five. It has **no fitted parameter**, so unlike a tuned selection
+  rule there is no mechanism by which it can overfit the 24 training buildings;
+  `docs/PIHYBRID_HANDOFF.md`'s warning that planner-config changes have no
+  trustworthy train instrument for transfer applies to fitted rules, not to a
+  variance reduction. Selection barely moves (precision 0.313 -> 0.313, recall
+  0.577 -> 0.581); the gain is operational.
+* **Why not the search budget too.** 120/120 is worth a further −17.5, and
+  measured through the real entry point it takes **829 s for 48 scenarios**,
+  projecting to **~27.7 minutes for 96** against a 30-minute cap. Seventeen
+  points is not worth 2.3 minutes of headroom. `validate_v6`'s own projection
+  (24.9 min) understates the shipped path by about 20 % here, which is why the
+  decision was made on `script.py` and not on the harness.
+* **Measured, shipped configuration:** `BATTERYSWAP_SPLITS=train python
+  script.py` plans 48 scenarios in **673 s**, `planned=48 degraded=0
+  deferred=0`, projecting **~22.5 minutes for 96** -- 7.5 minutes of headroom.
+
+**The governor is re-derived, not raised to the cap.** `bsai/runtime.py`'s soft
+deadline was 17 minutes, set for a 15-minute run; on a 22.5-minute run it would
+have fired around scenario 72 of 96 and degraded a quarter of a *healthy*
+submission. It is now **25 minutes** soft and **27.5 minutes** hard: the soft
+deadline fires only if the run is more than 11 % over expectation, which is the
+case it exists for, and on a machine 30 % slower than this one it takes over at
+roughly 82 % complete with the cheap search needing a minute or two for the
+rest. The hard deadline leaves 2.5 minutes for the all-defer tail, which needs
+no planning and so cannot itself overrun.
+
+### An honesty note on the public arithmetic
+
+**V8 + the V10 planner has never been submitted.** The −111 attributed to the
+mechanics comes from `docs/V11_TRANSFER_FINDINGS.md`'s decomposition of V10's
+row, where the forecast and the planner changed *together*: V10 scored 2179.06,
+credited as −111 operational and +179 forecast. Subtracting gives an estimate
+near 1967 for V8 + V10-planner, and the components listed in that table
+(travel −7.8, overtime −18.8, daily −41.7, weekly −8.3) sum to −76.6 rather than
+−111, so even the decomposition is not internally tight. **Treat any figure of
+the form "2078.28 − something" as an inference from a two-change A/B, not a
+measured row.** What is measured is the local paired delta above, and that only
+the deterministic half is being shipped.

@@ -223,6 +223,14 @@ prunes, it does not decide.
 REJECTED -- all three objectives. V8's ordering stands, and nothing is enabled.
 ```
 
+> **Correction, same day.** The closing sentence of this document read "Task 1 is
+> closed". That is too strong and is withdrawn. What these three objectives close
+> is *supervised reranking of V8 using the currently engineered 64-feature state*.
+> The oracle control proves a far better ordering exists, so the question is
+> whether a *different observable* predicts it -- which is a representation
+> question, not a loss question. `docs/FINAL_TERMINALITY.md` tests the strongest
+> such candidate and also fails, but on a specific and different mechanism.
+
 The 42-day decision framing was the strongest remaining argument for a learned
 residual: correct censoring-aware labels, evaluator-derived utilities, hard
 examples at the incumbent's own boundary, eight parameters, and an order-only
