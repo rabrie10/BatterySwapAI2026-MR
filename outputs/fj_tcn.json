@@ -1,0 +1,106 @@
+{
+ "horizon": {
+  "7d": {
+   "n": 15203,
+   "devices": 449,
+   "persistence_mae": 0.01853,
+   "v8_mae": 0.01813,
+   "tcn_mae": 0.01661,
+   "v8_medae": 0.00983,
+   "tcn_medae": 0.00752,
+   "v8_pinball": 0.00527,
+   "tcn_pinball": 0.00453,
+   "tcn_q10_q90_coverage": 0.7756
+  },
+  "14d": {
+   "n": 14844,
+   "devices": 449,
+   "persistence_mae": 0.02831,
+   "v8_mae": 0.02477,
+   "tcn_mae": 0.02353,
+   "v8_medae": 0.01314,
+   "tcn_medae": 0.01105,
+   "v8_pinball": 0.00704,
+   "tcn_pinball": 0.00645,
+   "tcn_q10_q90_coverage": 0.7631
+  },
+  "21d": {
+   "n": 14480,
+   "devices": 449,
+   "persistence_mae": 0.03735,
+   "v8_mae": 0.03102,
+   "tcn_mae": 0.02997,
+   "v8_medae": 0.0165,
+   "tcn_medae": 0.01426,
+   "v8_pinball": 0.00871,
+   "tcn_pinball": 0.00802,
+   "tcn_q10_q90_coverage": 0.7501
+  },
+  "28d": {
+   "n": 14118,
+   "devices": 449,
+   "persistence_mae": 0.04616,
+   "v8_mae": 0.03687,
+   "tcn_mae": 0.03588,
+   "v8_medae": 0.01977,
+   "tcn_medae": 0.01689,
+   "v8_pinball": 0.01035,
+   "tcn_pinball": 0.00952,
+   "tcn_q10_q90_coverage": 0.7416
+  },
+  "42d": {
+   "n": 13374,
+   "devices": 446,
+   "persistence_mae": 0.06048,
+   "v8_mae": 0.04652,
+   "tcn_mae": 0.04537,
+   "v8_medae": 0.02794,
+   "tcn_medae": 0.02283,
+   "v8_pinball": 0.01351,
+   "tcn_pinball": 0.01228,
+   "tcn_q10_q90_coverage": 0.7345
+  }
+ },
+ "band": {
+  "0-0.03": {
+   "n": 81,
+   "devices": 43,
+   "persistence_mae": 0.05274,
+   "v8_mae": 0.04535,
+   "tcn_mae": 0.04336,
+   "delta": -0.00198
+  },
+  "0.03-0.05": {
+   "n": 121,
+   "devices": 50,
+   "persistence_mae": 0.05697,
+   "v8_mae": 0.05161,
+   "tcn_mae": 0.04364,
+   "delta": -0.00797
+  },
+  "0.05-0.10": {
+   "n": 447,
+   "devices": 108,
+   "persistence_mae": 0.06841,
+   "v8_mae": 0.05686,
+   "tcn_mae": 0.04806,
+   "delta": -0.0088
+  },
+  "0.10-0.20": {
+   "n": 1414,
+   "devices": 179,
+   "persistence_mae": 0.07989,
+   "v8_mae": 0.06285,
+   "tcn_mae": 0.06112,
+   "delta": -0.00173
+  },
+  ">0.20": {
+   "n": 11311,
+   "devices": 422,
+   "persistence_mae": 0.06304,
+   "v8_mae": 0.04488,
+   "tcn_mae": 0.04492,
+   "delta": 4e-05
+  }
+ }
+}

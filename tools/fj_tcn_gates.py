@@ -355,3 +355,157 @@ def gate2(args) -> None:
     path = args.report.with_name("fj_tcn_gate2.json")
     path.write_text(json.dumps(results, indent=1))
     print(f"\nwrote {path} ({time.time() - started:.0f}s)")
+
+
+def verify(args) -> None:
+    """The two ways a gate-2 pass could still be false, priced.
+
+    Stage 1 of this branch produced a +0.0347 cross-margin gain with a bootstrap
+    interval excluding zero and a 66.8 % reversal accuracy, and one battery was
+    57 % of it. So an aggregate is not evidence here; the questions are whether
+    the routing is honest and whether the gain is spread over devices.
+
+    1. **Routing.** The TCN's fold index comes from `fold_of_device` and V8's
+       from `v8_folds`; both derive from the same bundle but by different paths.
+       If they disagreed for even one building, that building would be scored by
+       a model that trained on it. Asserted device by device.
+    2. **Concentration.** The cumulative device jackknife from Stage 1, on the
+       winning arm.
+    """
+    started = time.time()
+    ctx = context(args)
+    frame, fold, base, margin = ctx["frame"], ctx["fold"], ctx["base"], ctx["margin"]
+    lab = ctx["lab"]
+
+    from tools.fj_tcn import fold_of_device
+
+    print("1. routing: no row may be scored by a model that trained on its device")
+    tcn_fold = fold_of_device(args.folds)
+    mismatch = [str(b) for b in np.unique(frame.battery)
+                if tcn_fold.get(str(b), -1) != fold[frame.battery == str(b)][0]]
+    print(f"   devices whose TCN fold differs from their V8 fold: {len(mismatch)}")
+    if mismatch:
+        raise AssertionError(f"fold routing disagrees for {len(mismatch)} devices")
+    per_fold = {int(g): sorted({str(d) for d in frame.battery[fold == g]})
+                for g in sorted(set(fold.tolist()))}
+    for group, members in per_fold.items():
+        others = set().union(*(set(v) for k, v in per_fold.items() if k != group))
+        overlap = set(members) & others
+        if overlap:
+            raise AssertionError(f"fold {group} shares {len(overlap)} devices")
+    print(f"   {len(per_fold)} folds, "
+          + ", ".join(f"f{g} {len(m)}" for g, m in per_fold.items())
+          + " devices, pairwise disjoint")
+
+    cache = np.load(args.report.with_suffix(".npz"))
+    tcn, position = cache["tcn"].astype(float), cache["position"]
+    scored = (position >= 0) & np.isfinite(tcn[:, 0, 0])
+    column = HORIZONS.index(42)
+    probability = np.zeros(frame.scenario.size)
+    rows = np.flatnonzero(scored)
+    probability[rows] = _probability_from_quantiles(tcn[rows, column], -margin[rows])
+    standalone = logit(base).copy()
+    standalone[scored] = logit(np.clip(probability, 1e-9, 1 - 1e-9))[scored]
+
+    from tools.fj_fit import standardise_within
+
+    score = (standardise_within(frame.scenario, logit(base))
+             + standardise_within(frame.scenario, standalone))
+
+    reference = lab.report(base, fold)
+    table = lab.report(score, fold)
+    print("\n2. per fold, cross-margin (both rows held out)")
+    print(f"   {'fold':>6} {'V8':>8} {'blend':>8} {'delta':>8}")
+    folds = {}
+    for group in range(5):
+        old, new = reference[f"x{group}"], table[f"x{group}"]
+        folds[f"f{group}"] = {"v8": old, "blend": new, "delta": round(new - old, 4)}
+        print(f"   {group:>6} {old:>8.4f} {new:>8.4f} {new - old:>+8.4f}")
+
+    print("\n3. cumulative device jackknife on the cross-margin gain")
+    keep = lab.split["cross"]
+    positive, negative = lab.positive[keep], lab.negative[keep]
+    new = np.sign(score[positive] - score[negative])
+    old = np.sign(base[positive] - base[negative])
+    moved = np.flatnonzero(new != old)
+    gain = (new[moved] > 0).astype(float) - (old[moved] > 0).astype(float)
+    net: dict[str, float] = {}
+    for device, value in zip(frame.battery[positive[moved]], gain):
+        net[device] = net.get(device, 0.0) + float(value)
+    ordered = sorted(net.items(), key=lambda kv: -kv[1])
+    total = sum(net.values())
+    helped = sum(1 for v in net.values() if v > 0)
+    print(f"   {int(moved.size)} moved pairs, net {total:+.0f}, over {len(net)} due "
+          f"devices ({helped} helped, {sum(1 for v in net.values() if v < 0)} hurt)")
+    print(f"   top 5 carry {sum(v for _, v in ordered[:5]) / total:.1%} of the net")
+    steps = {}
+    for drop in (1, 2, 3, 5, 8, 12):
+        banned = {d for d, _ in ordered[:drop]}
+        mask = keep.copy()
+        mask[keep] = ~np.isin(frame.battery[positive], list(banned))
+        value = _delta(lab, score, base, mask)
+        steps[f"drop_top_{drop}"] = round(value, 4)
+        print(f"   without the top {drop:>2} device(s): cross-margin delta "
+              f"{value:+.4f} over {int(mask.sum())} pairs")
+    full = _delta(lab, score, base, keep)
+    print(f"   (full: {full:+.4f})")
+
+    strict = (old != 0) & (new != 0) & ((old > 0) != (new > 0))
+    correct = float((new[strict] > 0).mean())
+    print(f"\n4. reversals: {int(strict.sum())} of {int(keep.sum())} cross-margin "
+          f"pairs ({strict.mean():.1%}), the blend is right on {correct:.1%}")
+
+    out = {
+        "routing_ok": True, "folds": folds,
+        "jackknife": {"moved": int(moved.size), "net": total,
+                      "due_devices": len(net), "helped": helped,
+                      "top5_share": round(sum(v for _, v in ordered[:5]) / total, 3),
+                      "steps": steps, "full": round(full, 4),
+                      "top10": [[d, v] for d, v in ordered[:10]]},
+        "reversal": {"n": int(strict.sum()), "rate": round(float(strict.mean()), 4),
+                     "correct": round(correct, 4)},
+    }
+    path = args.report.with_name("fj_tcn_verify.json")
+    path.write_text(json.dumps(out, indent=1))
+    print(f"\nwrote {path} ({time.time() - started:.0f}s)")
+
+
+def _delta(lab, score, reference, keep) -> float:
+    positive, negative = lab.positive[keep], lab.negative[keep]
+    if positive.size == 0:
+        return float("nan")
+    win = lambda g: ((g > 0).sum() + 0.5 * (g == 0).sum()) / g.size  # noqa: E731
+    return float(win(score[positive] - score[negative])
+                 - win(reference[positive] - reference[negative]))
+
+
+def export(args) -> None:
+    """Write the per-row sequence score the planner will look up.
+
+    One entry per (device, remaining) -- unique across all 19,890 rows and
+    integral in days -- holding the same out-of-fold 42-day crossing probability
+    gate 2 was scored on. Nothing is recomputed at planning time, so the number
+    the planner ranks by is exactly the number the gate measured.
+    """
+    import json as _json
+
+    started = time.time()
+    ctx = context(args)
+    frame, margin = ctx["frame"], ctx["margin"]
+    cache = np.load(args.report.with_suffix(".npz"))
+    tcn, position = cache["tcn"].astype(float), cache["position"]
+    scored = (position >= 0) & np.isfinite(tcn[:, 0, 0])
+    column = HORIZONS.index(42)
+    rows = np.flatnonzero(scored)
+    probability = np.zeros(frame.scenario.size)
+    probability[rows] = _probability_from_quantiles(tcn[rows, column], -margin[rows])
+
+    table = {}
+    for row in rows:
+        table[f"{frame.battery[row]}|{int(round(float(frame.remaining[row])))}"] =             float(probability[row])
+    assert len(table) == rows.size, "a (device, remaining) key collided"
+    path = args.report.with_name("fj_tcn_table.json")
+    path.write_text(_json.dumps(table))
+    print(f"{len(table)} rows exported of {frame.scenario.size} "
+          f"({rows.size / frame.scenario.size:.1%}); wrote {path} "
+          f"({time.time() - started:.0f}s)")

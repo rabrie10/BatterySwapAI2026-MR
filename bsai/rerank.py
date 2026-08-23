@@ -303,3 +303,61 @@ class SumScorer:
                 part.score(features, remaining, devices, grid), dtype=float
             )
         return total
+
+
+@dataclass
+class SequenceScorer:
+    """Rank by a cached causal sequence-model crossing probability.
+
+    The TCN of `tools/fj_tcn.py` reads a device's raw 120-day trajectory, not the
+    64-feature state, so it cannot be evaluated from `features` alone -- it needs
+    the row's position in that device's own daily grid. Reconstructing that
+    position from `end_time - remaining` agrees with the authoritative scenario
+    start on only 17,801 of 19,890 rows, so it is not reconstructed: the score is
+    computed once per row through the same out-of-fold path both gates used, and
+    looked up here by `(device, remaining)`, which is unique across all 19,890
+    rows and integral in days.
+
+    Deployment is order-only. `RankRemapModel` hands the incumbent's own CDF
+    multiset out in this scorer's order, so per-scenario risk mass is unchanged
+    by construction; this class only decides who receives which curve.
+
+    A row the table does not cover keeps its incumbent rank, which makes an
+    empty table exactly the identity. `misses` is carried so a run can assert it
+    stayed at zero rather than silently reordering on a fallback.
+    """
+
+    table: dict
+    weight: float = 1.0
+    horizons: tuple[int, ...] = HORIZON_GRID
+    hits: int = 0
+    misses: int = 0
+
+    def score(
+        self,
+        features: np.ndarray,
+        remaining: np.ndarray,
+        devices: np.ndarray | None,
+        grid: np.ndarray,
+    ) -> np.ndarray:
+        mine = decision_level(grid, remaining, self.horizons)
+        own = centred_rank(mine)
+        if devices is None:
+            self.misses += int(mine.size)
+            return own * (1.0 + self.weight)
+        theirs = np.full(mine.size, np.nan)
+        for position, device in enumerate(devices):
+            value = self.table.get(
+                (str(device), int(round(float(remaining[position]))))
+            )
+            if value is None:
+                self.misses += 1
+            else:
+                theirs[position] = value
+                self.hits += 1
+        present = np.isfinite(theirs)
+        other = own.copy()
+        if present.any():
+            ranked = centred_rank(theirs[present])
+            other[present] = ranked
+        return own + self.weight * other

@@ -200,6 +200,17 @@ def _maybe_rerank(model, args):
             ),
         )
     parts = []
+    if args.rerank_tcn is not None:
+        import json as _json
+
+        from bsai.rerank import SequenceScorer
+
+        raw = _json.loads(Path(args.rerank_tcn).read_text())
+        table = {}
+        for key, value in raw.items():
+            device, remaining = key.rsplit("|", 1)
+            table[(device, int(remaining))] = float(value)
+        parts.append(SequenceScorer(table=table, weight=args.rerank_tcn_weight))
     if args.rerank > 0.0:
         parts.append(CompensatedBarrierScorer(weight=args.rerank))
     if args.rerank_folds is not None:
@@ -286,6 +297,12 @@ def main() -> None:
              "-111 on the operational components (docs/V11_TRANSFER_FINDINGS.md)",
     )
     parser.add_argument("--blocks", type=int, default=6, help="non-overlapping blocks")
+    parser.add_argument("--rerank-tcn", type=Path, default=None,
+                        help="path to the sequence model's per-row score table "
+                             "(tools/fj_tcn.py --export); order-only, the "
+                             "incumbent's own CDF multiset is handed out in the "
+                             "blended rank order")
+    parser.add_argument("--rerank-tcn-weight", type=float, default=1.0)
     parser.add_argument(
         "--rerank",
         type=float,

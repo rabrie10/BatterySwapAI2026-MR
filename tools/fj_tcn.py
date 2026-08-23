@@ -384,6 +384,8 @@ def main() -> None:
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--gate1", action="store_true")
     parser.add_argument("--gate2", action="store_true")
+    parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--export", action="store_true")
     args = parser.parse_args()
     if args.train:
         train(args)
@@ -396,7 +398,15 @@ def main() -> None:
         from tools.fj_tcn_gates import gate2
         gate2(args)
         return
-    parser.error("choose a stage: --train, --gate1, --gate2")
+    if args.verify:
+        from tools.fj_tcn_gates import verify
+        verify(args)
+        return
+    if args.export:
+        from tools.fj_tcn_gates import export
+        export(args)
+        return
+    parser.error("choose a stage: --train, --gate1, --gate2, --verify")
 
 
 if __name__ == "__main__":
