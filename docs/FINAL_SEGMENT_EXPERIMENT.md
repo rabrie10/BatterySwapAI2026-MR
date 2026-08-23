@@ -353,3 +353,98 @@ argument this branch has not built. Recorded, not deployed.
 Per the brief's own instruction, the next representation experiment on the list —
 a small causal-TCN self-supervised future-trajectory model on the increment
 window population — was **not** started.
+
+---
+
+## 10. Stage 1 follow-up: the live thread, taken as a continuous score, is one battery
+
+_Added 2026-08-23, `tools/fj_cohort4.py`, artefacts `outputs/fj_cohort4{,_falsify}.json`._
+
+Section 7 left cohort 4 open on the explicit condition that it be re-expressed as
+a transferable continuous signature rather than a cluster id, and judged on
+cross-margin ordering rather than likelihood. That was done:
+
+    score = logit(p_V8) + alpha * s(device) * I(margin > 0.10 V)
+
+`s` is built from whole-life causal signature features, standardised inside each
+fold. **`alpha` is chosen by nested selection** — inside each outer building fold
+the four training groups are cross-validated against each other, and the held-out
+group is scored with a value it never saw. Deployment is order-only: V8's own
+per-scenario probability multiset is reassigned by the new rank, asserted
+identical in multiset and in sum for all 48 scenarios (concordance is invariant
+to that remap, which is why the gate is reported on the score).
+
+The decision region is small. Of 1,708 landmarks, **668 sit above 0.10 V** (126
+devices; 83 due rows from **35 devices**), giving 2,080 cross-margin pairs whose
+due row is above the gate. **V8 scores 0.5413 on them** — barely above chance,
+which is why the cell looked worth attacking.
+
+| arm (hard gate, nested alpha) | cross-margin | **cross-margin, due > 0.10 V** | folds won |
+|---|---:|---:|---:|
+| **V8** | **0.7359** | **0.5413** | — |
+| `cold` (lifetime mean temp, cold-day fraction) | 0.7325 | 0.5322 | 2/5 |
+| `amp` (lifetime seasonal amplitude) | 0.7172 | 0.5591 | 3/5 |
+| `sum3` (equal-weight, zero fitted parameters) | 0.7320 | 0.5380 | 2/5 |
+| `fitted` (in-fold direction, ceiling arm) | 0.7149 | 0.4889 | 2/5 |
+| **`obs` (whole-life observation fraction, inverted)** | **0.7420** | **0.5760** | 3/5 |
+
+**The temperature half of the cohort-4 description is worth nothing.** `cold` and
+`amp` — the two features that made the cohort recognisable — are at or below V8.
+Everything the cell had was `obs_frac`, and the direction *fitted* on the three
+inputs is the worst arm in the table, which is the usual sign that there is no
+direction to fit.
+
+`obs` looked like a pass, and by the pre-registered numbers it was one:
+
+| | value |
+|---|---|
+| cross-margin, due > 0.10 V | 0.5413 → **0.5760** |
+| device bootstrap, that region | **+0.0347 [+0.0020, +0.0787]**, P(Δ>0) = 0.98 |
+| device bootstrap, all cross-margin | +0.0062 [−0.0010, +0.0161], P(Δ>0) = 0.91 |
+| reversal accuracy | **66.8 %** on 178 reversals |
+| folds | 3 won, 2 exact ties, **0 lost** |
+
+An interval excluding zero, a reversal accuracy well above chance, and no fold
+damaged — sixteen times the general-segmentation delta. It is still an artefact,
+and two controls say so.
+
+**The jackknife.** The gain is 140 moved pairs worth a net +72, over 31 due
+devices of which 17 are helped and 11 hurt. Removing the largest contributors
+cumulatively:
+
+| removed | cross-margin, due > 0.10 V | pairs left |
+|---|---:|---:|
+| — | **+0.0347** | 2,080 |
+| top 1 (`d_be0fde6cb60d`, +41 of the +72) | +0.0165 | 1,877 |
+| top 2 | +0.0077 | 1,808 |
+| top 3 | +0.0028 | 1,777 |
+| **top 5** | **−0.0018** | 1,650 |
+| top 8 | −0.0074 | 1,488 |
+
+**One battery is 57 % of the effect and five batteries are all of it.** Note that
+leave-*one*-device-out is positive in 33 of 33 devices and would have passed this
+signal — with 33 due devices in the region, dropping one at a time leaves the
+other 32 carrying the result. The cumulative jackknife is the honest instrument
+and it is the same lesson as `weeks_observed` in section 2 of
+`docs/FINAL_FRAILTY.md` and the six repeats in `docs/FINAL_FP_ANALYSIS.md`.
+
+**The permutation null is not tight enough to have caught it.** Shuffling
+`obs_frac` among the devices present in each scenario, 12 seeds: mean +0.0053, sd
+0.0079, **max +0.0264** — 0 of 12 beat the real +0.0347, so on this control alone
+the arm passes at ~3.7σ. But a pure-noise correction reaches 76 % of the measured
+effect, because 2,080 pairs from 33 due devices is simply not enough support.
+**A permutation control is necessary and not sufficient; pair it with a
+cumulative device jackknife.**
+
+**The mechanism is real and too small to matter.** Above 0.10 V, device-weighted
+medians: `obs_frac` **0.861 for due against 0.935 for survivors**, while V8's own
+`staleness` and `gap_fraction_90` are median 0 in *both* groups — V8 genuinely
+cannot see whole-life telemetry loss, exactly as section 6 said. The separation
+points the right way and is backed by 35 devices; it is not backed by enough of
+them to order pairs transferably.
+
+```
+STAGE 1 CLOSED. No planner run. The cohort-4 thread from section 7 is now
+closed too: its temperature half carries nothing, and its observation half is
+one battery.
+```
