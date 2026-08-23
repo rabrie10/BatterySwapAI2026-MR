@@ -1,0 +1,105 @@
+{
+ "base": "outputs\\fj_v10sweep_det_80_35_s05.json",
+ "candidate": "outputs\\fj_tcn_plan_det.json",
+ "n": 48,
+ "base_mean": 2091.23,
+ "candidate_mean": 2038.94,
+ "delta": -52.29,
+ "t": -0.937,
+ "wins": 27,
+ "losses": 21,
+ "blocks": [
+  259.9,
+  204.1,
+  -143.5,
+  -513.7,
+  -40.2,
+  -80.4
+ ],
+ "components": {
+  "early_swap": {
+   "base": 765.72,
+   "candidate": 743.86,
+   "delta": -21.85
+  },
+  "late_swap": {
+   "base": 1030.83,
+   "candidate": 998.75,
+   "delta": -32.08
+  },
+  "battery_swap": {
+   "base": 5.38,
+   "candidate": 5.32,
+   "delta": -0.06
+  },
+  "travel": {
+   "base": 39.32,
+   "candidate": 40.17,
+   "delta": 0.85
+  },
+  "overtime": {
+   "base": 66.89,
+   "candidate": 69.35,
+   "delta": 2.46
+  },
+  "daily_limit": {
+   "base": 75.0,
+   "candidate": 77.08,
+   "delta": 2.08
+  },
+  "weekly_limit": {
+   "base": 87.5,
+   "candidate": 83.33,
+   "delta": -4.17
+  },
+  "building_change": {
+   "base": 12.46,
+   "candidate": 12.85,
+   "delta": 0.4
+  },
+  "room_change": {
+   "base": 8.12,
+   "candidate": 8.21,
+   "delta": 0.08
+  }
+ },
+ "decisions": {
+  "served": {
+   "base": 17.562,
+   "candidate": 17.521,
+   "delta": -0.042
+  },
+  "due": {
+   "base": 9.458,
+   "candidate": 9.458,
+   "delta": 0.0
+  },
+  "hit": {
+   "base": 5.5,
+   "candidate": 5.688,
+   "delta": 0.188
+  },
+  "missed": {
+   "base": 3.958,
+   "candidate": 3.771,
+   "delta": -0.188
+  }
+ },
+ "precision": [
+  0.3132,
+  0.3246
+ ],
+ "recall": [
+  0.5815,
+  0.6013
+ ],
+ "wasted_swaps": [
+  12.062,
+  11.833
+ ],
+ "runtime_seconds_per_scenario": [
+  12.23,
+  16.48
+ ],
+ "projected_minutes_for_96": 28.6
+}
