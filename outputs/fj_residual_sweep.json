@@ -1,0 +1,131 @@
+{
+ "concordance_v8": 0.728,
+ "sweep": [
+  {
+   "objective": "cost",
+   "l2": 0.2,
+   "sum_abs_w": 0.786,
+   "oof": 0.7258,
+   "in_sample": 0.732
+  },
+  {
+   "objective": "focal",
+   "l2": 0.2,
+   "sum_abs_w": 0.978,
+   "oof": 0.7302,
+   "in_sample": 0.732
+  },
+  {
+   "objective": "pair",
+   "l2": 0.2,
+   "sum_abs_w": 0.203,
+   "oof": 0.7266,
+   "in_sample": 0.7312
+  },
+  {
+   "objective": "cost",
+   "l2": 0.05,
+   "sum_abs_w": 1.958,
+   "oof": 0.724,
+   "in_sample": 0.734
+  },
+  {
+   "objective": "focal",
+   "l2": 0.05,
+   "sum_abs_w": 2.379,
+   "oof": 0.7284,
+   "in_sample": 0.7321
+  },
+  {
+   "objective": "pair",
+   "l2": 0.05,
+   "sum_abs_w": 0.671,
+   "oof": 0.726,
+   "in_sample": 0.7329
+  },
+  {
+   "objective": "cost",
+   "l2": 0.02,
+   "sum_abs_w": 2.986,
+   "oof": 0.7198,
+   "in_sample": 0.7342
+  },
+  {
+   "objective": "focal",
+   "l2": 0.02,
+   "sum_abs_w": 3.608,
+   "oof": 0.7247,
+   "in_sample": 0.7289
+  },
+  {
+   "objective": "pair",
+   "l2": 0.02,
+   "sum_abs_w": 1.29,
+   "oof": 0.7246,
+   "in_sample": 0.7352
+  },
+  {
+   "objective": "cost",
+   "l2": 0.005,
+   "sum_abs_w": 5.207,
+   "oof": 0.7082,
+   "in_sample": 0.7327
+  },
+  {
+   "objective": "focal",
+   "l2": 0.005,
+   "sum_abs_w": 6.101,
+   "oof": 0.7136,
+   "in_sample": 0.7229
+  },
+  {
+   "objective": "pair",
+   "l2": 0.005,
+   "sum_abs_w": 2.815,
+   "oof": 0.7236,
+   "in_sample": 0.7386
+  },
+  {
+   "objective": "cost",
+   "l2": 0.001,
+   "sum_abs_w": 9.751,
+   "oof": 0.6959,
+   "in_sample": 0.7321
+  },
+  {
+   "objective": "focal",
+   "l2": 0.001,
+   "sum_abs_w": 9.944,
+   "oof": 0.7031,
+   "in_sample": 0.718
+  },
+  {
+   "objective": "pair",
+   "l2": 0.001,
+   "sum_abs_w": 5.85,
+   "oof": 0.7256,
+   "in_sample": 0.7421
+  },
+  {
+   "objective": "cost",
+   "l2": 0.0,
+   "sum_abs_w": 41.664,
+   "oof": 0.6873,
+   "in_sample": 0.7294
+  },
+  {
+   "objective": "focal",
+   "l2": 0.0,
+   "sum_abs_w": 29.89,
+   "oof": 0.6956,
+   "in_sample": 0.7175
+  },
+  {
+   "objective": "pair",
+   "l2": 0.0,
+   "sum_abs_w": 21.346,
+   "oof": 0.6975,
+   "in_sample": 0.7444
+  }
+ ]
+}

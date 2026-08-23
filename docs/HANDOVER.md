@@ -10,13 +10,25 @@ them are recorded because each one cost real time, and most were not obvious.
 
 ## 1. Where the score stands
 
+> **Superseded in part, 2026-08-23.** Sections 1 and 2 below were written when
+> V9 was believed to be the best model. It is not: V9 scored **2137.22** on
+> public against V8 phase 1's **2078.28**, and V19 scored 2113.43. **V8 phase 1
+> is the incumbent and `script.py` loads it.** Read
+> `docs/FINAL_J2W_RESULTS.md` before acting on anything in sections 1, 2 or 6 --
+> in particular the transfer-stress gate is not an oracle (it passes V9), and
+> `tools/rank_lab.py`'s top-k pricing over-reports a *permutation* of the
+> probabilities by more than 100 points.
+
 | submission | public | rank |
 |---|---:|---|
 | v3, discrete-time hazard classifier | 4252.33 | 17 of 19 |
 | V6, censoring-aware label | 2915.68 | 17 of 19 |
-| V7, Wiener first passage + within-day features | **2167.11** | **12 of 12** |
-| V8 phase 1 (remaining-observation calibration) | 2078.28 | 13 of 16 |
-| J2W, first place | 1135.82 | 1 |
+| V7, Wiener first passage + within-day features | 2167.11 | 12 of 12 |
+| V10, censored drift | 2179.06 | — |
+| **V8 phase 1 (remaining-observation calibration)** | **2078.28** | **the incumbent** |
+| V19, cens ranking behind a hard volume cap | 2113.43 | — |
+| V9, blended Wiener + boosted head | 2137.22 | — |
+| J2W, first place | 1077.72 | 1 |
 
 Local out-of-fold mean over all 48 train scenarios, which is the only number
 allowed to justify a submission:
@@ -34,8 +46,9 @@ allowed to justify a submission:
 V8 phase 1 is committed at `db85121`, a clean fast-forward from `main`, 62 tests
 passing, submission path verified. **It has not been submitted yet.**
 
-**V9 is the current best: 1753.46, a paired −391.71 against V8 with t = 6.44 and
-41/48 wins, and all six non-overlapping blocks improve.** Precision 0.313 -> 0.404
+**V9 was the best *local* number: 1753.46, a paired −391.71 against V8 with
+t = 6.44 and 41/48 wins, all six non-overlapping blocks improving -- and it lost
+59 points on public.** Precision 0.313 -> 0.404
 *and* recall 0.584 -> 0.626, which no
 earlier generation managed -- every previous gain in one came out of the other.
 The write-up is `docs/V9_BLEND.md`; the two-line version is that the Wiener

@@ -22,18 +22,29 @@ recorded in [`docs/V6_IMPLEMENTATION.md`](docs/V6_IMPLEMENTATION.md).
 
 ## Where it stands
 
+The shipped model is **V8 phase 1** (`models/v7_wiener.joblib`), which scored
+**2078.28** on the public leaderboard. Two later generations beat it locally by
+a wide margin and both scored worse on public -- V9 at 2137.22 and V19 at
+2113.43 -- so local rank does not decide what ships here. See
+[`docs/FINAL_J2W_RESULTS.md`](docs/FINAL_J2W_RESULTS.md) for the full record,
+including why the two local gates this project built cannot be trusted to
+predict transfer.
+
 Out-of-fold by building, official `evaluate_plan()` over all 48 train scenarios:
 
-| configuration | mean total cost |
-|---|---:|
-| all-defer (service nothing) | 3324.7 |
-| shipped v3 | 2644.9 |
-| V6 hazard classifier | 2526.0 |
-| **this branch (V7 Wiener)** | **2293.2** |
-| perfect knowledge, this planner (scenarios 0-11) | 77.8 |
+| configuration | mean total cost | public |
+|---|---:|---:|
+| all-defer (service nothing) | 3324.7 | — |
+| shipped v3 | 2644.9 | 4252.33 |
+| V6 hazard classifier | 2526.0 | 2915.68 |
+| V7 Wiener | 2293.2 | 2167.11 |
+| **V8 phase 1 (shipped)** | **2126.5** | **2078.28** |
+| V9 blend | 1753.5 | 2137.22 |
+| same model, same risk mass, perfect ordering (scenarios 0-5) | 882.6 | — |
+| perfect knowledge, this planner (scenarios 0-11) | 77.8 | — |
 
-The submission run plans all 48 train scenarios in 476 s with nothing degraded
-or deferred, projecting about 18 minutes for the 96 public and private
+The submission run plans all 48 train scenarios in 462 s with nothing degraded
+or deferred, projecting about 17 minutes for the 96 public and private
 scenarios against a 30-minute limit.
 
 The change that mattered was not the model class. A two-line control -- rank by

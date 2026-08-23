@@ -1,0 +1,49 @@
+{
+ "thresholds": {
+  "120": {
+   "scenarios_remapped": 17,
+   "cross_all": 0.7512,
+   "cross_early": 0.7588,
+   "cross_late": 0.7331
+  },
+  "160": {
+   "scenarios_remapped": 23,
+   "cross_all": 0.7642,
+   "cross_early": 0.7588,
+   "cross_late": 0.7773
+  },
+  "200": {
+   "scenarios_remapped": 28,
+   "cross_all": 0.7775,
+   "cross_early": 0.775,
+   "cross_late": 0.7835
+  },
+  "240": {
+   "scenarios_remapped": 34,
+   "cross_all": 0.7821,
+   "cross_early": 0.7815,
+   "cross_late": 0.7835
+  },
+  "280": {
+   "scenarios_remapped": 40,
+   "cross_all": 0.7879,
+   "cross_early": 0.7898,
+   "cross_late": 0.7835
+  },
+  "1e+09": {
+   "scenarios_remapped": 48,
+   "cross_all": 0.792,
+   "cross_early": 0.7956,
+   "cross_late": 0.7835
+  }
+ },
+ "picked_on_early": 1000000000.0,
+ "picked_on_late": 200.0,
+ "held_out_early": 0.775,
+ "held_out_late": 0.7835,
+ "ungated_early": 0.7956,
+ "ungated_late": 0.7835,
+ "agree": false,
+ "both_improve": false,
+ "verdict": "ABANDON"
+}

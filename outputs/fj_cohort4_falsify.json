@@ -1,0 +1,86 @@
+{
+ "permutation": {
+  "real": 0.0346,
+  "mean": 0.0053,
+  "sd": 0.0079,
+  "max": 0.0264,
+  "exceeded_by": 0,
+  "draws": 12
+ },
+ "jackknife": {
+  "net_by_device": {
+   "d_be0fde6cb60d": 41.0,
+   "d_497cf69db25f": 17.0,
+   "d_db6b21a2bcd5": 9.0,
+   "d_eb7b60348254": 4.0,
+   "d_9b73308fafc4": 4.0,
+   "d_a5ffa7db0b8f": 3.0,
+   "d_1b79ece9f065": 3.0,
+   "d_834971e10647": 2.0,
+   "d_37142ede415b": 2.0,
+   "d_3b189e96404c": 2.0,
+   "d_d678d9f27b31": 1.0,
+   "d_d993db63a0c7": 1.0,
+   "d_871279fba467": 1.0,
+   "d_719d519dcc91": 1.0,
+   "d_05d8311854b1": 1.0,
+   "d_4a83f49a6956": 1.0,
+   "d_de8ae6808bd5": 1.0,
+   "d_3e0292ad88b6": 0.0,
+   "d_8ba95cfeaaa6": 0.0,
+   "d_30e86d81563a": 0.0,
+   "d_1d0190865d91": -1.0,
+   "d_fa3b18f14362": -1.0,
+   "d_773cab150c55": -1.0,
+   "d_9bda8de77e4f": -1.0,
+   "d_84bde2e0b708": -2.0,
+   "d_5039a842fbdd": -2.0,
+   "d_b94797370f49": -2.0,
+   "d_57e99ff00802": -2.0,
+   "d_b56846e1ecf6": -3.0,
+   "d_ed28ebb86070": -3.0,
+   "d_7792551fb838": -4.0
+  },
+  "steps": {
+   "drop_top_1": {
+    "delta": 0.0165,
+    "pairs": 1877,
+    "due_devices": 32
+   },
+   "drop_top_2": {
+    "delta": 0.0077,
+    "pairs": 1808,
+    "due_devices": 31
+   },
+   "drop_top_3": {
+    "delta": 0.0028,
+    "pairs": 1777,
+    "due_devices": 30
+   },
+   "drop_top_5": {
+    "delta": -0.0018,
+    "pairs": 1650,
+    "due_devices": 28
+   },
+   "drop_top_8": {
+    "delta": -0.0074,
+    "pairs": 1488,
+    "due_devices": 25
+   }
+  }
+ },
+ "leave_one_device_out": {
+  "min": 0.0165,
+  "max": 0.0385,
+  "median": 0.0352,
+  "still_positive": 33,
+  "devices": 33
+ },
+ "mechanism": {
+  "obs_frac_due_median": 0.8614,
+  "obs_frac_survivor_median": 0.9347,
+  "correlation_obs_margin": -0.1563,
+  "correlation_obs_pv8": 0.1197,
+  "due_devices_above_threshold": 35
+ }
+}
