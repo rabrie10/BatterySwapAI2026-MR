@@ -50,6 +50,7 @@ from bsai.rerank import (
     SecondModelScorer,
     SumScorer,
 )
+from bsai.residual import OofResidualScorer
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
 
@@ -119,6 +120,18 @@ def _maybe_rerank(model, args):
         return RankRemapModel(
             base=model,
             scorer=OracleScorer(end_ordinal=end_ordinal, eol_ordinal=eol_ordinal),
+        )
+    if args.rerank_residual is not None:
+        bundle = joblib.load(args.rerank_residual)
+        return RankRemapModel(
+            base=model,
+            scorer=OofResidualScorer(
+                by_building=bundle["by_building"],
+                building_of=_BUILDING_OF,
+                room_of=bundle["room_of"],
+                names=tuple(bundle["names"]),
+                objective=bundle.get("objective", ""),
+            ),
         )
     parts = []
     if args.rerank > 0.0:
@@ -196,6 +209,16 @@ def main() -> None:
         action="store_true",
         help="record the predicted probability of every genuinely due battery",
     )
+    parser.add_argument(
+        "--robust-samples",
+        type=int,
+        default=4,
+        help="stratified emergency samples in the search objective. 0 is the "
+             "V10 deterministic expected-cost path: one replay per evaluation "
+             "instead of five, which is what pays for a larger search budget. "
+             "The public A/B credits that plus the 240-evaluation search with "
+             "-111 on the operational components (docs/V11_TRANSFER_FINDINGS.md)",
+    )
     parser.add_argument("--blocks", type=int, default=6, help="non-overlapping blocks")
     parser.add_argument(
         "--rerank",
@@ -205,6 +228,9 @@ def main() -> None:
              "order-only remap; 0 is the incumbent exactly, 1 is the "
              "equal-weight rank average",
     )
+    parser.add_argument("--rerank-residual", type=Path, default=None,
+                        help="a fitted bsai.residual scorer bundle; its score "
+                             "reorders V8's curves and nothing else")
     parser.add_argument("--rerank-folds", type=Path, default=None,
                         help="a second fold bundle whose ORDER (never its level) "
                              "joins the remap")
@@ -247,6 +273,7 @@ def main() -> None:
                 late_risk_multiplier=args.late_multiplier,
                 local_search_evaluations=args.local_search,
                 uncertain_local_search_evaluations=args.uncertain_search,
+                robust_emergency_samples=args.robust_samples,
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
                 move_order=args.move_order,

@@ -427,6 +427,10 @@ happens to land. No conclusion about Task 2 should be drawn from them.
 
 ## 8. Final recommendation
 
+> **Updated after section 11.** A fourth and fifth candidate were run since this
+> section was written -- three residual objectives on two planners -- and all of
+> them lose too. The recommendation is unchanged and better supported.
+
 **No candidate robustly beats V8, and none is enabled.** `script.py` loads
 `models/v7_wiener.joblib`, the artifact that scored 2078.28, and
 `tests/test_submission_identity.py` pins its path, class, version, calibration
@@ -561,3 +565,88 @@ The CDF contract itself is not visible in `submission.csv` -- the file is a plan
 not a forecast -- so monotonicity in the horizon and the sum-to-one branch split
 are covered where they live, in `tests/test_task1_forecast.py` and
 `tests/test_rerank.py`. The whole suite is **85 tests, all passing**.
+
+---
+
+## 11. The 42-day decision-focused residual reranker (closing Task 1)
+
+Full record: [`docs/FINAL_RESIDUAL_OBJECTIVES.md`](FINAL_RESIDUAL_OBJECTIVES.md).
+Code `bsai/residual.py`, `tools/fj_residual.py`, `tests/test_residual.py`.
+
+The last open modelling question: is there a *learned* residual, trained on the
+42-day decision rather than on remaining life, that orders V8's own candidates
+better -- and does the answer depend on the loss? Three objectives, identical
+landmarks, identical eight ranked signals, identical building-disjoint folds,
+identical L2, identical order-only deployment (`sum p / scenario = 9.4040` for
+all three, exactly V8's):
+
+1. **cost** -- 42-day binary log-loss, each landmark weighted by the official
+   cost model's own service value (`deferred - served`, from training EOL data
+   and the published rates: +281 median on positives, −70.5 on negatives);
+2. **focal** -- the same loss with a `(1-p_t)^2` modulator and a class prior;
+3. **pair** -- weighted pairwise logistic ranking over within-scenario
+   (due, survivor) pairs that V8 already scores within 2 logits of each other,
+   each pair weighted by the service-value gap it would get wrong.
+
+1,705 landmarks, 373 positives from 75 devices, **215 rows excluded** as
+censored before the horizon rather than labelled safe, 3,902 ambiguous pairs.
+
+| planner | arm | total | Δ vs its own V8 | early | late | swaps | useful | FP | misses | precision | recall | paired t | runtime |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| old | **V8** | **2126.53** | — | 764.2 | 1045.8 | 21.46 | 5.46 | 12.00 | 4.00 | 0.313 | 0.577 | — | 9.57 s |
+| old | cost | 2232.53 | **+106.00** | 784.1 | 1116.9 | 21.57 | 5.31 | 12.11 | 4.15 | 0.305 | 0.562 | +2.67 | 9.24 s |
+| old | focal | 2186.26 | **+59.73** | 782.1 | 1088.8 | 21.58 | 5.35 | 12.13 | 4.10 | 0.306 | 0.566 | +1.74 | 9.26 s |
+| old | pair | 2155.72 | **+29.19** | 764.1 | 1074.8 | 21.58 | 5.35 | 12.13 | 4.10 | 0.306 | 0.566 | +1.27 | 9.12 s |
+| V10 | **V8** | **2070.28** | — | 757.1 | 1030.6 | 21.48 | 5.50 | 12.02 | 3.96 | 0.314 | 0.581 | — | 15.11 s |
+| V10 | cost | 2157.24 | **+86.96** | 780.3 | 1113.3 | 21.72 | 5.33 | 12.27 | 4.12 | 0.303 | 0.564 | +2.09 | 15.05 s |
+| V10 | focal | 2133.21 | **+62.93** | 781.7 | 1074.0 | 21.75 | 5.42 | 12.29 | 4.04 | 0.306 | 0.573 | +1.97 | 15.12 s |
+| V10 | pair | 2095.31 | **+25.03** | 759.5 | 1053.3 | 21.69 | 5.42 | 12.23 | 4.04 | 0.307 | 0.573 | +1.32 | 14.97 s |
+
+**Every arm is worse, on both planners, in the same order** -- the second
+planner is an independent replication, so the result belongs to the model and
+not to a planner configuration. The failure signature is neither of the two the
+brief warns about: swaps barely move, so it is not V9-like, and early cost does
+not fall, so it is not V19-like. All four quantities move the wrong way at once
+-- early up, late up, precision down, recall down. The requested success
+signature never appears, at any regularisation, under any loss.
+
+`pair` is the least destructive (early flat to a tenth of a point, +29 of late),
+which is consistent with a ranking objective being the right match for an
+order-only deployment; but least destructive is not useful. The two pointwise
+objectives lose significantly (t = +2.67 / +2.09 and +1.74 / +1.97 on 48 paired
+scenarios), and cost-weighting is the more damaging, because weighting by
+service value concentrates the fit on the 373 positives from 75 devices.
+
+**The capacity sweep says why.** Across six L2 settings and all three
+objectives, every fit improves within-scenario concordance *in sample* (0.729 to
+0.744 against V8's 0.7280) and **exactly one of eighteen beats V8 out of fold**
+-- focal at L2 0.20, by 0.0022, with a residual so small it is nearly the
+identity. The in-sample-minus-out-of-fold gap widens monotonically as the
+regulariser is released.
+
+**A screen worth keeping.** Out-of-fold within-scenario concordance on the
+landmarks tracked the planner here, where the top-k pricing of §6 did not:
+pair −0.0034 -> +29/+25, focal −0.0033 -> +60/+63, cost −0.0082 -> +106/+87.
+Every arm that lost concordance lost cost, and the biggest loser on concordance
+was the biggest loser on cost, on both planners. It prunes; it does not decide
+(focal and pair are indistinguishable on it and differ by 30 through the
+planner).
+
+**One measurement here is not a Task-1 result and is worth acting on.** The V10
+planner *mechanics* -- deterministic expected cost (`robust_emergency_samples=0`)
+plus a 240/240 search, with its expected-due volume budget deliberately left off
+-- are worth **−56.25 with V8's forecast and V8's selection unchanged**
+(precision 0.313 -> 0.314, recall 0.577 -> 0.581, misses 4.00 -> 3.96). The gain
+is entirely operational: daily limit −16.7, weekly limit −10.4, overtime −6.1.
+That reproduces the public A/B, which credited the same mechanics with −111 and
+charged V10's forecast +179 separately. **The catch is runtime**: 15.11 s per
+scenario projects to 26.4 minutes for 96, inside the 30-minute cap but past
+`bsai/runtime.py`'s 17-minute soft deadline, so much of the private split would
+plan degraded. Shipping it is a Task-2 decision that needs the governor's
+margins re-derived first, and this branch does not enable it.
+
+**Task 1 is closed.** Together with the flexible-model bound already on record
+-- a gradient-boosted classifier on 72 within-scenario ranked signals reaching
+concordance 0.5567 against V8's 0.6152 -- the conclusion is not about model class
+or loss function. At 454 positives from about 82 devices, the within-scenario
+ordering at V8's decision boundary is not learnable.
