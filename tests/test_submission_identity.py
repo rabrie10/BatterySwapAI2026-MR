@@ -10,6 +10,8 @@ accident this test exists to prevent.
 
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -47,6 +49,34 @@ class SubmissionIdentityTest(unittest.TestCase):
         for got, want in zip(model.calibration.factors, expected):
             self.assertAlmostEqual(got, want, places=3)
         self.assertAlmostEqual(model.volatility_scale, 1.0)
+
+    def test_an_lfs_pointer_is_recognised_rather_than_unpickled(self) -> None:
+        """A clone without Git LFS puts a text file where the model should be.
+
+        ``.gitattributes`` tracks ``*.joblib``, so the blob in the repository is
+        a 132-byte pointer and the real bytes appear only if the checkout ran
+        the smudge filter. Left to ``joblib.load`` that raises, the loader
+        returns None and the submission silently downgrades to the voltage-trend
+        forecaster -- a valid plan and a catastrophic score.
+        """
+        directory = Path(tempfile.mkdtemp())
+        pointer = directory / "pointer.joblib"
+        pointer.write_bytes(
+            b"version https://git-lfs.github.com/spec/v1\n"
+            b"oid sha256:" + b"0" * 64 + b"\n"
+            b"size 2028470\n"
+        )
+        self.assertTrue(script._is_lfs_pointer(pointer))
+        self.assertFalse(script._is_lfs_pointer(REPO_ROOT / script.DEFAULT_MODEL_PATH))
+        previous = os.environ.get("BATTERYSWAP_MODEL_PATH")
+        os.environ["BATTERYSWAP_MODEL_PATH"] = str(pointer)
+        try:
+            self.assertIsNone(script.load_forecaster())
+        finally:
+            if previous is None:
+                os.environ.pop("BATTERYSWAP_MODEL_PATH", None)
+            else:
+                os.environ["BATTERYSWAP_MODEL_PATH"] = previous
 
     def test_describe_names_the_model_that_was_loaded(self) -> None:
         model = joblib.load(REPO_ROOT / script.DEFAULT_MODEL_PATH)

@@ -58,6 +58,21 @@ def _int_env(name: str, default: int) -> int:
     return int(os.environ.get(name, default))
 
 
+def _is_lfs_pointer(path: Path) -> bool:
+    """Is this the 132-byte stand-in rather than the artifact itself?
+
+    ``.gitattributes`` tracks ``*.joblib`` through Git LFS, so the blob in the
+    repository *is* a pointer and the real bytes only appear if the checkout ran
+    the LFS smudge filter with the objects available. A clone without
+    ``git lfs`` produces a text file where the model should be.
+    """
+    try:
+        head = path.read_bytes()[:64]
+    except OSError:
+        return False
+    return head.startswith(b"version https://git-lfs")
+
+
 def _describe_model(model: object, path: Path) -> str:
     """One line naming exactly which Task 1 model is about to plan.
 
@@ -96,6 +111,20 @@ def load_forecaster() -> HazardForecaster | None:
     path = Path(os.environ.get("BATTERYSWAP_MODEL_PATH", DEFAULT_MODEL_PATH))
     if not path.exists():
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)
+        return None
+    if _is_lfs_pointer(path):
+        # A pointer unpickles as garbage, joblib.load raises, and the fallback
+        # below silently downgrades the whole submission to the voltage-trend
+        # forecaster -- which is a valid plan and a catastrophic score. Say so
+        # in one line that names the fix, so it is visible in the transcript
+        # rather than deduced from the result.
+        LOGGER.error(
+            "%s is a %d-byte Git-LFS pointer, not a model. Run `git lfs install "
+            "&& git lfs pull` in this checkout. Falling back to voltage trend, "
+            "which scores several thousand points worse.",
+            path,
+            path.stat().st_size,
+        )
         return None
     try:
         model = joblib.load(path)

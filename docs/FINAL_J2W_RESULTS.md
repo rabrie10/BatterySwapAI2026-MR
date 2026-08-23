@@ -522,7 +522,7 @@ python tools/fj_check_submission.py --dataset dataset --split train
 
 | check | result |
 |---|---|
-| artifact is a real file, not a Git-LFS pointer | **ok** — 2.03 MB, first bytes `\x80\x04\x95…bsai.wiener.WienerModel`; no `git lfs pull` needed |
+| artifact is a real file, not a Git-LFS pointer | **ok** — 2.03 MB, first bytes `\x80\x04\x95…bsai.wiener.WienerModel`. Read the caveat below: this holds because Git LFS is installed here and the objects are local. |
 | artifact loads through the submission's own loader | **ok** — `joblib.load` returns `bsai.wiener.WienerModel` |
 | identity logged at INFO | **ok** — `version=bsai-wiener/v1 volatility_scale=1.0 calibration=[0.4134, 0.6563, 0.7955, 1.0965, 1.7123, 2.3348]` |
 | `submission.csv` produced | **ok** — 751,349 bytes, 19,890 rows, columns `day, battery, split, scenario` |
@@ -533,6 +533,23 @@ python tools/fj_check_submission.py --dataset dataset --split train
 | runtime | **462 s for 48 scenarios** = 9.6 s/scenario |
 | network | none required; the dataset is local and no model is fetched |
 | GPU | none required |
+
+**The one live packaging risk, found by this check.** `.gitattributes` tracks
+`*.joblib` through Git LFS, so the blob stored in the repository for
+`models/v7_wiener.joblib` is a **132-byte pointer**; the real 2 MB model appears
+in a checkout only because `git lfs` 3.5.1 is installed on this machine and all
+four LFS objects are present in `.git/lfs`. A clone made without Git LFS -- or
+with the objects unfetched -- puts a text file where the model should be,
+`joblib.load` raises, and the previous code path caught that and returned
+`None`, silently downgrading the whole submission to the voltage-trend
+forecaster: a perfectly valid plan and a catastrophic score, with nothing in the
+log naming the cause.
+
+`script.py` now recognises the pointer before trying to unpickle it and logs one
+ERROR that names the fix, and `tests/test_submission_identity.py` asserts both
+the detection and that the shipped artifact is not a pointer. **Before any
+submission, run `git lfs install && git lfs pull` in the checkout being
+submitted, then `python tools/fj_check_submission.py`.**
 
 **Runtime projection for the official run.** 96 scenarios plus a second dataset
 load projects to roughly **16.6 minutes** against the 30-minute limit. That is
