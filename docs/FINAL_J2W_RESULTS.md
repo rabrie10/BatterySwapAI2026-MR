@@ -471,3 +471,76 @@ version tested here is *worse* because `beta_30` carries HVAC duty cycle -- whic
 makes a clean per-device V/degC estimate, from the raw hourly channel rather than
 from the within-day shape features, the one specific unexplored thing this
 analysis points at.
+
+---
+
+## 9. Appendix: the public rows, decoded on this branch
+
+`tools/public_row.py` is recovered from `claude/v13-pipeline` (`cfd8389`) so the
+only ground-truth instrument this project has lives on the branch that cites it.
+It inverts the emergency-queue late-cost curve in closed form and self-tests
+against both recorded rows. All figures per scenario:
+
+| row | swaps | misses | planned | caught | precision | recall | early per planned swap |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| V8 2078.28 | 21.68 | 2.27 | 19.41 | 7.23 | 0.372 | 0.761 | 48.7 |
+| V9 2137.22 | 22.69 | 2.28 | 20.41 | 7.22 | 0.354 | 0.760 | 51.8 |
+| V19 2113.43 | 17.80 | 3.63 | 14.17 | 5.87 | 0.414 | 0.618 | 47.4 |
+| **J2W 1077.72** | **14.48** | **2.13** | **12.35** | **7.37** | **0.597** | **0.776** | **22.6** |
+
+J2W catches *marginally more* than V8 (7.37 against 7.23) with **seven fewer
+planned swaps**. That is the whole gap, and it is precision.
+
+One term does not close on precision alone. Solving the two rows jointly for a
+shared cost per due swap and per wasted swap has no non-negative solution: at a
+due swap's ~2.5, our wasted swap prices at 76.1 and J2W's at 52.4. Two things
+can produce that, and they are not distinguishable from the published columns:
+J2W places wasted swaps later in the 42-day window, or its wasted swaps land
+disproportionately on batteries whose substitute end of life is near (the
+closing scenarios), which is a selection effect rather than a timing one.
+
+The timing branch is already measured and closed. `docs/HANDOVER.md` section 4:
+an oracle-free swap-day policy has a naive headroom of 333 per scenario, and
+fitted on three scenario blocks and scored on the other three it is **56** --
+because moving a swap late costs 10 per day on the ones that really were due,
+against 0.5 per day saved on the ones that were not, and at precision 0.31 that
+trade is close to break-even. Day 1 is close to the asymmetric-loss optimum.
+Nothing here reopens it.
+
+---
+
+## 10. Clean-checkout verification
+
+A fresh detached worktree was cut from this branch's HEAD, given only a junction
+to the dataset, and run through the official entry point with nothing else set:
+
+```bash
+git worktree add --detach <tmp> claude/final-j2w-precision
+BATTERYSWAP_DATASET_PATH=dataset BATTERYSWAP_SPLITS=train python script.py
+python tools/fj_check_submission.py --dataset dataset --split train
+```
+
+| check | result |
+|---|---|
+| artifact is a real file, not a Git-LFS pointer | **ok** — 2.03 MB, first bytes `\x80\x04\x95…bsai.wiener.WienerModel`; no `git lfs pull` needed |
+| artifact loads through the submission's own loader | **ok** — `joblib.load` returns `bsai.wiener.WienerModel` |
+| identity logged at INFO | **ok** — `version=bsai-wiener/v1 volatility_scale=1.0 calibration=[0.4134, 0.6563, 0.7955, 1.0965, 1.7123, 2.3348]` |
+| `submission.csv` produced | **ok** — 751,349 bytes, 19,890 rows, columns `day, battery, split, scenario` |
+| planner fallbacks | **none** — `planned=48 degraded=0 deferred=0` |
+| NaN / Inf anywhere | **none** |
+| dates parse, none before a scenario start | **ok** — 2025-09-02 .. 2026-09-08 |
+| every active battery exactly once, per scenario | **ok** — 48 scenarios, no missing, no duplicates, no extras |
+| runtime | **462 s for 48 scenarios** = 9.6 s/scenario |
+| network | none required; the dataset is local and no model is fetched |
+| GPU | none required |
+
+**Runtime projection for the official run.** 96 scenarios plus a second dataset
+load projects to roughly **16.6 minutes** against the 30-minute limit. That is
+just under `bsai/runtime.py`'s 17-minute soft deadline, so the governor may
+switch the last scenarios to the cheap search; that is the shipped V8 behaviour,
+unchanged by this branch, and the 25-minute hard deadline is far away.
+
+The CDF contract itself is not visible in `submission.csv` -- the file is a plan,
+not a forecast -- so monotonicity in the horizon and the sum-to-one branch split
+are covered where they live, in `tests/test_task1_forecast.py` and
+`tests/test_rerank.py`. The whole suite is **85 tests, all passing**.
