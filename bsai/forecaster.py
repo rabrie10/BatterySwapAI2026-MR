@@ -31,13 +31,32 @@ from batteryswap_solution.forecast import (
     RiskForecast,
 )
 
-from .features import DeviceView, FeatureContext, feature_row, fleet_climatology
+from .calibrate import RemainingCalibration
+from .features import (
+    FEATURE_NAMES,
+    DeviceView,
+    FeatureContext,
+    feature_row,
+    fleet_climatology,
+)
 from .hazard import HazardModel
 from .shape import ShapeCache, align_to
 from .smoothing import SmoothingCache
 
 _EPOCH = pd.Timestamp("1970-01-01")
 _MAX_TAIL_DAYS = 400.0
+
+# Stale-transmission veto. EOL is defined from the timeseries, so a device that
+# has stopped transmitting cannot record a 2.4 V crossing and cannot become due;
+# every swap spent on one is waste. Inside the near-threshold band the due rate
+# falls from 30.8% while transmitting to about 5% past 14 days of silence,
+# against a break-even service probability near 15%. The effect is confined to
+# that band -- across the whole population staleness barely moves the due rate --
+# so this is a veto justified by cost asymmetry, not a ranking feature.
+EOL_VOLTAGE = 2.4
+STALE_DAYS_LIMIT = 14.0
+STALE_MARGIN_LIMIT = 0.1
+_VOLTAGE_COLUMN = FEATURE_NAMES.index("voltage")
 
 
 def _normal_date(value) -> pd.Timestamp:
@@ -60,30 +79,35 @@ class HazardForecaster:
         *,
         use_split_climatology: bool = True,
         probability_scale: float = 1.0,
+        calibration: RemainingCalibration | None = None,
     ) -> None:
-        """``probability_scale`` shrinks the whole CDF.
+        """Two corrections sit between the model and the planner.
 
-        The model ranks well but its probability *level* does not survive a
-        change of buildings: measured out-of-fold at scenario cutoffs it
-        predicts 12.86 due per scenario against a realised 9.46, and the top
-        bucket predicts 0.87 against 0.39. Refitting the calibrator on the
-        scenario population does not help, because the shift is between
-        buildings and a calibrator fitted on the other four folds cannot see it
-        -- which is exactly the situation on the public and private splits.
-
-        So the correction is a deliberate, tunable under-confidence rather than
-        a calibrator. It is one number, selected out-of-fold, and it errs in the
-        cheaper direction: under-confidence costs late swaps on a handful of
-        batteries, over-confidence costs early swaps on dozens.
+        ``probability_scale`` shrinks the whole CDF uniformly. ``calibration``
+        corrects along the remaining-observation axis, and that one is not
+        optional in practice: pooled, the model looks well calibrated at 0.93
+        predicted-to-actual, but that average is 0.54 in the opening scenarios
+        and 1.64 in the closing ones. It predicts the most failures where there
+        are the fewest. A uniform scale cannot fix a bias that changes sign,
+        which is why every global knob tried in V6 traded one end against the
+        other and landed inside the noise floor.
         """
         self.model = model
         self.probability_scale = float(probability_scale)
+        # Correction along the remaining-observation axis. The pooled calibration
+        # ratio of 0.93 hides an under-prediction of 0.54 in the opening
+        # scenarios and an over-prediction of 1.64 in the closing ones, and no
+        # single scalar can fix a bias that changes sign.
+        if calibration is not None:
+            model.calibration = calibration
+        self.calibration = getattr(model, "calibration", None)
         self.model_version = model.model_version
         self.cache = SmoothingCache()
         self.shape_cache = ShapeCache()
         self.use_split_climatology = use_split_climatology
         self._context: FeatureContext | None = None
         self.last_cold_start = 0
+        self.last_vetoed = 0
         self.last_expected_due = 0.0
         self.last_probabilities: pd.Series | None = None
 
@@ -128,6 +152,7 @@ class HazardForecaster:
         rows: list[list[float]] = []
         positions: list[int] = []
         row_devices: list[str] = []
+        stale_days: list[float] = []
         for position, device_id in enumerate(battery_ids):
             series = self.cache.devices.get(device_id)
             if series is None:
@@ -148,27 +173,42 @@ class HazardForecaster:
             rows.append(row)
             positions.append(position)
             row_devices.append(device_id)
+            # Days of silence: the cutoff ordinal is deliberately NOT clamped to
+            # the series, because the series simply ends where the device stops
+            # transmitting. ``feature_row``'s own ``staleness`` cannot be reused
+            # here -- ``value_at_or_before`` clamps to ``size - 1``, so it only
+            # sees gaps *inside* the series and reads ~0 for a stopped device.
+            # ``last_valid`` is a prefix maximum, so this stays causal.
+            last_seen = int(view.last_valid[index])
+            stale_days.append(
+                float(origin_ordinal - (series.origin + last_seen))
+                if last_seen >= 0
+                else float("inf")
+            )
 
         count = len(battery_ids)
         self.last_cold_start = count - len(positions)
         grid = np.zeros((count, len(self.model.horizons)))
-        scenario_scale_method = getattr(
-            self.model, "probability_scale_for_origin", None
-        )
-        scenario_scale = (
-            1.0
-            if scenario_scale_method is None
-            else float(scenario_scale_method(origin))
-        )
+        veto = np.zeros(count, dtype=bool)
         if rows:
+            design = np.asarray(rows, dtype=np.float32)
+            index = np.asarray(positions, dtype=int)
             predicted = self.model.predict_grid(
-                np.asarray(rows, dtype=np.float32),
-                remaining[np.asarray(positions, dtype=int)],
+                design,
+                remaining[index],
                 np.asarray(row_devices),
             )
-            grid[np.asarray(positions, dtype=int)] = np.clip(
-                predicted * self.probability_scale * scenario_scale, 0.0, 1.0
-            )
+            # The remaining-observation calibration is applied inside the model,
+            # where the out-of-fold dispatcher has already chosen the right fold.
+            grid[index] = np.clip(predicted * self.probability_scale, 0.0, 1.0)
+            # Stale-transmission veto, as a vectorised mask over the assembled
+            # arrays. ``design`` column ``voltage`` is the last smoothed voltage
+            # at or before the cutoff, the same quantity the model sees.
+            margin = design[:, _VOLTAGE_COLUMN].astype(float) - EOL_VOLTAGE
+            veto[index] = (
+                np.asarray(stale_days, dtype=float) > STALE_DAYS_LIMIT
+            ) & (margin < STALE_MARGIN_LIMIT)
+        self.last_vetoed = int(veto.sum())
 
         daily = self.model.cdf_at(grid, day_offsets)
 
@@ -179,11 +219,22 @@ class HazardForecaster:
         censor = np.where(remaining < 0.0, 0.0, censor)
         daily = np.minimum(daily, censor[:, None])
 
+        # Stale-transmission veto. A constant-zero curve, not a transformed one,
+        # so the row is trivially monotone in forecast_date and cannot break the
+        # contract. ``grid`` is deliberately left alone: it still feeds ``censor``
+        # above and the mean-excess integral below.
+        if veto.any():
+            daily[veto] = 0.0
+
         horizon_cdf = daily[:, -1]
-        observed_tail = np.clip(censor - horizon_cdf, 0.0, 1.0)
+        # prob_unobserved_eol is left exactly as the censoring branch computed it.
+        # prob_observed_after_horizon is then taken as the residual, so
+        # final_cdf + observed_tail + unobserved == 1 holds by construction --
+        # including for vetoed rows -- rather than by adding the removed mass
+        # back and hoping floating point cooperates. This also absorbs the
+        # interpolation slack the sum-to-one check would otherwise trip on.
         unobserved = np.clip(1.0 - censor, 0.0, 1.0)
-        # Absorb interpolation slack so the contract's sum-to-one check holds.
-        unobserved = np.clip(1.0 - horizon_cdf - observed_tail, 0.0, 1.0)
+        observed_tail = np.clip(1.0 - horizon_cdf - unobserved, 0.0, 1.0)
 
         # Predicted expected number of due batteries. Comparing this against the
         # realised count per scenario is the calibration check that matters:

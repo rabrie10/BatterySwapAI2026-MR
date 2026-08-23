@@ -1,0 +1,20 @@
+{
+  "stride": 4,
+  "max_iter": 250,
+  "em_iterations": 4,
+  "n_events": 15581,
+  "metrics": {
+    "oof": {
+      "n": 88013,
+      "positives": 862,
+      "auc": 0.9644,
+      "pr_auc": 0.2824,
+      "predicted_over_actual": 1.135,
+      "precision_at_50": 0.48,
+      "precision_at_100": 0.56,
+      "precision_at_200": 0.535,
+      "precision_at_500": 0.436,
+      "precision_at_1000": 0.333
+    }
+  }
+}

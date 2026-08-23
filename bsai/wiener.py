@@ -181,6 +181,10 @@ class WienerModel:
     scatter: HistGradientBoostingRegressor
     climatology: np.ndarray
     volatility_scale: float = 1.0
+    # Correction along the remaining-observation axis; see bsai/calibrate.py.
+    # Applied here rather than in the forecaster so the out-of-fold dispatcher
+    # routes each device to its own fold's correction automatically.
+    calibration: object | None = None
     horizons: tuple[int, ...] = HORIZON_GRID
     feature_names: tuple[str, ...] = tuple(FEATURE_NAMES)
     model_version: str = "bsai-wiener/v1"
@@ -259,6 +263,8 @@ class WienerModel:
         probability = self.probabilities(tall, effective.reshape(-1))
         probability = np.where(effective.reshape(-1) <= 0.0, 0.0, probability)
         out = probability.reshape(len(self.horizons), rows).T
+        if self.calibration is not None:
+            out = self.calibration.apply(out, remaining)
         return np.maximum.accumulate(np.clip(out, 0.0, 1.0), axis=1)
 
     def cdf_at(self, grid_values: np.ndarray, days: np.ndarray) -> np.ndarray:

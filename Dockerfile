@@ -13,11 +13,11 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy everything script.py needs at runtime.
-# bsai/ must be present before models/v8_ensemble.joblib can be loaded: joblib
-# resolves the artifact's classes from bsai.ensemble, bsai.hybrid and bsai.wiener.
-# Those classes in turn import
-# bsai.features, bsai.hazard, bsai.margin and bsai.smoothing, so the whole package
-# has to come along. src/ is kept for the frozen v4 control artifact, which
+# bsai/ must be present before models/v9_blend.joblib can be loaded: joblib
+# resolves the artifact's class as bsai.blend.BlendedModel, which holds a
+# bsai.wiener.WienerModel and a bsai.calibrate.RemainingCalibration, and those in
+# turn import bsai.features, bsai.hazard, bsai.margin and bsai.smoothing -- so the
+# whole package has to come along. src/ is kept for the frozen v4 control artifact, which
 # unpickles as src.risk.model.Task1Forecaster.
 COPY batteryswap_solution/ ./batteryswap_solution
 COPY bsai/ ./bsai
@@ -32,7 +32,5 @@ COPY script.py ./
 # silently produced a train-only submission. Pass -e BATTERYSWAP_SPLITS=train
 # explicitly when testing locally against the train-only dataset checkout.
 
-# The competition base image installs allowed requirements into /app/env.
-# Its runtime entrypoint resets PATH to the separate miniconda interpreter, so
-# an unqualified python/python3 cannot import joblib or batteryswap_public.
-CMD ["/app/env/bin/python", "script.py"]
+# Default to making submissions.
+CMD ["python3", "script.py"]

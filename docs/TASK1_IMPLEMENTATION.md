@@ -1,9 +1,6 @@
-# Legacy Task 1 implementation: parametric AFT and physical prior
+# Task 1 Implementation Guide
 
-> Historical document (2026-08-18). This describes the retained `src/risk`
-> forecaster and `models/risk_forecaster.pkl`; it is not the model loaded by the
-> current submission. See `V8_HYBRID_IMPLEMENTATION.md` for the active Task 1
-> path.
+Status: implemented and locally verified, last updated 2026-08-18.
 
 This document is the engineering specification for the Task 1 risk model in
 this repository: `src/risk/`. It describes the causal feature pipeline, the

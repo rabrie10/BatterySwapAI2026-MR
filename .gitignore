@@ -16,3 +16,10 @@ outputs/v5match.json
 outputs/daily_shape.parquet
 outputs/v7_*.json
 outputs/v7_folds.joblib
+outputs/v8_aft_folds.joblib
+outputs/v9_blend_folds.joblib
+outputs/v9_frame.npz
+outputs/v9_*.npz
+outputs/v9_*.csv
+outputs/v9_*.json
+outputs/v8_*.json

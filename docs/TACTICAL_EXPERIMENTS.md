@@ -1,9 +1,5 @@
 # Tactical Task 2 Experiments
 
-> Historical experiment protocol. Configuration names and baselines below are
-> not the current submission defaults; see `V8_HYBRID_IMPLEMENTATION.md` and
-> `script.py` for the active configuration.
-
 This protocol keeps leaderboard work attributable: one behavioral variable is
 changed per experiment, every candidate is compared with the same baseline,
 and public submissions are reserved for candidates that improve locked local

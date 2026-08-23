@@ -1,10 +1,6 @@
 # BatterySwapAI 2026 Solution Design Specification
 
-> Historical design proposal. It records intended work, including components
-> that were later rejected or replaced, and must not be read as an inventory of
-> the current code. See `README.md` for the active implementation map.
-
-**Status:** archived v0.10 leaderboard-informed design draft
+**Status:** v0.10 leaderboard-informed implementation draft; freeze after Phase P0 clock/schema tests
 **Owners:** Task 1 (RUL/risk model) and Task 2 (work-order planner)  
 **Primary objective:** Minimize the official evaluator's mean `total_cost` across unseen scenarios under the CPU, memory, and runtime constraints.  
 **Secondary objective:** Preserve enough uncertainty and diagnostics to improve the complete prediction-to-planning system rather than optimizing an isolated ML metric.

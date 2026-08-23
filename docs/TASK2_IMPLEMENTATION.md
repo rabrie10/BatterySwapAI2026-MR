@@ -1,7 +1,6 @@
 # Task 2 Implementation Guide
 
-Status: production planner guide; submission defaults reconciled with
-`script.py` on 2026-08-24.
+Status: implemented and locally verified, last updated 2026-08-18.
 
 This document is the engineering specification and operating guide for the
 BatterySwapAI 2026 work-order planner. It describes the code currently in this
@@ -181,17 +180,15 @@ those fields for optimization.
 
 ### 4.4 Artifact handoff
 
-The current default artifact location is:
+The default artifact location is:
 
 ```text
-models/v8_ensemble.joblib
+models/risk_forecaster.pkl
 ```
 
 The object must be loadable with the competition Python environment and must
 not depend on unavailable packages or files. `script.py` also accepts a custom
-path through `BATTERYSWAP_MODEL_PATH`. The older
-`models/risk_forecaster.pkl`/`BATTERYSWAP_FORECASTER_PATH` path belongs to the
-legacy Task 1 implementation and is not used by the current entry point.
+path through `BATTERYSWAP_FORECASTER_PATH`.
 
 If loading, prediction, or validation fails, `CompetitionPlanner` logs the
 failure and uses `VoltageTrendForecaster`. This keeps the submission valid, but
@@ -360,8 +357,8 @@ a competitive score.
 | Parameter | Default | Purpose |
 | --- | ---: | --- |
 | `late_risk_multiplier` | `1.0` | Robustness multiplier on late-swap loss |
-| `local_search_evaluations` | `80` | Primary search budget for deterministic/low-uncertainty cases |
-| `uncertain_local_search_evaluations` | `35` | Primary search budget when multiple emergency outcomes are sampled |
+| `local_search_evaluations` | `160` | Search budget for deterministic/low-uncertainty cases |
+| `uncertain_local_search_evaluations` | `70` | Search budget when multiple emergency outcomes are sampled |
 | `robust_emergency_samples` | `4` | Number of emergency outcomes used in robust scoring |
 | `random_seed` | `20260818` | Reproducible sampling and tie behavior |
 
@@ -369,41 +366,28 @@ a competitive score.
 
 | Parameter | Default | Purpose |
 | --- | ---: | --- |
-| `solver_seconds` | `1.0` | Primary CP-SAT solve time per scenario |
+| `solver_seconds` | `2.0` | Maximum CP-SAT solve time per scenario |
 | `random_seed` | `20260818` | Deterministic CP-SAT seed |
 | `cost_scale` | `1000` | Integer precision for objective costs |
 | `time_scale` | `1000` | Integer precision for work hours |
 | `capacity_margin_hours` | `0.05` | Buffer below daily and weekly limits |
 | `objective_roundtrip_fraction` | `0.55` | Weight of base round-trip proxy in assignment objective |
-| `expected_due_multiplier` | `2.0` | Multiplier in the proactive-service incidence cap |
-| `expected_due_buffer` | `5.0` | Additive headroom in the proactive-service incidence cap |
 
 These defaults are a reproducible baseline, not universal optima. Tune them on
 out-of-fold scenario simulations and keep one locked configuration for private
 leaderboard selection.
-
-`BudgetedPlanner` changes to the fast profile after the soft runtime deadline:
-`0.25` solver seconds, `12` normal local-search evaluations, and `6` uncertain
-evaluations. The primary and fast configurations otherwise share the same
-production risk and expected-incidence defaults built by `script.py`.
 
 ### Environment variables
 
 | Variable | Effect |
 | --- | --- |
 | `BATTERYSWAP_PLANNER_PATH` | Load a fully serialized `Planner`; takes precedence over all other planner construction |
-| `BATTERYSWAP_MODEL_PATH` | Load the Task 1 artifact; defaults to `models/v8_ensemble.joblib` |
+| `BATTERYSWAP_FORECASTER_PATH` | Load the Task 1 artifact; defaults to `models/risk_forecaster.pkl` |
 | `BATTERYSWAP_LATE_RISK_MULTIPLIER` | Override late-risk robustness multiplier |
-| `BATTERYSWAP_MINIMUM_EXPECTED_IMPROVEMENT` | Require this expected saving before keeping a planned swap |
 | `BATTERYSWAP_SOLVER_SECONDS` | Override CP-SAT time budget |
 | `BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS` | Override normal local-search budget |
 | `BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS` | Override uncertain-case search budget |
 | `BATTERYSWAP_ROBUST_SAMPLES` | Override emergency sample count |
-| `BATTERYSWAP_MAX_PLANNED_COUNT` | Optional absolute proactive-swap cap; zero disables it |
-| `BATTERYSWAP_EXPECTED_DUE_MULTIPLIER` | Incidence-cap multiplier; defaults to `2.0` |
-| `BATTERYSWAP_EXPECTED_DUE_BUFFER` | Incidence-cap additive buffer; defaults to `5.0` |
-| `BATTERYSWAP_SOFT_DEADLINE` | Switch to the fast planner profile; defaults to 17 minutes |
-| `BATTERYSWAP_HARD_DEADLINE` | Stop before the evaluator limit; defaults to 25 minutes |
 | `BATTERYSWAP_DATASET_PATH` | Dataset root used by `script.py` |
 | `BATTERYSWAP_SPLITS` | Comma-separated splits; official default is `public,private` |
 

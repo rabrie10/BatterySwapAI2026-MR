@@ -1,41 +1,24 @@
-# BatterySwapAI 2026 documentation
+# BatterySwapAI 2026 Docs
 
-This index separates the code that currently ships from historical designs and
-experiments. Statements in a historical document describe that version only;
-they are not descriptions of the current submission.
+This folder contains the working documentation for our BatterySwapAI 2026
+solution.
 
-## Current implementation
+- [Official Challenge Reference](OFFICIAL_CHALLENGE_REFERENCE.md): condensed
+  reference for the challenge story, dataset, participant rules, submission
+  process, and official links.
+- [Task 2 Planner Reference](TASK2_PLANNER_REFERENCE.md): the practical
+  interface, cost model, validation rules, and implementation notes for the
+  work-order planning task.
+- [Task 2 Implementation Guide](TASK2_IMPLEMENTATION.md): the implemented
+  architecture, Task 1 API contract, optimization model, configuration,
+  verification workflow, benchmark, and competition tuning protocol.
+- [Submission Checklist](SUBMISSION_CHECKLIST.md): pre-submit checks for local
+  testing, reproducibility, Git history, licensing, and final submission.
+- [Solution Design Spec](SOLUTION_DESIGN_SPEC.md): our technical design spec for
+  the full Task 1 + Task 2 system.
 
-- [V8 boosted-hazard/Wiener implementation](V8_HYBRID_IMPLEMENTATION.md): the
-  Task 1 model loaded by `script.py`, its active probability path, calibration,
-  service budget, validation, and reproduction commands.
-- [Task 2 implementation](TASK2_IMPLEMENTATION.md): the production
-  `batteryswap_solution/` planner and forecast contract.
-- [Task 2 planner reference](TASK2_PLANNER_REFERENCE.md): evaluator semantics,
-  cost model, and planner requirements.
-- [Submission checklist](SUBMISSION_CHECKLIST.md): packaging, LFS, Docker,
-  validity, and reproducibility checks.
-- [Official challenge reference](OFFICIAL_CHALLENGE_REFERENCE.md): a dated local
-  summary of organizer material and evaluator inspection.
-
-The submission entry point is `script.py`. By default it loads
-`models/v8_ensemble.joblib`, a gradient-boosted near-term hazard/ranking model
-blended with a Wiener first-passage model, and passes its forecast to
-`batteryswap_solution.planner.CompetitionPlanner`.
-
-## Historical material
-
-The following files are retained as experiment records and rationale, not as
-current implementation documentation:
-
-- `TASK1_IMPLEMENTATION.md` and `task1_training_report.json`: the legacy
-  `src/risk` parametric-AFT/physical-prior forecaster.
-- `V6_IMPLEMENTATION.md`, `v6_training_report.json`,
-  `PLAN_V6_MAXIMUM.md`: the retired V6 hazard classifier.
-- `V7_IMPLEMENTATION.md`, `v7_training_report.json`, `PLAN_V7_MARGIN.md`: the
-  standalone V7 Wiener candidate.
-- `PLAN_V5_TOP_SCORE.md`, `SOLUTION_DESIGN_SPEC.md`, and
-  `TACTICAL_EXPERIMENTS.md`: proposals and experiment protocols; some ideas
-  were rejected or superseded.
-
-The canonical organizer rules take precedence over all local notes.
+Source note: these notes are based on the NORA BatterySwapAI 2026 pages pasted
+into this workspace on 2026-08-18, plus the locally cloned official example
+repository and installed `batteryswap_public` evaluator. Before final
+submission, re-check the canonical rules page because organizer clarifications
+take precedence.
