@@ -15,26 +15,57 @@ They meet at the versioned forecast contract in
 `batteryswap_solution/forecast.py`, so the model can be replaced without
 touching any scheduling code.
 
-The current design and its measurements, including the approaches that failed,
-are in [`docs/V7_IMPLEMENTATION.md`](docs/V7_IMPLEMENTATION.md) and
-[`docs/PLAN_V7_MARGIN.md`](docs/PLAN_V7_MARGIN.md). The previous generation is
-recorded in [`docs/V6_IMPLEMENTATION.md`](docs/V6_IMPLEMENTATION.md).
+This README describes what currently ships, including the two changes made after
+the V7/V8 model work: the stale-transmission veto and the probability scale. The
+model itself, its measurements and the approaches that failed are in
+[`docs/V7_IMPLEMENTATION.md`](docs/V7_IMPLEMENTATION.md) and
+[`docs/PLAN_V7_MARGIN.md`](docs/PLAN_V7_MARGIN.md); the previous generation is in
+[`docs/V6_IMPLEMENTATION.md`](docs/V6_IMPLEMENTATION.md). Where those documents
+and this one disagree about what is shipped, this one is current — they predate
+the veto and the scale.
 
 ## Where it stands
 
-Out-of-fold by building, official `evaluate_plan()` over all 48 train scenarios:
+What `script.py` actually ships, and what each change scored on the public
+leaderboard:
+
+| commit | change | public |
+|---|---|---:|
+| `7792b78` | V8 Wiener model + V10 planner budgets | 1985.43 |
+| `89573f5` | + stale-transmission veto | **1555.80** |
+| `37ae686` | + probability scale 1.5 | not yet scored |
+
+The shipped configuration, all of it explicit in source rather than defaulted:
+
+| setting | value | where |
+|---|---|---|
+| Task 1 artifact | `models/v7_wiener.joblib` | `script.py: DEFAULT_MODEL_PATH` |
+| probability scale | 1.5 | `script.py: PROBABILITY_SCALE` |
+| volatility scale | 1.0 | `script.py: load_forecaster()` |
+| stale-transmission veto | `v_stale_days > 14` and `margin < 0.1` | `bsai/forecaster.py` |
+| solver seconds | 1.0 | `script.py` |
+| local / uncertain search | 240 / 240 | `script.py` |
+| robust emergency samples | 0 | `script.py` |
+
+For reference, out-of-fold by building over all 48 train scenarios:
 
 | configuration | mean total cost |
 |---|---:|
 | all-defer (service nothing) | 3324.7 |
 | shipped v3 | 2644.9 |
 | V6 hazard classifier | 2526.0 |
-| **this branch (V7 Wiener)** | **2293.2** |
+| V7 Wiener | 2293.2 |
 | perfect knowledge, this planner (scenarios 0-11) | 77.8 |
 
-The submission run plans all 48 train scenarios in 476 s with nothing degraded
-or deferred, projecting about 18 minutes for the 96 public and private
-scenarios against a 30-minute limit.
+**Local validation does not track public on the early/late axis.** In production
+mode the totals agree closely (local 1937.57 against public 1985.43 at
+`7792b78`), but the composition is inverted: locally the planner is late-heavy
+(early 671 / late 1020), on public it is early-heavy (early 962 / late 658).
+Tuning that axis against local validation points the wrong way, which is why the
+veto was justified from a due-rate table rather than from a local cost delta.
+
+Runtime projects to roughly 15-16 minutes for the 96 public and private
+scenarios against the 30-minute limit.
 
 The change that mattered was not the model class. A two-line control -- rank by
 `margin / -slope`, no model at all -- matched V6 exactly (precision 0.309
@@ -76,7 +107,7 @@ whole competition is the question of *which* batteries to touch.
 | `wiener.py` | Wiener first passage: learned drift and volatility, closed-form crossing probability. |
 | `hazard.py` | Cutoff sampling and the previous multi-horizon classifier, kept for comparison. |
 | `margin.py` | Quantile regression on the running minimum; measured, not shipped. |
-| `forecaster.py` | Adapter to the Task 2 forecast contract, including the censoring branch. |
+| `forecaster.py` | Adapter to the Task 2 forecast contract: the censoring branch, the uniform probability scale, and the stale-transmission veto. |
 | `validation.py` | Out-of-fold dispatch, so no device is ever scored by a model that saw its building. |
 | `runtime.py` | Wall-clock governor for the 30-minute evaluation budget. |
 
@@ -101,6 +132,37 @@ The 4.87 degC indoor annual swing is 0.023 V, which near the knee is about two
 weeks of remaining life, and EOL incidence is 1.76x higher in Nov-Mar than in
 May-Sep. Features include temperature-compensated levels and slopes plus the
 expected seasonal temperature change across the planning window.
+
+**A battery that has stopped transmitting cannot become due.** EOL is defined
+from the timeseries, so a device with no recent readings cannot record a 2.4 V
+crossing, and every swap spent on one is waste. Within the near-threshold band
+the due rate falls from 30.8% while transmitting to about 5% past 14 days of
+silence, against a break-even service probability near 15% (mean early cost per
+wasted swap about 45, against about 261 per miss). `bsai/forecaster.py`
+therefore vetoes service when `v_stale_days > 14` **and** `margin < 0.1`, where
+`margin` is the last smoothed voltage minus 2.4 and `v_stale_days` is the gap
+between the last day the smoothed series has a value and the cutoff. It fires on
+about 9.6 batteries per scenario.
+
+The effect exists only inside the near-threshold band — across the whole
+population staleness barely moves the due rate (2.4% transmitting against
+1.5-2.7% stale) — so this is a veto justified by cost asymmetry, not a ranking
+feature. Both thresholds are fixed constants; neither is swept or configurable.
+
+Note that `features.py` also exposes a feature named `staleness`, which is *not*
+the same quantity: `DeviceView.value_at_or_before` clamps its index to the end
+of the series, so it measures gaps *inside* the series and reads about zero for
+exactly the stopped devices this rule targets. The veto computes silence against
+the unclamped cutoff ordinal instead.
+
+**Service volume is set by a uniform probability scale.** After the veto removed
+the sub-break-even population, every serviced margin band clears break-even (the
+marginal band at 0.273 precision) while service ran at 13.6 per scenario against
+12.3 due, with late costing more than twice early. `PROBABILITY_SCALE = 1.5` in
+`script.py` multiplies the whole CDF, raising service to roughly 19 per scenario.
+The veto is applied *after* the scaling, so vetoed batteries are never
+resurrected by it, and the veto condition depends only on `margin` and
+`v_stale_days`, both independent of the scale.
 
 ## Task 2: `batteryswap_solution/`
 
@@ -127,6 +189,21 @@ Writes `models/v7_wiener.joblib` (the shipped artifact, fitted on every
 building), `outputs/v7_folds.joblib` (the five fold models, used for validation
 and not needed at submission time), and `docs/v7_training_report.json`.
 
+**Known discrepancy — this command does not reproduce the shipped artifact
+byte-for-byte.** `tools/train_wiener.py` selects `best_scale` by calibration gap
+and assigns it to the model before dumping; that selection is **1.4**, while the
+committed `models/v7_wiener.joblib` carries **1.0**. A model regenerated from
+this source therefore arrives with a different volatility scale. Everything else
+reproduces exactly: a regenerated run matches `docs/v7_training_report.json` in
+every substantive field (n=88013, positives 862, AUC 0.9823, PR-AUC 0.4303,
+predicted/actual 0.637, every precision@k), differing only in wall-clock seconds.
+
+The submission is insulated from this: `script.py` pins `volatility_scale = 1.0`
+explicitly after loading, so a regenerated artifact arriving at 1.4 cannot change
+what ships. 1.0 is the value that produced the scores in the table above; 1.4
+measured worse (+10.1 against baseline on 42 train scenarios) despite being
+better calibrated in isolation (predicted/actual 1.025 against 0.637).
+
 ```bash
 python tools/validate_v6.py --folds outputs/v7_folds.joblib     --model models/v7_wiener.joblib --volatility-scale 1.0
 ```
@@ -134,6 +211,21 @@ python tools/validate_v6.py --folds outputs/v7_folds.joblib     --model models/v
 Scores the production planner over all 48 train scenarios using predictions from
 models that never saw the device's own building, and prints the anchors so a
 result is never read in isolation.
+
+Two cautions when comparing a validation run against the shipped build:
+
+- `tools/validate_v6.py` constructs its own `PlannerConfig` and does not set
+  `robust_emergency_samples`, so it inherits the dataclass default of **4**,
+  while `script.py` ships **0**. A run left on defaults is not measuring the
+  submitted configuration.
+- `--volatility-scale` is honoured only in the out-of-fold branch of
+  `build_forecaster`; under `--production` the flag is ignored. A production-mode
+  sweep over it measures nothing but wall-clock noise.
+
+Out-of-fold numbers are also not comparable to the public leaderboard on
+service volume: out-of-fold runs at roughly 29 swaps per scenario against the
+shipped 19, which is a different operating regime, not a pessimistic estimate of
+the same one. Use `--production` when the question is what the submission does.
 
 Local submission generation:
 
@@ -177,6 +269,16 @@ equality between the fast operational replay and
   `BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS`, `BATTERYSWAP_ROBUST_SAMPLES`
 - `BATTERYSWAP_LATE_RISK_MULTIPLIER`, `BATTERYSWAP_MINIMUM_EXPECTED_IMPROVEMENT`
 - `BATTERYSWAP_SOFT_DEADLINE`, `BATTERYSWAP_HARD_DEADLINE` -- governor thresholds
+
+Defaults in `script.py` are the shipped values, so the submission is correct with
+no variables set: solver seconds 1.0, local and uncertain search 240/240,
+`BATTERYSWAP_ROBUST_SAMPLES` 0 (note the `PlannerConfig` dataclass default is 4).
+
+The probability scale, the volatility scale and the veto thresholds are
+deliberately **not** environment-configurable. They are constants in source
+(`PROBABILITY_SCALE` in `script.py`, `STALE_DAYS_LIMIT` and
+`STALE_MARGIN_LIMIT` in `bsai/forecaster.py`) so that what ships cannot depend on
+a variable being set at evaluation time.
 
 ## Third-party components
 
