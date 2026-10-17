@@ -9,16 +9,16 @@ permissions:
 
 jobs:
   core:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           lfs: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7.0.0
         with:
           python-version: "3.12"
           cache: pip
@@ -33,7 +33,7 @@ jobs:
         run: python tools/demo.py
       - name: Check documentation and result calculations
         run: python tools/check_portfolio.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: synthetic-planning-demo
           path: outputs/demo/
