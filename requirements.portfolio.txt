@@ -1,0 +1,14 @@
+# Small, pinned environment for the demo, shipped model, and core tests.
+# Python 3.12. Competition requirements.txt remains organizer-controlled.
+numpy==2.5.2
+pandas==2.3.3
+scipy==1.18.0
+scikit-learn==1.9.0
+joblib==1.5.3
+fastparquet==2026.5.0
+ortools==9.15.6755
+batteryswap_public==0.3.4
+pydantic-settings==2.15.0
+structlog==26.1.0
+# Historical survival-model regression tests.
+lifelines==0.30.3

@@ -1,0 +1,33 @@
+{
+  "metric": "Leaderboard total cost (lower is better)",
+  "provenance": "Historical public scores in repository notes plus the latest team-provided leaderboard transcription; not independently fetched from a live leaderboard.",
+  "submissions": [
+    {"label": "Initial v3", "cost": 4252.33, "source": "docs/HANDOVER.md", "commit": null},
+    {"label": "V6", "cost": 2915.68, "source": "docs/HANDOVER.md", "commit": null},
+    {"label": "Wiener + planner", "cost": 1985.43, "source": "README.md at 328a3ac", "commit": "7792b78"},
+    {"label": "Stale-transmission veto", "cost": 1555.80, "source": "README.md at 328a3ac", "commit": "89573f5"},
+    {"label": "Latest reported submission", "cost": 1468.44, "source": "Team-provided leaderboard transcription, supplied 2026-10-18", "commit": null}
+  ],
+  "latest_leaderboard": {
+    "rank": 5,
+    "team": "Dynamic duo",
+    "submission_datetime": "2026-08-23 23:58:31",
+    "timezone": "not supplied",
+    "split": "not confirmed in supplied transcription",
+    "total_time": 1468.44,
+    "components": {
+      "battery_swap": 4.2865,
+      "building_change": 11.9792,
+      "room_change": 7.1354,
+      "travel": 40.7476,
+      "overtime": 74.1871,
+      "daily_limit": 89.5833,
+      "weekly_limit": 66.6667,
+      "late_swap": 623.542,
+      "early_swap": 550.312
+    }
+  },
+  "current_probability_scale": 1.5,
+  "current_configuration_public_score": null,
+  "training_report": "docs/v7_training_report.json"
+}

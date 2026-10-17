@@ -2,6 +2,9 @@ submission.csv
 data/
 dataset/
 outputs/tactical/
+outputs/demo/
+outputs/validation*.json
+outputs/portfolio-*.log
 
 venv/
 .

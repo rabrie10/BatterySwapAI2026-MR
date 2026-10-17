@@ -227,14 +227,14 @@ class HazardForecaster:
             daily[veto] = 0.0
 
         horizon_cdf = daily[:, -1]
-        # prob_unobserved_eol is left exactly as the censoring branch computed it.
-        # prob_observed_after_horizon is then taken as the residual, so
-        # final_cdf + observed_tail + unobserved == 1 holds by construction --
-        # including for vetoed rows -- rather than by adding the removed mass
-        # back and hoping floating point cooperates. This also absorbs the
-        # interpolation slack the sum-to-one check would otherwise trip on.
+        # Allocate residual mass to the observed tail only when observation
+        # continues beyond the planning window. The transmission veto can remove
+        # in-window mass, but cannot move a recorded event past observation end.
         unobserved = np.clip(1.0 - censor, 0.0, 1.0)
         observed_tail = np.clip(1.0 - horizon_cdf - unobserved, 0.0, 1.0)
+        short_observation = remaining <= float(horizon_days)
+        observed_tail[short_observation] = 0.0
+        unobserved[short_observation] = 1.0 - horizon_cdf[short_observation]
 
         # Predicted expected number of due batteries. Comparing this against the
         # realised count per scenario is the calibration check that matters:

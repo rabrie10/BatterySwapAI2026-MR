@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="792pt" height="360pt" viewBox="0 0 792 360" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:description>Leaderboard total cost (lower is better)</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.1, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 360
+L 792 360
+L 792 0
+L 0 0
+z
+" style="fill: #101c30"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 198 291.6
+L 760.32 291.6
+L 760.32 90
+L 198 90
+z
+" style="fill: #101c30"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 198 291.6
+L 198 90
+" clip-path="url(#p70c1968915)" style="fill: none; stroke: #304058; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_2"/>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #c1cede" x="198" y="309.197656" transform="rotate(-0 198 309.197656)">0</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 311.6 291.6
+L 311.6 90
+" clip-path="url(#p70c1968915)" style="fill: none; stroke: #304058; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4"/>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #c1cede" x="311.6" y="309.197656" transform="rotate(-0 311.6 309.197656)">1000</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 425.2 291.6
+L 425.2 90
+" clip-path="url(#p70c1968915)" style="fill: none; stroke: #304058; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6"/>
+     <g id="text_3">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #c1cede" x="425.2" y="309.197656" transform="rotate(-0 425.2 309.197656)">2000</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_7">
+      <path d="M 538.8 291.6
+L 538.8 90
+" clip-path="url(#p70c1968915)" style="fill: none; stroke: #304058; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8"/>
+     <g id="text_4">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #c1cede" x="538.8" y="309.197656" transform="rotate(-0 538.8 309.197656)">3000</text>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_9">
+      <path d="M 652.4 291.6
+L 652.4 90
+" clip-path="url(#p70c1968915)" style="fill: none; stroke: #304058; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10"/>
+     <g id="text_5">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #c1cede" x="652.4" y="309.197656" transform="rotate(-0 652.4 309.197656)">4000</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_11"/>
+     <g id="text_6">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #c1cede" x="188" y="114.039778" transform="rotate(-0 188 114.039778)">Initial v3</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_12"/>
+     <g id="text_7">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #c1cede" x="188" y="154.319108" transform="rotate(-0 188 154.319108)">V6</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_13"/>
+     <g id="text_8">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #c1cede" x="188" y="194.599219" transform="rotate(-0 188 194.599219)">Wiener + planner</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_14"/>
+     <g id="text_9">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #c1cede" x="188" y="234.878939" transform="rotate(-0 188 234.878939)">Stale-transmission veto</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_15"/>
+     <g id="text_10">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #c1cede" x="188" y="275.158659" transform="rotate(-0 188 275.158659)">Latest reported submission</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 198 99.163636
+L 681.064688 99.163636
+L 681.064688 121.317483
+L 198 121.317483
+z
+" clip-path="url(#p70c1968915)" style="fill: #6f8099"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 198 139.443357
+L 529.221248 139.443357
+L 529.221248 161.597203
+L 198 161.597203
+z
+" clip-path="url(#p70c1968915)" style="fill: #6f8099"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 198 179.723077
+L 423.544848 179.723077
+L 423.544848 201.876923
+L 198 201.876923
+z
+" clip-path="url(#p70c1968915)" style="fill: #5e9df5"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 198 220.002797
+L 374.73888 220.002797
+L 374.73888 242.156643
+L 198 242.156643
+z
+" clip-path="url(#p70c1968915)" style="fill: #5e9df5"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 198 260.282517
+L 364.814784 260.282517
+L 364.814784 282.436364
+L 198 282.436364
+z
+" clip-path="url(#p70c1968915)" style="fill: #44d6ae"/>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #ffffff" x="688.448688" y="113.357747" transform="rotate(-0 688.448688 113.357747)">4,252.33</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #ffffff" x="536.605248" y="153.637467" transform="rotate(-0 536.605248 153.637467)">2,915.68</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #ffffff" x="430.928848" y="193.917188" transform="rotate(-0 430.928848 193.917188)">1,985.43</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #ffffff" x="382.12288" y="234.196908" transform="rotate(-0 382.12288 234.196908)">1,555.80</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #ffffff" x="372.198784" y="274.476628" transform="rotate(-0 372.198784 274.476628)">1,468.44</text>
+   </g>
+  </g>
+  <g id="text_16">
+   <text style="font-weight: 700; font-size: 22px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #ffffff" x="39.6" y="32.4" transform="rotate(-0 39.6 32.4)">Rank 5 | 65.5% lower leaderboard cost</text>
+  </g>
+  <g id="text_17">
+   <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #c1cede" x="39.6" y="57.6" transform="rotate(-0 39.6 57.6)">Initial public score to latest team-reported leaderboard result</text>
+  </g>
+  <g id="text_18">
+   <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #c1cede" x="39.6" y="338.4" transform="rotate(-0 39.6 338.4)">Team-reported scores • Lower is better • Latest submission: 23 August 2026</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p70c1968915">
+   <rect x="198" y="90" width="562.32" height="201.6"/>
+  </clipPath>
+ </defs>
+</svg>

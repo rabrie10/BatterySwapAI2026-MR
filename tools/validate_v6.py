@@ -1,8 +1,8 @@
-"""Score the V6 pipeline end to end on the train scenarios.
+"""Score the current pipeline end to end on the train scenarios.
 
-The only number allowed to justify a submission is this one: the production
-planner, driven by predictions from a model that never saw the device's own
-building, scored by the official ``evaluate_plan``.
+Defaults match bsai.config. The historical filename is retained for existing
+scripts. Out-of-fold mode holds out each device's building; production mode is
+an in-fold integration diagnostic, not a generalization estimate.
 
 Anchors are printed on every run so a result is never read in isolation:
 
@@ -45,6 +45,7 @@ from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 from bsai.forecaster import HazardForecaster
 from bsai.simple_planner import PerBatteryPlanner, SimplePlannerConfig
 from bsai.validation import OofHazardModel
+from bsai import config as shipped
 
 ALL_DEFER_ANCHOR = 3324.7
 NAIVE_ORACLE_ANCHOR = 205.2
@@ -72,6 +73,8 @@ class FallbackCounter(logging.Handler):
 def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
     if args.production:
         model = joblib.load(args.model)
+        if args.volatility_scale is not None and hasattr(model, "volatility_scale"):
+            model.volatility_scale = args.volatility_scale
         return HazardForecaster(model, probability_scale=args.probability_scale)
     bundle = joblib.load(args.folds)
     if args.volatility_scale is not None:
@@ -88,20 +91,21 @@ def build_forecaster(args, building_of: dict[str, str]) -> HazardForecaster:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, default=Path("dataset/train"))
-    parser.add_argument("--model", type=Path, default=Path("models/v6_hazard.joblib"))
-    parser.add_argument("--folds", type=Path, default=Path("outputs/v6_folds.joblib"))
-    parser.add_argument("--report", type=Path, default=Path("outputs/v6_validation.json"))
+    parser.add_argument("--model", type=Path, default=shipped.MODEL_PATH)
+    parser.add_argument("--folds", type=Path, default=Path("outputs/v7_folds.joblib"))
+    parser.add_argument("--report", type=Path, default=Path("outputs/validation.json"))
     parser.add_argument("--limit", type=int, default=None)
-    parser.add_argument("--solver-seconds", type=float, default=1.0)
-    parser.add_argument("--local-search", type=int, default=80)
-    parser.add_argument("--uncertain-search", type=int, default=35)
+    parser.add_argument("--solver-seconds", type=float, default=shipped.SOLVER_SECONDS)
+    parser.add_argument("--local-search", type=int, default=shipped.LOCAL_SEARCH_EVALUATIONS)
+    parser.add_argument("--uncertain-search", type=int, default=shipped.UNCERTAIN_SEARCH_EVALUATIONS)
+    parser.add_argument("--robust-samples", type=int, default=shipped.ROBUST_EMERGENCY_SAMPLES)
     parser.add_argument(
         "--production",
         action="store_true",
         help="use the shipped model instead of out-of-fold; in-fold and optimistic",
     )
     parser.add_argument("--late-multiplier", type=float, default=1.0)
-    parser.add_argument("--candidate-margin", type=float, default=24.0)
+    parser.add_argument("--candidate-margin", type=float, default=shipped.CANDIDATE_MARGIN_HOURS)
     parser.add_argument("--emergency-rank-scale", type=float, default=1.0)
     parser.add_argument("--prune", type=int, default=0,
                         help="evaluations spent offering the weakest swaps for removal")
@@ -112,11 +116,11 @@ def main() -> None:
         help="how the local search spends its evaluation budget; see PlannerConfig",
     )
     parser.add_argument("--max-planned-rate", type=float, default=None)
-    parser.add_argument("--probability-scale", type=float, default=1.0)
+    parser.add_argument("--probability-scale", type=float, default=shipped.PROBABILITY_SCALE)
     parser.add_argument(
         "--volatility-scale",
         type=float,
-        default=None,
+        default=shipped.VOLATILITY_SCALE,
         help="override the Wiener volatility scale; the level must be calibrated "
         "on the scenario population, not the training cutoffs",
     )
@@ -159,6 +163,7 @@ def main() -> None:
                 late_risk_multiplier=args.late_multiplier,
                 local_search_evaluations=args.local_search,
                 uncertain_local_search_evaluations=args.uncertain_search,
+                robust_emergency_samples=args.robust_samples,
                 candidate_margin_hours=args.candidate_margin,
                 emergency_rank_scale=args.emergency_rank_scale,
                 move_order=args.move_order,
@@ -264,6 +269,8 @@ def main() -> None:
         json.dumps(
             {
                 "mode": "production-in-fold" if args.production else "out-of-fold",
+                "configuration": {key: str(value) if isinstance(value, Path) else value
+                                  for key, value in vars(args).items()},
                 "summary": summary,
                 "scenarios": rows,
                 "audit": audit,

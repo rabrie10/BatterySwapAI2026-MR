@@ -1,0 +1,39 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.portfolio.txt
+      - run: python -m pip install -r requirements.portfolio.txt
+      - name: Dataset-independent regression tests
+        run: >-
+          python -m unittest tests.test_task2 tests.test_runtime
+          tests.test_task1_forecast tests.test_candidates tests.test_blend
+          tests.test_configuration -v
+      - name: Run synthetic planning demo
+        run: python tools/demo.py
+      - name: Check documentation and result calculations
+        run: python tools/check_portfolio.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-planning-demo
+          path: outputs/demo/

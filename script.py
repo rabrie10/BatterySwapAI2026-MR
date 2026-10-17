@@ -25,6 +25,7 @@ from batteryswap_public.utils import make_submissions
 from batteryswap_solution.optimizer import OptimizationConfig
 from batteryswap_solution.planner import CompetitionPlanner, PlannerConfig
 from bsai.forecaster import HazardForecaster
+from bsai import config as shipped
 from bsai.runtime import (
     HARD_DEADLINE_SECONDS,
     SOFT_DEADLINE_SECONDS,
@@ -33,14 +34,14 @@ from bsai.runtime import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/v7_wiener.joblib")
+DEFAULT_MODEL_PATH = shipped.MODEL_PATH
 
 # Uniform multiplier on the Task 1 CDF. After the stale-transmission veto every
 # serviced margin band clears the ~15% break-even (worst 0.273) and service runs
 # at 13.62/scenario against 12.29 due, so the marginal swap is now worth making.
 # 1.5 was the best single-axis result in the 25-configuration production sweep
 # (-151.8, served 18.36, lowest capacity penalty of any configuration tested).
-PROBABILITY_SCALE = 1.5
+PROBABILITY_SCALE = shipped.PROBABILITY_SCALE
 
 
 def _float_env(name: str, default: float) -> float:
@@ -52,33 +53,18 @@ def _int_env(name: str, default: int) -> int:
 
 
 def load_forecaster() -> HazardForecaster | None:
-    """Load the shipped model, or None so the planner uses its own fallback.
-
-    ``models/v9_blend.joblib`` unpickles as ``bsai.blend.BlendedModel``, which
-    holds a ``bsai.wiener.WienerModel``, a scikit-learn head and a
-    ``bsai.calibrate.RemainingCalibration``. ``COPY bsai/ ./bsai`` covers all of
-    them -- see HANDOVER.md trap 9, where a missing module silently downgraded
-    the submission to the voltage-trend forecaster.
-    """
+    """Load the Wiener artifact, or log an error and use the voltage fallback."""
     path = Path(os.environ.get("BATTERYSWAP_MODEL_PATH", DEFAULT_MODEL_PATH))
     if not path.exists():
         LOGGER.error("Model artifact missing at %s; falling back to voltage trend", path)
         return None
     try:
         model = joblib.load(path)
-        # Pin the volatility scale rather than inheriting whatever the artifact
-        # happens to carry. train_wiener.py selects 1.4 and writes it onto the
-        # model it dumps, while the shipped artifact carries 1.0; 1.0 is the
-        # value that produced the shipped result, so state it here explicitly.
+        # Submission behavior is explicit even when loading a research artifact.
         if hasattr(model, "volatility_scale"):
-            model.volatility_scale = 1.0
-        # Set here rather than under tools/validate_v6.py so the scale is active
-        # on the submission path: --volatility-scale was silently a no-op in
-        # production mode once already, because validate_v6.build_forecaster
-        # applied it only in the out-of-fold branch. Not read from the
-        # environment, so it cannot depend on a variable being set at evaluation
-        # time. The veto is applied after scaling (bsai/forecaster.py:227), so
-        # vetoed batteries are not resurrected by it.
+            model.volatility_scale = shipped.VOLATILITY_SCALE
+        # Apply the probability scale on the submission path. The transmission
+        # veto is applied afterwards, so scaling cannot resurrect vetoed devices.
         return HazardForecaster(model, probability_scale=PROBABILITY_SCALE)
     except Exception:
         LOGGER.exception("Could not load %s; falling back to voltage trend", path)
@@ -93,8 +79,8 @@ def build_planner_config(solver_seconds: float, local: int, uncertain: int) -> P
         ),
         local_search_evaluations=local,
         uncertain_local_search_evaluations=uncertain,
-        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", 0),
-        candidate_margin_hours=_float_env("BATTERYSWAP_CANDIDATE_MARGIN", 12.0),
+        robust_emergency_samples=_int_env("BATTERYSWAP_ROBUST_SAMPLES", shipped.ROBUST_EMERGENCY_SAMPLES),
+        candidate_margin_hours=_float_env("BATTERYSWAP_CANDIDATE_MARGIN", shipped.CANDIDATE_MARGIN_HOURS),
         optimizer=OptimizationConfig(solver_seconds=solver_seconds),
     )
 
@@ -112,9 +98,9 @@ def load_competition_planner() -> Planner:
         return planner
 
     config = build_planner_config(
-        _float_env("BATTERYSWAP_SOLVER_SECONDS", 1.0),
-        _int_env("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", 240),
-        _int_env("BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS", 240),
+        _float_env("BATTERYSWAP_SOLVER_SECONDS", shipped.SOLVER_SECONDS),
+        _int_env("BATTERYSWAP_LOCAL_SEARCH_EVALUATIONS", shipped.LOCAL_SEARCH_EVALUATIONS),
+        _int_env("BATTERYSWAP_UNCERTAIN_LOCAL_SEARCH_EVALUATIONS", shipped.UNCERTAIN_SEARCH_EVALUATIONS),
     )
     inner = CompetitionPlanner(forecaster=load_forecaster(), config=config)
     fast = build_planner_config(0.25, 12, 6)

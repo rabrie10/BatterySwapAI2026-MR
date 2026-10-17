@@ -37,6 +37,7 @@ from bsai.hazard import build_training_frame
 from bsai.shape import ShapeCache
 from bsai.smoothing import SmoothingCache
 from bsai.wiener import FIT_HORIZONS, WienerModel, build_increment_targets
+from bsai.config import VOLATILITY_SCALE
 
 _EPOCH = pd.Timestamp("1970-01-01")
 DECISION_HORIZON = 42
@@ -74,7 +75,11 @@ def main() -> None:
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--max-iter", type=int, default=250)
     parser.add_argument("--no-shape", action="store_true", help="ablate the within-day features")
+    parser.add_argument("--volatility-scale", type=float, default=VOLATILITY_SCALE,
+                        help="saved artifact scale; default matches the submission")
     args = parser.parse_args()
+    if not np.isfinite(args.volatility_scale) or args.volatility_scale <= 0:
+        parser.error("--volatility-scale must be finite and positive")
 
     started = time.time()
     devices = load_devices(args.dataset / "devices.csv")
@@ -193,13 +198,13 @@ def main() -> None:
     print(json.dumps(metrics, indent=2), flush=True)
 
     for model in fold_models.values():
-        model.volatility_scale = best_scale
+        model.volatility_scale = args.volatility_scale
 
     print("fitting production model on all buildings...", flush=True)
     production = WienerModel.fit(
         design, drop, climatology, params={"max_iter": args.max_iter}
     )
-    production.volatility_scale = best_scale
+    production.volatility_scale = args.volatility_scale
     args.out.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(production, args.out)
     args.folds_out.parent.mkdir(parents=True, exist_ok=True)
@@ -214,7 +219,8 @@ def main() -> None:
                 "n_features": int(frame.features.shape[1]),
                 "stride_days": int(args.stride),
                 "fit_horizons": list(FIT_HORIZONS),
-                "volatility_scale": best_scale,
+                "volatility_scale": args.volatility_scale,
+                "calibration_selected_scale": best_scale,
                 "n_cutoffs": int(len(frame)),
                 "n_windows": int(design.shape[0]),
                 "metrics": metrics,
