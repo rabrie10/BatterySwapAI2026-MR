@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="330" viewBox="0 0 1120 330" role="img" aria-labelledby="title description">
+  <title id="title">BatterySwapAI system pipeline</title>
+  <desc id="description">Read the top row left to right, then the bottom row right to left. Hourly telemetry becomes features, failure forecasts, expected costs, schedules, routes, and validated work orders.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#536780"/>
+    </marker>
+  </defs>
+  <rect width="1120" height="330" rx="16" fill="#f3f6fb"/>
+  <g fill="none" stroke="#536780" stroke-width="2" marker-end="url(#arrow)">
+    <path d="M 260 91 H 301"/>
+    <path d="M 536 91 H 577"/>
+    <path d="M 812 91 H 853"/>
+    <path d="M 972 144 V 183"/>
+    <path d="M 860 239 H 819"/>
+    <path d="M 584 239 H 543"/>
+    <path d="M 308 239 H 267"/>
+  </g>
+  <g fill="#ffffff" stroke="#c5d2e4" stroke-width="1.5">
+    <rect x="32" y="38" width="228" height="106" rx="12"/>
+    <rect x="308" y="38" width="228" height="106" rx="12"/>
+    <rect x="584" y="38" width="228" height="106" rx="12"/>
+    <rect x="860" y="38" width="228" height="106" rx="12"/>
+    <rect x="860" y="186" width="228" height="106" rx="12"/>
+    <rect x="584" y="186" width="228" height="106" rx="12"/>
+    <rect x="308" y="186" width="228" height="106" rx="12"/>
+    <rect x="32" y="186" width="228" height="106" rx="12" fill="#e5f6f0" stroke="#65b7a0"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <g font-size="12" font-weight="700" fill="#007d68">
+      <text x="146" y="63">01 / TELEMETRY</text>
+      <text x="422" y="63">02 / FEATURES</text>
+      <text x="698" y="63">03 / MODEL</text>
+      <text x="974" y="63">04 / FORECAST</text>
+      <text x="974" y="211">05 / COSTS</text>
+      <text x="698" y="211">06 / SCHEDULING</text>
+      <text x="422" y="211">07 / ROUTING</text>
+      <text x="146" y="211">08 / WORK ORDERS</text>
+    </g>
+    <g font-size="17" fill="#17283f">
+      <text x="146" y="93">Hourly voltage</text>
+      <text x="146" y="117">and temperature</text>
+      <text x="422" y="93">Causal features and</text>
+      <text x="422" y="117">within-day response</text>
+      <text x="698" y="93">Wiener first-passage</text>
+      <text x="698" y="117">model</text>
+      <text x="974" y="93">Daily failure</text>
+      <text x="974" y="117">probabilities</text>
+      <text x="974" y="241">Expected service</text>
+      <text x="974" y="265">and deferral costs</text>
+      <text x="698" y="241">CP-SAT scheduling</text>
+      <text x="698" y="265">and local search</text>
+      <text x="422" y="241">Route optimization</text>
+      <text x="146" y="241">Evaluator-checked</text>
+      <text x="146" y="265">work orders</text>
+    </g>
+  </g>
+</svg>

@@ -30,16 +30,7 @@ A low-voltage reading alone does not tell a maintenance team which building to v
 
 This system turns hourly voltage and temperature histories into daily failure probabilities, then selects **which batteries to service, on which day, and in what visit order** over a 42-day planning horizon. It optimizes the evaluator's asymmetric costs: late replacement costs **20 times more per day** than early replacement.
 
-```mermaid
-flowchart LR
-    A[Hourly voltage + temperature] --> B[Causal features + within-day response]
-    B --> C[Wiener first-passage model]
-    C --> D[Daily failure probabilities]
-    D --> E[Expected service and deferral costs]
-    E --> F[CP-SAT scheduling + local search]
-    F --> G[Route optimization]
-    G --> H[Evaluator-checked work orders]
-```
+![System pipeline: hourly voltage and temperature, causal features, Wiener forecasting, daily failure probabilities, expected costs, scheduling, routing, and evaluator-checked work orders.](docs/assets/architecture.svg)
 
 ## What makes this project interesting
 
